@@ -302,9 +302,21 @@ To bulk-populate annotations from the engine parser, run `tools/seed_mc_override
 
 ## Related tools and credits
 
+### Tools used in the project
+
 - **[Colmines92's `FFDimensionsTool`](https://github.com/Colmines92)** — Windows GUI extractor for the Android `.obb`. Output of `FFDimensionsTool` in "proper" mode is the byte-for-byte reference target for `ffd.containers.obb`. The `proper_obb/` folder in the project tree was produced by this tool.
 - **APKTool** — used to decompile the Android `.apk` into smali for reverse engineering.
-- **Decompiled mobile sources** — the `Mobile/Decompiled_Java_Classes/` folder contains the decompiled feature-phone Java; references like `class_16.java::method_785` and `class_20.java::method_940` point into it.
+- **YYCHR** — a free tile/graphics editor (originally built for NES ROM hacking). YYCHR was the stepping stone used to manually figure out the mobile sprite layout before it could be parsed programmatically: drop in a raw `.dat` blob, scrub through bit-depths and tile widths, and the structure becomes visible by eye. PowerPanda's sprite research (see Source material below) was carried out by hand in YYCHR before being formalised into the parsers in `ffd/sprites/` and `ffd/images/ic.py`.
+
+### Source material
+
+- **Mobile `.sp` scratchpad extraction & Java research** — **GuyPerfect** was the first to successfully extract the original `.dat` files from the Mobile version's `.sp` scratchpads, cracking the DoCoMo FOMA container format that had previously kept those assets sealed. From there, GuyPerfect did the extensive research on the decompiled Java classes (`class_16.java::method_785`, `class_20.java::method_940`, etc., all in `Mobile/Decompiled_Java_Classes/`) that identified what each `.dat` actually contained — boot data sections, item/job/monster records, message tables, map chunks, the whole layout. Every mobile-side parser in this toolkit builds on that foundation.
+- **Mobile spritesheet structure & rendering** — **PowerPanda** did the original graphical research on how mobile spritesheets are laid out in `chpk.dat` / `cpk*.dat` / `mpk*.dat` and how the engine renders them. This was painstaking manual work done in **YYCHR** — scrubbing through bit-depths, tile sizes, and palette offsets in the raw `.dat` blobs by eye until the structure resolved. The sprite-container parser (`ffd/sprites/container.py`) and the `ic` image format decoder + renderer (`ffd/images/ic.py`) trace directly to that work.
+- Together, GuyPerfect's `.sp` extraction breakthrough plus the Java analysis, combined with PowerPanda's sprite-layout research, are what **made asset extraction from the Mobile version a reality**. Before this work, the mobile build was effectively a black box; afterwards, every `.dat` file inside it can be parsed, sliced, and rendered.
 - **`libjniproxy.so` decompilation** — the Android engine port. Most map / animation / event findings cite line numbers in `Decomp/Functions/libjniproxy_c.c`.
+
+### Acknowledgements
+
+Many thanks to the **Final Fantasy Legemensions team** — GuyPerfect and PowerPanda — and to the **KeitaiWorld community**, whose incredible help and accumulated knowledge of DoCoMo FOMA-era games made this toolkit possible. Without their groundwork there would be no parsers to write.
 
 The toolkit itself was developed by Jack (`sourmelee`) with Claude as a research collaborator. Engine references in docstrings cite the decompiled sources directly so future debuggers can chase any claim back to its primary source.
