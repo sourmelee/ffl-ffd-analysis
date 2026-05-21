@@ -1,0 +1,35 @@
+# --- Python bytecode & build artifacts ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# --- Virtual environments ---
+.venv/
+venv/
+env/
+ENV/
+
+# --- Editor / IDE ---
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# --- OS junk ---
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Project-specific ---
+# Historical snapshot of ffd_toolkit.py — superseded by git history
+ffd_toolkit_BACKUP.py
+
+# Local scratch / experiments (uncomment if you start using these)
+# scratch/
+# *.local.py
