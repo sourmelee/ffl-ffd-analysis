@@ -1,69 +1,99 @@
-"""Item parsers — mobile (BE section 4) and Android (LE section 5)."""
+"""Item parsers — mobile (BE section 4) and Android (LE section 5).
+
+Both platforms store items in the shared namedesc record layout: a u16
+count, then `name(pstr) + desc(pstr) + body[54]` per record (with 0xff
+sentinel for deleted slots).
+
+Layout match verified 2026-05-22: Potion (id 420) has byte-identical
+name + desc on both platforms, with 51 out of 54 body bytes identical
+(see ffd/comparison/registry.py::register_items for the field-level
+delta surfaced by ComparisonTab).
+
+History: the prior Mobile parser called ``boot_section_be(boot, 4)``,
+which the helper reads as a byte-offset — that's TOC entry 1 (magic),
+not §4 (items). It also assumed a 50-byte body; the real size is 54.
+Together this produced garbage starting at record 1. Fixed 2026-05-22.
+
+Mobile attribution: section identification builds on GuyPerfect's
+``class_20.java`` research; see ``project_collaborators.md`` /
+``ffd_boot_data_format.md`` in MEMORY for the credit graph.
+"""
 
 from __future__ import annotations
 
-from ..binary import be_u16, be_u32, read_pstr_sjis
-from ..boot.sections import boot_section_be, _parse_android_namedesc_section
+from ..boot.sections import _parse_namedesc_section
+
+
+_MOBILE_ITEMS_TOC_OFFSET  = 0x10
+_ANDROID_ITEMS_TOC_OFFSET = 0x14
+_ITEM_BODY_SIZE = 54
 
 
 def parse_items_mobile(boot: bytes):
-    """Parse mobile item records from section 4 (BE)."""
-    sec = boot_section_be(boot, 4)
-    if len(sec) < 2:
-        return []
-    n = be_u16(sec, 0)
-    pos = 2
-    out = []
-    safety = 0
-    while pos < len(sec) and safety < 4096:
-        safety += 1
-        try:
-            name, pos = read_pstr_sjis(sec, pos)
-            desc, pos = read_pstr_sjis(sec, pos)
-            if pos + 50 > len(sec):
-                break
-            item_type   = sec[pos]; pos += 1
-            equip_type  = sec[pos]; pos += 1
-            price       = be_u32(sec, pos); pos += 4
-            atk         = sec[pos]; pos += 1
-            df          = sec[pos]; pos += 1
-            mag         = sec[pos]; pos += 1
-            weight      = be_u16(sec, pos); pos += 2
-            flags       = be_u16(sec, pos); pos += 2
-            element     = sec[pos]; pos += 1
-            status      = sec[pos]; pos += 1
-            # 11 stat fields (rough mix); we skip heuristically using 19 bytes
-            pos += 19
-            hp_bonus    = sec[pos]; pos += 1
-            mp_bonus    = sec[pos]; pos += 1
-            speed       = sec[pos]; pos += 1
-            use_effect  = be_u16(sec, pos); pos += 2
-            battle_flg  = be_u16(sec, pos); pos += 2
-            pos += 8                                  # 4 pairs of equip fields
-            job_mask    = sec[pos]; pos += 1
-            ic_r = sec[pos]; pos += 1
-            ic_g = sec[pos]; pos += 1
-            ic_b = sec[pos]; pos += 1
-            sort_key = be_u16(sec, pos); pos += 2
-            out.append({
-                "id": len(out), "name": name, "desc": desc,
-                "item_type": item_type, "equip_type": equip_type,
-                "price": price, "attack": atk, "defense": df, "magic": mag,
-                "weight": weight, "flags": flags,
-                "element": element, "status": status,
-                "hp_bonus": hp_bonus, "mp_bonus": mp_bonus, "speed": speed,
-                "use_effect": use_effect, "battle_flags": battle_flg,
-                "job_mask": job_mask,
-                "icon_color": (ic_r, ic_g, ic_b),
-                "sort_key": sort_key,
-            })
-        except Exception:
-            break
-        if n > 0 and len(out) >= n:
-            break
-    return out
+    """Parse mobile item records from section 4 (BE TOC).
+
+    Returns a list of {id, name, desc, body: bytes} dicts, with None
+    in deleted-slot positions. Body bytes are not field-decoded here.
+    """
+    return _parse_namedesc_section(
+        boot, _MOBILE_ITEMS_TOC_OFFSET, _ITEM_BODY_SIZE, endian="be"
+    )
 
 
 def parse_items_android(boot: bytes):
-    """Items / equipment. body=54."""
-    return _parse_android_namedesc_section(boot, 0x14, 54)
+    """Parse Android item records from section 5 (LE TOC). Body=54 bytes."""
+    return _parse_namedesc_section(
+        boot, _ANDROID_ITEMS_TOC_OFFSET, _ITEM_BODY_SIZE, endian="le"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Body field decode (shared)
+# ---------------------------------------------------------------------------
+
+_ITEM_FIELDS = [
+    # (field_name, offset, size_bytes, kind)
+    ("item_type",     0,  1, "u8"),
+    ("equip_type",    1,  1, "u8"),
+    ("price",         2,  4, "u32"),
+    ("attack",        6,  1, "u8"),
+    ("defense",       7,  1, "u8"),
+    ("magic",         8,  1, "u8"),
+    ("weight",        9,  2, "u16"),
+    ("flags",        11,  2, "u16"),
+    ("element",      13,  1, "u8"),
+    ("status",       14,  1, "u8"),
+    ("hp_bonus",     34,  1, "u8"),
+    ("mp_bonus",     35,  1, "u8"),
+    ("speed",        36,  1, "u8"),
+    ("use_effect",   37,  2, "u16"),
+    ("battle_flags", 39,  2, "u16"),
+    ("job_mask",     49,  1, "u8"),
+    ("icon_r",       50,  1, "u8"),
+    ("icon_g",       51,  1, "u8"),
+    ("icon_b",       52,  1, "u8"),
+    ("sort_key_lo",  53,  1, "u8"),
+]
+
+
+def _read_int(body, off, size, endian):
+    raw = body[off:off + size]
+    if len(raw) < size:
+        return 0
+    return int.from_bytes(raw, "big" if endian == "be" else "little",
+                          signed=False)
+
+
+def decode_item_body(body, endian):
+    """Decode the 54-byte item body to a flat field dict.
+
+    `endian` controls how multi-byte fields are read ('be' for Mobile,
+    'le' for Android). u8 fields are platform-invariant.
+    """
+    out = {}
+    for name, off, size, kind in _ITEM_FIELDS:
+        if kind == "u8":
+            out[name] = body[off] if off < len(body) else 0
+        else:
+            out[name] = _read_int(body, off, size, endian)
+    return out

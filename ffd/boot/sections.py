@@ -7,6 +7,20 @@ we hit it.
 
 Mobile boot_data is big-endian; the Android port re-encoded it as
 little-endian. :func:`detect_boot_endian` picks the right reader.
+
+Most record sections (items, magic, jobs, etc.) share a common shape:
+
+    u16 count
+    record × count, where each record is either:
+        0xff sentinel byte (deleted slot)   OR
+        pascal_name + pascal_desc + body[body_size]
+
+This is shared between Mobile (BE count) and Android (BE count too --
+verified 2026-05-22 against Mobile section 4 boot_data which produces
+the same 640-record items table as Android section 5, with name/desc
+byte-for-byte identical). :func:`_parse_namedesc_section` decodes
+either side; :func:`_parse_android_namedesc_section` is kept as a
+back-compat wrapper for callers that hard-coded the Android LE path.
 """
 
 from __future__ import annotations
@@ -45,20 +59,20 @@ def detect_boot_endian(boot: bytes) -> str:
         return "le"
     if 0 < be0 <= n and (le0 == 0 or le0 > n):
         return "be"
-    # tie-break: if high bytes are zero, it's LE
     return "le" if boot[3] == 0 and boot[7] == 0 else "be"
 
 
-def parse_boot_toc(boot: bytes, endian: str | None = None):
-    """
-    Parse the section TOC of a boot_data.dat.
-    Returns (sections, endian) where sections is a list of (start, end) byte ranges.
+def parse_boot_toc(boot: bytes, endian=None):
+    """Parse the section TOC of a boot_data.dat.
+
+    Returns (sections, endian) where sections is a list of (start, end)
+    byte ranges.
     """
     if endian is None:
         endian = detect_boot_endian(boot)
     rd = le_u32 if endian == "le" else be_u32
     n = len(boot)
-    offs: list[int] = []
+    offs = []
     i = 0
     prev = -1
     while i + 4 <= n:
@@ -67,16 +81,13 @@ def parse_boot_toc(boot: bytes, endian: str | None = None):
             break
         offs.append(v)
         i += 4
-        if v == n:                       # file-size terminator
+        if v == n:
             break
         prev = v
     sections = [(offs[k], offs[k+1]) for k in range(len(offs) - 1)]
     return sections, endian
 
 
-# Android section labels (decoded 2026-05-13 by cross-referencing Mobile
-# class_20.java loaders + verifying byte patterns in proper_obb/boot_data.dat).
-# Section count and ordering DIFFERS from Mobile — these labels are Android-specific.
 ANDROID_BOOT_SECTION_LABELS = {
     0:  "(unused — overlaps TOC tail)",
     1:  "16 records, Shift-JIS pascal (elements / small enum table)",
@@ -96,7 +107,6 @@ ANDROID_BOOT_SECTION_LABELS = {
     15: "asset / scene name pascal-string manifest",
 }
 
-# Mobile labels — accessed by method_940(boot, i) in class_20.java
 MOBILE_BOOT_SECTION_LABELS = {
     0:  "method_951 — string-pair table (mob/spell names)",
     1:  "method_938 — class_6[] records",
@@ -122,7 +132,7 @@ MOBILE_BOOT_SECTION_LABELS = {
 }
 
 
-def boot_section_label(idx: int, endian: str) -> str:
+def boot_section_label(idx, endian):
     table = ANDROID_BOOT_SECTION_LABELS if endian == "le" else MOBILE_BOOT_SECTION_LABELS
     return table.get(idx, "(unknown)")
 
@@ -137,24 +147,44 @@ ANDROID_BOOT_LOADERS = {
     "jobs":     (0x18, 126, "Jobs (~33)"),
 }
 
+# Mobile equivalent — discovered 2026-05-22 by side-by-side comparison
+# with Android. Mobile boot_data has more sections (21 vs 16), so indices
+# differ, but per-record body sizes match.
+MOBILE_BOOT_LOADERS = {
+    "items": (0x10, 54, "Items (640)"),                # section 4 in mobile TOC
+}
 
-def _parse_android_namedesc_section(boot: bytes, toc_offset: int,
-                                    body_size: int):
+
+def _parse_namedesc_section(boot, toc_offset, body_size, endian):
+    """Shared namedesc decoder for both Mobile (BE) and Android (LE).
+
+    Section layout (verified 2026-05-22 against Mobile section 4 +
+    Android section 5 items, 640 records each, body=54, name/desc
+    byte-identical):
+
+        u16-BE count                  ; count is BE on both platforms
+        record × count:
+            0xff sentinel             ; deleted slot
+            OR
+            u8 name_len, name bytes (SJIS)
+            u8 desc_len, desc bytes (SJIS)
+            body[body_size]
+
+    `endian` selects the TOC pointer reader (the outer u32 pointers in
+    boot_data.dat flip endian between platforms). Returns a list of
+    dicts (or None for sentinel slots) with id, name, desc, body.
     """
-    Generic Android boot_data section parser for "pascal_name + pascal_desc +
-    body_size fixed bytes" records (the pattern used by all Load*Data calls).
+    if endian == "be":
+        rd = be_u32
+    elif endian == "le":
+        rd = le_u32
+    else:
+        raise ValueError("endian must be 'be' or 'le', got %r" % (endian,))
 
-    Returns a list of dicts (or None for 0xff-sentinel slots), one entry per
-    declared record. Each dict has:
-        name, desc (Shift-JIS decoded), body (bytes object).
-
-    `toc_offset` is the byte offset in boot_data where the section's start
-    pointer (LE u32) lives. e.g. items = 0x14, magic = 0x08, jobs = 0x18.
-    """
     if len(boot) < toc_offset + 8:
         return []
-    sec_start = le_u32(boot, toc_offset)
-    sec_end   = le_u32(boot, toc_offset + 4)
+    sec_start = rd(boot, toc_offset)
+    sec_end   = rd(boot, toc_offset + 4)
     if not (0 < sec_start < sec_end <= len(boot)):
         return []
     sec = boot[sec_start:sec_end]
@@ -195,5 +225,17 @@ def _parse_android_namedesc_section(boot: bytes, toc_offset: int,
             break
         body = bytes(sec[p:p+body_size])
         p += body_size
-        out.append({"name": name, "desc": desc, "body": body})
+        out.append({"id": i, "name": name, "desc": desc, "body": body})
     return out
+
+
+def _parse_android_namedesc_section(boot, toc_offset, body_size):
+    """Back-compat wrapper: Android-side namedesc decoder.
+
+    Older callers (magic, passive, command, jobs, monsters) pass just
+    `(toc_offset, body_size)` and expect the Android LE TOC pointer
+    convention. Forward to the unified decoder. Note: the return shape
+    now includes an `id` field that older callers didn't get -- this is
+    purely additive.
+    """
+    return _parse_namedesc_section(boot, toc_offset, body_size, endian="le")

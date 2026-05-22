@@ -1,18 +1,4 @@
-"""Top-level Tk application — notebook of all tabs + status bar + menu.
-
-Restored from the user's backup of the original ``ffd_toolkit.py`` (the
-working copy was truncated mid-``TAB_ORDER`` before this refactor). The
-class body matches the backup with two differences:
-
-* The duplicate ``_menu_load_archive`` / ``_menu_load_folder`` /
-  ``_menu_clear_all`` / ``_show_about`` definitions the backup had
-  accumulated from append-style edits are collapsed to a single canonical
-  copy each (the later, fuller versions win).
-* Tab construction now logs a loud ``[FFDApp] FAILED to build XxxTab``
-  banner and inserts a visible red placeholder tab when a class fails,
-  instead of silently producing a tiny error label. Easier to spot when
-  a viewer regresses.
-"""
+"""Top-level Tk application -- notebook of all tabs + status bar + menu."""
 
 from __future__ import annotations
 
@@ -22,7 +8,6 @@ import traceback
 from ..gui_stub import tk, ttk, filedialog, messagebox
 from ..data.ffdata import FFData
 
-# Import every tab class — order here is import order, not notebook order.
 from ..files_io.files_tab import FilesTab
 from ..files_io.extract_tab import ExtractTab
 from ..tilesets.tab import TilesetTab
@@ -39,6 +24,7 @@ from ..jobs.tab import JobTab
 from ..events.tab import EventScriptTab
 from ..animation.tab import AnimationTab
 from ..cross_ref.tab import CrossRefTab
+from ..comparison.tab import ComparisonTab
 from ..maps.annotation_tab import MapAnnotationTab
 
 
@@ -49,12 +35,12 @@ class FFDApp(tk.Tk):
         FilesTab, ExtractTab, MapTab, MapAnnotationTab, EventScriptTab,
         TextTab, CharacterTab, AnimationTab, TilesetTab, BackgroundTab,
         BattleEffectTab, MonsterTab, MusicTab, AbilityTab, ItemTab, JobTab,
-        CrossRefTab,
+        CrossRefTab, ComparisonTab,
     ]
 
     def __init__(self):
         super().__init__()
-        self.title("FFD/FFL Toolkit — Reverse-Engineering GUI")
+        self.title("FFD/FFL Toolkit -- Reverse-Engineering GUI")
         self.geometry("1280x820")
         self.minsize(900, 600)
         style = ttk.Style()
@@ -71,23 +57,22 @@ class FFDApp(tk.Tk):
         self._build_notebook()
         self._build_status()
 
-    # ---- menu --------------------------------------------------------------
     def _build_menu(self):
         bar = tk.Menu(self)
         m_file = tk.Menu(bar, tearoff=False)
-        m_file.add_command(label="Load .sp into slot…", command=self._menu_load_sp)
+        m_file.add_command(label="Load .sp into slot...", command=self._menu_load_sp)
         m_file.add_separator()
-        m_file.add_command(label="Load .obb…",  command=lambda: self._menu_load_archive("obb"))
-        m_file.add_command(label="Load .apk…",  command=lambda: self._menu_load_archive("apk"))
-        m_file.add_command(label="Load .jar…",  command=lambda: self._menu_load_archive("jar"))
-        m_file.add_command(label="Load .jam (manifest)…",
+        m_file.add_command(label="Load .obb...",  command=lambda: self._menu_load_archive("obb"))
+        m_file.add_command(label="Load .apk...",  command=lambda: self._menu_load_archive("apk"))
+        m_file.add_command(label="Load .jar...",  command=lambda: self._menu_load_archive("jar"))
+        m_file.add_command(label="Load .jam (manifest)...",
                            command=lambda: self._menu_load_archive("jam"))
         m_file.add_separator()
-        m_file.add_command(label="Load folder as Android assets (.obb-equivalent)…",
+        m_file.add_command(label="Load folder as Android assets (.obb-equivalent)...",
                            command=lambda: self._menu_load_folder("obb"))
-        m_file.add_command(label="Load folder as APK contents…",
+        m_file.add_command(label="Load folder as APK contents...",
                            command=lambda: self._menu_load_folder("apk"))
-        m_file.add_command(label="Load folder as JAR contents…",
+        m_file.add_command(label="Load folder as JAR contents...",
                            command=lambda: self._menu_load_folder("jar"))
         m_file.add_separator()
         m_file.add_command(label="Clear all", command=self._menu_clear_all)
@@ -99,7 +84,6 @@ class FFDApp(tk.Tk):
         bar.add_cascade(label="Help", menu=m_help)
         self.config(menu=bar)
 
-    # ---- notebook ----------------------------------------------------------
     def _build_notebook(self):
         nb = ttk.Notebook(self)
         nb.pack(fill="both", expand=True)
@@ -108,34 +92,27 @@ class FFDApp(tk.Tk):
             label = getattr(cls, "LABEL", cls.__name__)
             try:
                 frame = ttk.Frame(nb)
-                # MapAnnotationTab needs the full app instance (it reads
-                # self.data.mc_overrides and triggers refreshes across the
-                # notebook). All other tabs just need FFData.
                 tab = cls(frame, self) if cls is MapAnnotationTab else cls(frame, self.data)
                 tab.pack(fill="both", expand=True)
                 nb.add(frame, text=label)
                 self.tabs.append(tab)
             except Exception as exc:
-                # Loud per-tab failure: print a banner so you can see which
-                # tabs failed and why, and visibly mark the slot in the
-                # notebook (titled "! Label") with the exception text.
-                print(f"\n[FFDApp] FAILED to build {cls.__name__}: "
-                      f"{type(exc).__name__}: {exc}", file=sys.stderr)
+                print("\n[FFDApp] FAILED to build %s: %s: %s" % (
+                    cls.__name__, type(exc).__name__, exc), file=sys.stderr)
                 traceback.print_exc(file=sys.stderr)
                 try:
                     frame = ttk.Frame(nb)
                     ttk.Label(
                         frame,
-                        text=(f"{cls.__name__} failed to load.\n\n"
-                              f"{type(exc).__name__}: {exc}\n\n"
-                              "See the terminal for the full traceback."),
+                        text=("%s failed to load.\n\n%s: %s\n\n"
+                              "See the terminal for the full traceback." %
+                              (cls.__name__, type(exc).__name__, exc)),
                         foreground="#a00", justify="left", padding=12,
                     ).pack(anchor="nw")
-                    nb.add(frame, text=f"! {label}")
+                    nb.add(frame, text="! " + label)
                 except Exception:
                     pass
 
-    # ---- status bar --------------------------------------------------------
     def _build_status(self):
         bar = ttk.Frame(self, relief="sunken")
         bar.pack(fill="x", side="bottom")
@@ -148,14 +125,13 @@ class FFDApp(tk.Tk):
         archs = self.data.archives_loaded()
         parts = []
         if loaded:
-            parts.append(f"{len(loaded)} .sp slots")
+            parts.append("%d .sp slots" % len(loaded))
         else:
             parts.append("no .sp loaded")
         if archs:
             parts.append("archives: " + ", ".join(archs))
         self.status_var.set("  |  ".join(parts))
 
-    # ---- menu handlers -----------------------------------------------------
     def _menu_load_sp(self):
         path = filedialog.askopenfilename(
             title="Choose a .sp scratchpad",
@@ -167,8 +143,7 @@ class FFDApp(tk.Tk):
         except Exception as exc:
             messagebox.showerror("Load .sp failed", str(exc))
 
-    def _menu_load_archive(self, kind: str):
-        """Open an .obb/.apk/.jar/.jam archive via the File menu."""
+    def _menu_load_archive(self, kind):
         exts = {
             "obb": [("OBB", "*.obb")],
             "apk": [("APK", "*.apk")],
@@ -176,7 +151,7 @@ class FFDApp(tk.Tk):
             "jam": [("JAM manifest", "*.jam")],
         }
         path = filedialog.askopenfilename(
-            title=f"Choose a .{kind} file",
+            title="Choose a ." + kind + " file",
             filetypes=exts.get(kind, []) + [("All", "*.*")])
         if not path:
             return
@@ -184,12 +159,11 @@ class FFDApp(tk.Tk):
             self.data.set_archive(kind, path)
             self._on_data_change()
         except Exception as exc:
-            messagebox.showerror(f"Load .{kind} failed", str(exc))
+            messagebox.showerror("Load ." + kind + " failed", str(exc))
 
-    def _menu_load_folder(self, kind: str):
-        """Load a directory tree as the equivalent of an OBB/APK/JAR archive."""
+    def _menu_load_folder(self, kind):
         path = filedialog.askdirectory(
-            title=f"Choose a folder to treat as .{kind} contents")
+            title="Choose a folder to treat as ." + kind + " contents")
         if not path:
             return
         try:
@@ -199,7 +173,6 @@ class FFDApp(tk.Tk):
             messagebox.showerror("Load folder failed", str(exc))
 
     def _menu_clear_all(self):
-        """Reset every loaded archive / slot in FFData and refresh the tabs."""
         try:
             for kind in ("obb", "apk", "jar", "sp"):
                 try:
@@ -220,7 +193,7 @@ class FFDApp(tk.Tk):
     def _show_about(self):
         messagebox.showinfo(
             "About",
-            "Final Fantasy Dimensions / Legends — reverse-engineering toolkit.\n"
+            "Final Fantasy Dimensions / Legends -- reverse-engineering toolkit.\n"
             "Pure Python 3.7+; requires Pillow.\n\n"
             "Use the Files tab (or this File menu) to load .sp scratchpads "
             "and an .obb / .apk / .jar / .jam archive, then explore via the "
