@@ -30,6 +30,10 @@ desktop.ini
 # Historical snapshot of ffd_toolkit.py — superseded by git history
 ffd_toolkit_BACKUP.py
 
+# Per-user toolkit state: last-opened project + recent project list.
+# Written by ffd.project.serialize; not meant to be shared.
+.ffd_toolkit_config.json
+
 # Local scratch / experiments (uncomment if you start using these)
 # scratch/
 # *.local.py
