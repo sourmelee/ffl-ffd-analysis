@@ -67,10 +67,14 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+from .. import __version__ as _TOOLKIT_VERSION
 from ..constants import SP_SLOTS
 
 
 PROJECT_FORMAT = "ffdproj"
+# Wire-format version of the .ffdproj file itself. Bump only on
+# breaking schema changes; `toolkit_version` (below) tracks the
+# release that wrote the file and is informational only.
 PROJECT_VERSION = 1
 PROJECT_EXT = ".ffdproj"
 CONFIG_FILENAME = ".ffd_toolkit_config.json"
@@ -261,6 +265,11 @@ def save_project(data, project_path, *, bundle: bool = False) -> Path:
     manifest = {
         "format": PROJECT_FORMAT,
         "version": PROJECT_VERSION,
+        # toolkit_version is informational — it lets us read a project
+        # file later and know exactly which toolkit release wrote it,
+        # which is invaluable for bug reports and for planning future
+        # schema migrations. The loader does NOT gate on this field.
+        "toolkit_version": _TOOLKIT_VERSION,
         "saved_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "bundle": bool(bundle),
         "sp_slots": sp_entries,

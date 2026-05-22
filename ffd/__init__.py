@@ -20,7 +20,14 @@ systems without Tk installed.
 
 from __future__ import annotations
 
-# Constants and binary helpers are foundational — re-exported so older
+# Canonical toolkit version. Bump on each release per semver:
+# - MAJOR: breaking changes to parsers / .ffdproj format / public API
+# - MINOR: backward-compatible new features (new tab, new parser, new menu)
+# - PATCH: bug fixes only
+# Keep CHANGELOG.md in sync.
+__version__ = "0.1.0"
+
+# Constants and binary helpers are foundational - re-exported so older
 # parser-only callers can keep doing ``from ffd_toolkit import be_u32``.
 from .binary import (
     be_u8, be_s8, be_u16, be_u32, le_u16, le_u32,
@@ -33,6 +40,7 @@ from .constants import (
 from .gui_stub import HAS_GUI, HAS_TK, HAS_IMAGETK
 
 __all__ = [
+    "__version__",
     # binary
     "be_u8", "be_s8", "be_u16", "be_u32", "le_u16", "le_u32",
     "read_pstr_sjis", "safe_decode_ascii",

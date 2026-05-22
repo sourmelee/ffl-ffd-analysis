@@ -6,6 +6,7 @@ import sys
 import traceback
 from pathlib import Path
 
+from .. import __version__
 from ..gui_stub import tk, ttk, filedialog, messagebox
 from ..data.ffdata import FFData
 from ..project import (
@@ -51,7 +52,7 @@ class FFDApp(tk.Tk):
 
     def __init__(self):
         super().__init__()
-        self.title("FFD/FFL Toolkit -- Reverse-Engineering GUI")
+        self.title(f"FFD/FFL Toolkit v{__version__} -- Reverse-Engineering GUI")
         self.geometry("1280x820")
         self.minsize(900, 600)
         style = ttk.Style()
@@ -425,6 +426,7 @@ class FFDApp(tk.Tk):
     def _show_about(self):
         messagebox.showinfo(
             "About",
+            f"FFD/FFL Toolkit v{__version__}\n"
             "Final Fantasy Dimensions / Legends -- reverse-engineering toolkit.\n"
             "Pure Python 3.7+; requires Pillow.\n\n"
             "Use the Files tab (or this File menu) to load .sp scratchpads "

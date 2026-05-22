@@ -27,6 +27,8 @@ import sys
 # Public-API re-exports (verbatim from the legacy module's namespace).
 # ---------------------------------------------------------------------------
 
+from ffd import __version__
+
 from ffd.constants import (
     SP_BASE, DIR_POS, SP_SLOTS, KNOWN_DAT_FILES,
     CPK_NAMES, MPK_NAMES, CHARA_TABLE, ELEMENTS, STATUSES,
@@ -126,6 +128,11 @@ from ffd.comparison import (
 def main():
     """Entry point: dispatch to --compare CLI if requested, else launch GUI."""
     argv = sys.argv[1:]
+    # Allow `python ffd_toolkit.py --version` to print and exit, the same
+    # way most CLIs handle it.
+    if "--version" in argv or "-V" in argv:
+        print(f"FFD/FFL Toolkit v{__version__}")
+        sys.exit(0)
     cli_flags = {"--compare", "--list-kinds", "--sp", "--obb", "--apk",
                  "--raw", "--show-identical", "--link-id"}
     if any(a in cli_flags or a.startswith("--compare=") for a in argv):
@@ -136,6 +143,9 @@ def main():
               "cannot start. Parser modules in `ffd.*` still import fine for "
               "headless analysis.", file=sys.stderr)
         sys.exit(1)
+    # Startup banner — handy in bug reports so users can read off the
+    # version they were running.
+    print(f"FFD/FFL Toolkit v{__version__} -- starting GUI...")
     FFDApp().mainloop()
 
 

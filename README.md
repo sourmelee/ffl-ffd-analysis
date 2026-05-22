@@ -1,5 +1,7 @@
 # FFL / FFD Toolkit
 
+[![version](https://img.shields.io/badge/version-0.1.0-blue.svg)](CHANGELOG.md)
+
 Reverse-engineering toolkit for **Final Fantasy Legends** (DoCoMo FOMA feature-phone, 2010 — Japan-only mobile release) and its 2013 Android remaster **Final Fantasy Dimensions**. The two builds share roughly 80% of their asset format DNA — the Android port re-encoded the mobile data files almost field-for-field, mostly flipping big-endian to little-endian and stuffing the obfuscated payloads inside an XOR-wrapped OBB. This codebase parses both.
 
 The toolkit is a single Tk GUI plus a parser library, structured so that every viewer tab uses the same parsers a headless script would. Run the GUI, click around, and inspect map chunks, sprite atlases, event scripts, tile palettes, monster stats, etc. — or import `ffd.*` from your own scripts to do batch analysis without launching Tk.
