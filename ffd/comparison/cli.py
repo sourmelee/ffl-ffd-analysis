@@ -85,10 +85,17 @@ def _slot_label_for(folder_name):
 def _load_sp_into(ffdata, path):
     label = None
     p_for_label = Path(path)
-    hinted = _slot_label_for(p_for_label.stem if not p_for_label.is_dir()
-                             else p_for_label.name)
+    raw_name = p_for_label.stem if not p_for_label.is_dir() else p_for_label.name
+    hinted = _slot_label_for(raw_name)
     if hinted and ffdata.sp_slots.get(hinted) is None:
         label = hinted
+    elif raw_name and raw_name not in ffdata.sp_slots:
+        # Folder/file name doesn't map to a canonical SP_SLOTS label
+        # (e.g. ChapterOnline, ChapterGladiatorHall). Use the raw name as
+        # the slot label rather than mis-mapping to the first free
+        # canonical slot. sp_slots is just an OrderedDict; extra keys
+        # are tolerated by find_in_sp_any_chapter and friends.
+        label = raw_name
     if label is None:
         for cand in SP_SLOTS:
             if ffdata.sp_slots.get(cand) is None:

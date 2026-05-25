@@ -178,6 +178,7 @@ class MonsterTab(TabBase):
             n_failed = 0
             seen_keys = set()  # avoid showing identical sprite from many slots
 
+            n_gif_added = 0
             for slot, blob in ene_sources:
                 try:
                     entries = list(parse_sprite_container(blob))
@@ -209,6 +210,38 @@ class MonsterTab(TabBase):
                     label = f"[{slot}]\n{name}\n  entry {e} v{var}"
                     self._items[key] = (img, stats, name)
                     self.thumbs.add(key, img, label)
+
+                # Chapter1 / ChapterOnline (and possibly others) store
+                # enemy sprites as hidden GIF89a payloads inside the
+                # ene.dat entries rather than as ic-format tiles. When
+                # parse_sprite_container yields nothing for a slot,
+                # fall through to extract_hidden_gifs so those chapters'
+                # monsters surface here too. Discovered 2026-05-22:
+                # Chapter1 and ChapterOnline both have 0 ic entries and
+                # 52 hidden GIFs each.
+                if not entries:
+                    try:
+                        from io import BytesIO
+                        for (e, hdr_size, gif_bytes) in extract_hidden_gifs(blob):
+                            try:
+                                img = Image.open(BytesIO(gif_bytes)).convert("RGBA")
+                            except Exception:
+                                n_failed += 1
+                                continue
+                            dedup_key = ("gif", e, img.width, img.height)
+                            if dedup_key in seen_keys:
+                                continue
+                            seen_keys.add(dedup_key)
+                            key = f"{slot}_enegif_{e}"
+                            stats = sprite_to_enemies.get(e, [None])[0]
+                            name = stats["name"] if stats else f"sprite #{e}"
+                            label = f"[{slot}]\n{name}\n  entry {e} (gif)"
+                            self._items[key] = (img, stats, name)
+                            self.thumbs.add(key, img, label)
+                            n_gif_added += 1
+                    except Exception as exc:
+                        self.warn.configure(
+                            text=f"extract_hidden_gifs failed on {slot}: {exc}")
 
             # Status line
             n_added = len(self._items)

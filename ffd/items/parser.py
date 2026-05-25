@@ -76,24 +76,29 @@ _ITEM_FIELDS = [
 ]
 
 
-def _read_int(body, off, size, endian):
+def _read_int(body, off, size):
     raw = body[off:off + size]
     if len(raw) < size:
         return 0
-    return int.from_bytes(raw, "big" if endian == "be" else "little",
-                          signed=False)
+    return int.from_bytes(raw, "big", signed=False)
 
 
-def decode_item_body(body, endian):
+def decode_item_body(body, endian=None):
     """Decode the 54-byte item body to a flat field dict.
 
-    `endian` controls how multi-byte fields are read ('be' for Mobile,
-    'le' for Android). u8 fields are platform-invariant.
+    The `endian` kwarg is retained for back-compat with callers that pass
+    'be' or 'le', but is IGNORED -- multi-byte fields inside the item
+    body are big-endian on both platforms. (Verified 2026-05-22 by
+    checking item bodies across all 640 records: 325/640 have
+    byte-identical body[2..5] (the price field) across Mobile and
+    Android, which is only consistent with BE-on-both. The earlier
+    "endian-flipped" interpretation was wrong; the ComparisonTab now
+    correctly shows real layout drift instead of phantom endian noise.)
     """
     out = {}
     for name, off, size, kind in _ITEM_FIELDS:
         if kind == "u8":
             out[name] = body[off] if off < len(body) else 0
         else:
-            out[name] = _read_int(body, off, size, endian)
+            out[name] = _read_int(body, off, size)
     return out

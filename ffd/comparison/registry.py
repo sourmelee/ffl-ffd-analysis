@@ -9,11 +9,12 @@ Each AssetKind plugs in:
     decode(record, side)                  -> normalised dict to diff
     render(m_rec, a_rec)                  -> optional (Pillow_img, Pillow_img)
 
-When `list_sources_*` is non-None, the GUI shows a per-side source
-combobox; the selected `source_key` is forwarded to the loader. Items
-have a single implicit source (whichever boot_data is currently
-loaded), so they leave it None. Characters have one chara_set.dat per
-chapter on the Mobile side, so they enumerate every loaded SP slot.
+`source_key` lets the GUI/CLI pick a non-default source (e.g. per-chapter
+chara_set.dat on Mobile). The selected source is forwarded to the loader.
+
+Multi-language names (English / French / etc.) are pulled from Android
+`system_message.msd` via ffd.text.system_message.SystemMessageLookup and
+spliced into the decoded dicts as `en_name`, `en_desc`, etc.
 """
 
 from __future__ import annotations
@@ -27,12 +28,16 @@ from ..items.parser import (
 from ..characters.parser import (
     parse_chara_set_mobile, parse_chara_set_android,
 )
+from ..monsters.parser import (
+    parse_monsters_mobile, parse_monsters_android, decode_monster_body,
+)
 from ..constants import CHARA_TABLE
+from ..text.system_message import SystemMessageLookup
 from .diff import diff_dicts, diff_bytes
 
 
 # ---------------------------------------------------------------------------
-# AssetKind dataclass
+# AssetKind dataclass + dispatch helper
 # ---------------------------------------------------------------------------
 
 LoaderFn      = Callable[..., List[Any]]
@@ -56,8 +61,6 @@ class AssetKind:
 
 
 def _call_loader(loader, ffdata, source_key):
-    """Loaders can be written with or without the `source_key` kwarg
-    (back-compat with the stub loaders). Try with kwarg first."""
     if loader is None:
         return []
     try:
@@ -67,7 +70,54 @@ def _call_loader(loader, ffdata, source_key):
 
 
 # ---------------------------------------------------------------------------
-# Item -- the seed asset (single implicit source per side).
+# Multi-language name lookup cache (per FFData identity)
+# ---------------------------------------------------------------------------
+#
+# Parsing system_message.msd is non-trivial (~750KB of UTF-8) so cache
+# the SystemMessageLookup against the underlying bytes object. The cache
+# entry invalidates when FFData reloads its OBB (different bytes -> new
+# key in the WeakValueDictionary).
+import weakref
+_sm_cache: "weakref.WeakKeyDictionary" = weakref.WeakKeyDictionary()
+
+
+def _system_message(ffdata) -> SystemMessageLookup:
+    if ffdata is None:
+        return SystemMessageLookup(b"")
+    try:
+        cached = _sm_cache.get(ffdata)
+    except TypeError:
+        cached = None
+    if cached is not None:
+        return cached
+    sm = SystemMessageLookup.from_ffdata(ffdata)
+    try:
+        _sm_cache[ffdata] = sm
+    except TypeError:
+        pass
+    return sm
+
+
+def _splice_names(out: dict, ffdata, asset_type: str, record_id: int,
+                  langs=("en", "fr"), include_desc=True) -> None:
+    """Add `en_name`, `en_desc`, `fr_name`, etc. into `out` if available."""
+    if ffdata is None or record_id is None:
+        return
+    sm = _system_message(ffdata)
+    if not sm.has(asset_type):
+        return
+    for lang in langs:
+        nm = sm.name(asset_type, record_id, lang)
+        if nm:
+            out[lang + "_name"] = nm
+        if include_desc:
+            ds = sm.desc(asset_type, record_id, lang)
+            if ds:
+                out[lang + "_desc"] = ds
+
+
+# ---------------------------------------------------------------------------
+# Item
 # ---------------------------------------------------------------------------
 
 def _items_label(rec):
@@ -76,52 +126,52 @@ def _items_label(rec):
     return "%s -- %s" % (rec.get("id", "?"), rec.get("name", "?"))
 
 
-def _items_decode(rec, side):
+def _items_decode(rec, side, ffdata=None):
     if rec is None:
         return {}
     out = {"id": rec.get("id"), "name": rec.get("name"),
            "desc": rec.get("desc"), "body": rec.get("body", b"")}
     body = rec.get("body", b"")
     if body:
-        out.update(decode_item_body(body,
-                                    "be" if side == "mobile" else "le"))
+        out.update(decode_item_body(body))
+    _splice_names(out, ffdata, "Item", rec.get("id"))
     return out
+
+
+def _items_load_mobile(ffdata, source_key=None):
+    bd = ffdata.boot_data_mobile() if ffdata else None
+    return parse_items_mobile(bd) if bd else []
+
+
+def _items_load_android(ffdata, source_key=None):
+    bd = ffdata.boot_data_android() if ffdata else None
+    return parse_items_android(bd) if bd else []
 
 
 _ITEMS = AssetKind(
     name="Item",
-    load_mobile=lambda ffdata, source_key=None: parse_items_mobile(
-        ffdata.boot_data_mobile()),
-    load_android=lambda ffdata, source_key=None: parse_items_android(
-        ffdata.boot_data_android()),
+    load_mobile=_items_load_mobile,
+    load_android=_items_load_android,
     record_label=_items_label,
     decode=_items_decode,
     notes=(
-        "640 records each. name/desc encoded as Shift-JIS pascal on both "
-        "platforms (NOT UTF-8 on Android -- only .msd messages are UTF-8). "
-        "Body=54 bytes; legacy per-field offsets are a best guess that the "
-        "diff is here to invalidate."
+        "640 records each. Body=54, BE on BOTH platforms (multi-byte fields "
+        "inside the record body don't endian-flip -- only the outer TOC "
+        "pointer does). body[45..46] differ on 100% of items (per-record "
+        "watermark/sort-key the remaster systematically renumbered). "
+        "EN/FR names spliced from system_message.msd sec 7."
     ),
 )
 
 
 # ---------------------------------------------------------------------------
-# Character -- per-chapter source on Mobile (chara_set.dat ships in every
-# .sp scratchpad and varies by chapter; Android has one canonical copy in
-# the OBB). Equipment IDs are resolved to item names via parse_items_*.
+# Character
 # ---------------------------------------------------------------------------
 
-# Build a single id -> romaji map up front. Some CHARA_TABLE entries have
-# trailing fields we don't need here; we only want id + romaji name.
 _ID_TO_ROMAJI = {row[0]: row[2] for row in CHARA_TABLE}
 
 
-def _romaji_for(rec_id):
-    return _ID_TO_ROMAJI.get(rec_id, "")
-
-
 def _resolve_equipment(equipment, items):
-    """Replace each numeric equip id with its item name (if known)."""
     out = []
     for eid in equipment:
         if eid == 0 or items is None:
@@ -135,21 +185,14 @@ def _resolve_equipment(equipment, items):
 
 
 def _list_sources_chara_mobile(ffdata):
-    """Every loaded SP slot that contains chara_set.dat."""
-    if ffdata is None:
-        return []
-    out = []
-    for slot, blob in ffdata.find_in_sp_any_chapter("chara_set.dat"):
-        out.append((slot, slot))
-    return out
+    if ffdata is None: return []
+    return [(slot, slot) for slot, _ in ffdata.find_in_sp_any_chapter("chara_set.dat")]
 
 
 def _list_sources_chara_android(ffdata):
-    if ffdata is None or not ffdata.obb_files:
-        return []
+    if ffdata is None or not ffdata.obb_files: return []
     if "chara_set.dat" in ffdata.obb_files:
         return [("obb", "Android OBB")]
-    # Some apks ship chara_set.dat directly; surface that too.
     if ffdata.apk_files:
         for k in ffdata.apk_files:
             if k.endswith("chara_set.dat"):
@@ -158,38 +201,29 @@ def _list_sources_chara_android(ffdata):
 
 
 def _load_chara_mobile(ffdata, source_key=None):
-    if ffdata is None:
-        return []
+    if ffdata is None: return []
     chosen = None
     for slot, blob in ffdata.find_in_sp_any_chapter("chara_set.dat"):
         if source_key is None or slot == source_key:
             chosen = (slot, blob)
-            if source_key is not None:
-                break
-    if chosen is None:
-        return []
+            if source_key is not None: break
+    if chosen is None: return []
     _, blob = chosen
     chars = parse_chara_set_mobile(blob)
-    # Resolve equipment names against any loaded mobile boot_data. If no
-    # boot_data is loaded the equipment field stays as raw ids -- still
-    # useful, just less readable.
     items = None
     try:
         bd = ffdata.boot_data_mobile()
-        if bd is not None:
-            items = parse_items_mobile(bd)
+        if bd is not None: items = parse_items_mobile(bd)
     except Exception:
         items = None
     for c in chars:
         if c is not None:
-            c["equipment_resolved"] = _resolve_equipment(c.get("equipment", []),
-                                                        items)
+            c["equipment_resolved"] = _resolve_equipment(c.get("equipment", []), items)
     return chars
 
 
 def _load_chara_android(ffdata, source_key=None):
-    if ffdata is None:
-        return []
+    if ffdata is None: return []
     blob = None
     if source_key in (None, "obb") and ffdata.obb_files:
         blob = ffdata.obb_files.get("chara_set.dat")
@@ -197,40 +231,29 @@ def _load_chara_android(ffdata, source_key=None):
         for k, v in ffdata.apk_files.items():
             if k.endswith("chara_set.dat"):
                 blob = v; break
-    if blob is None:
-        return []
+    if blob is None: return []
     chars = parse_chara_set_android(blob)
     items = None
     try:
         bd = ffdata.boot_data_android()
-        if bd is not None:
-            items = parse_items_android(bd)
+        if bd is not None: items = parse_items_android(bd)
     except Exception:
         items = None
     for c in chars:
         if c is not None:
-            c["equipment_resolved"] = _resolve_equipment(c.get("equipment", []),
-                                                        items)
+            c["equipment_resolved"] = _resolve_equipment(c.get("equipment", []), items)
     return chars
 
 
 def _character_label(rec):
-    if rec is None:
-        return "(deleted)"
-    romaji = _romaji_for(rec.get("id"))
+    if rec is None: return "(deleted)"
+    romaji = _ID_TO_ROMAJI.get(rec.get("id"), "")
     suffix = "  (%s)" % romaji if romaji else ""
     return "%2d -- %s%s" % (rec.get("id", -1), rec.get("name", "?"), suffix)
 
 
-def _character_decode(rec, side):
-    """Flatten the character record for diffing.
-
-    Equipment is shown as a compact "id:name" list so the diff highlights
-    rename-style changes (same id, different item name across builds)
-    distinctly from id changes.
-    """
-    if rec is None:
-        return {}
+def _character_decode(rec, side, ffdata=None):
+    if rec is None: return {}
     eq = rec.get("equipment_resolved") or [
         {"id": e, "name": "?"} for e in rec.get("equipment", [])
     ]
@@ -239,7 +262,7 @@ def _character_decode(rec, side):
     out = {
         "id":         rec.get("id"),
         "name":       rec.get("name"),
-        "romaji":     _romaji_for(rec.get("id")),
+        "romaji":     _ID_TO_ROMAJI.get(rec.get("id"), ""),
         "chpk_entry": rec.get("f186"),
         "palette":    rec.get("f190"),
         "f173":       rec.get("f173"),
@@ -251,6 +274,7 @@ def _character_decode(rec, side):
         "f191":       rec.get("f191"),
         "equipment":  eq_str,
     }
+    _splice_names(out, ffdata, "Character", rec.get("id"), include_desc=False)
     return out
 
 
@@ -263,16 +287,93 @@ _CHARACTER = AssetKind(
     record_label=_character_label,
     decode=_character_decode,
     notes=(
-        "chara_set.dat. Mobile = 12-byte BE header per chapter (record set "
-        "varies by chapter, .sp-local); Android = 16-byte LE header in OBB. "
-        "Records section is BE on both. Equipment ids resolved to item "
-        "names via parse_items_*."
+        "chara_set.dat. Mobile = 12-byte BE header per chapter, .sp-local; "
+        "Android = 16-byte LE header in OBB. Records section is BE on both. "
+        "Equipment ids resolved to item names. EN/FR names from "
+        "system_message.msd sec 5."
     ),
 )
 
 
 # ---------------------------------------------------------------------------
-# Stubs for the remaining types -- filled in by future sessions.
+# Monster
+# ---------------------------------------------------------------------------
+
+def _list_sources_monster_mobile(ffdata):
+    """Each Mobile .sp ships its own boot_data with chapter-scoped §8."""
+    if ffdata is None: return []
+    out = []
+    for slot, files in ffdata.sp_slots.items():
+        if files and "boot_data.dat" in files:
+            out.append((slot, slot))
+    return out
+
+
+def _list_sources_monster_android(ffdata):
+    if ffdata is None: return []
+    if ffdata.boot_data_android() is not None:
+        return [("obb", "Android OBB")]
+    return []
+
+
+def _load_monsters_mobile(ffdata, source_key=None):
+    if ffdata is None: return []
+    blob = None
+    if source_key is not None:
+        files = ffdata.sp_slots.get(source_key)
+        if files and "boot_data.dat" in files:
+            blob = files["boot_data.dat"]
+    if blob is None:
+        # Default: use any slot with boot_data.dat
+        for slot, files in ffdata.sp_slots.items():
+            if files and "boot_data.dat" in files:
+                blob = files["boot_data.dat"]; break
+    if blob is None: return []
+    return parse_monsters_mobile(blob)
+
+
+def _load_monsters_android(ffdata, source_key=None):
+    if ffdata is None: return []
+    bd = ffdata.boot_data_android()
+    return parse_monsters_android(bd) if bd else []
+
+
+def _monster_label(rec):
+    if rec is None: return "(deleted)"
+    return "%3d -- %s" % (rec.get("id", -1), rec.get("name", "?"))
+
+
+def _monster_decode(rec, side, ffdata=None):
+    if rec is None: return {}
+    out = {"id": rec.get("id"), "name": rec.get("name"),
+           "body": rec.get("body", b"")}
+    body = rec.get("body", b"")
+    if body:
+        out.update(decode_monster_body(body))
+    _splice_names(out, ffdata, "Monster", rec.get("id"), include_desc=False)
+    return out
+
+
+_MONSTER = AssetKind(
+    name="Monster",
+    load_mobile=_load_monsters_mobile,
+    load_android=_load_monsters_android,
+    list_sources_mobile=_list_sources_monster_mobile,
+    list_sources_android=_list_sources_monster_android,
+    record_label=_monster_label,
+    decode=_monster_decode,
+    notes=(
+        "boot_data section 8 (Mobile, BE TOC) / section 9 (Android, LE TOC). "
+        "Body=64, BE on BOTH platforms (no endian flip inside record body). "
+        "No desc field (unlike Item/Magic/Job). Mobile .sp ships chapter-"
+        "scoped tables; pick per-chapter via source picker. EN/FR names "
+        "from system_message.msd sec 13."
+    ),
+)
+
+
+# ---------------------------------------------------------------------------
+# Stubs
 # ---------------------------------------------------------------------------
 
 def _todo_loader(name):
@@ -284,9 +385,6 @@ def _todo_loader(name):
 
 
 _STUB_KINDS = [
-    AssetKind(name="Monster",   load_mobile=_todo_loader("Monster"),
-              load_android=_todo_loader("Monster"),
-              notes="Mobile section 12 BE / Android section 9 LE, body=64, no desc."),
     AssetKind(name="Job",       load_mobile=_todo_loader("Job"),
               load_android=_todo_loader("Job"),
               notes="Mobile section 20 BE / Android section 6 LE, body=126."),
@@ -308,7 +406,7 @@ _STUB_KINDS = [
 ]
 
 
-ASSET_KINDS = {k.name: k for k in ([_ITEMS, _CHARACTER] + _STUB_KINDS)}
+ASSET_KINDS = {k.name: k for k in ([_ITEMS, _CHARACTER, _MONSTER] + _STUB_KINDS)}
 
 
 def list_asset_kinds():
@@ -319,15 +417,19 @@ def list_asset_kinds():
 # compare_records
 # ---------------------------------------------------------------------------
 
+def _safe_decode(decode_fn, rec, side, ffdata):
+    """Call decoder, gracefully handling both 2-arg and 3-arg signatures."""
+    if decode_fn is None:
+        return rec or {}
+    try:
+        return decode_fn(rec, side, ffdata=ffdata)
+    except TypeError:
+        return decode_fn(rec, side)
+
+
 def compare_records(kind_name, m_idx, a_idx, ffdata,
                     *, hide_identical=True, mode="semantic",
                     m_source=None, a_source=None):
-    """Run a comparison and return a result dict.
-
-    `m_source` / `a_source` select which source the loaders use when the
-    kind exposes multiple (e.g. Character per-chapter on Mobile). None
-    means "default": loader picks the first available source.
-    """
     kind = ASSET_KINDS.get(kind_name)
     if kind is None:
         raise KeyError("unknown asset kind: %r" % kind_name)
@@ -335,9 +437,8 @@ def compare_records(kind_name, m_idx, a_idx, ffdata,
     a_recs = _call_loader(kind.load_android, ffdata, a_source)
     m_rec = m_recs[m_idx] if 0 <= m_idx < len(m_recs) else None
     a_rec = a_recs[a_idx] if 0 <= a_idx < len(a_recs) else None
-    decode = kind.decode or (lambda r, side: r or {})
-    m_dict = decode(m_rec, "mobile")
-    a_dict = decode(a_rec, "android")
+    m_dict = _safe_decode(kind.decode, m_rec, "mobile", ffdata)
+    a_dict = _safe_decode(kind.decode, a_rec, "android", ffdata)
     if mode == "semantic":
         rows = diff_dicts(m_dict, a_dict, hide_identical=hide_identical)
     elif mode == "raw":
