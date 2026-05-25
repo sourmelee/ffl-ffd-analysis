@@ -38,16 +38,17 @@ from ..animation.tab import AnimationTab
 from ..cross_ref.tab import CrossRefTab
 from ..comparison.tab import ComparisonTab
 from ..maps.annotation_tab import MapAnnotationTab
+from ..android_export.tab import AndroidExportTab
 
 
 class FFDApp(tk.Tk):
     """Top-level Tk application: notebook of all tabs + status bar + menu."""
 
     TAB_ORDER = [
-        FilesTab, ExtractTab, MapTab, MapAnnotationTab, EventScriptTab,
-        TextTab, CharacterTab, AnimationTab, TilesetTab, BackgroundTab,
-        BattleEffectTab, MonsterTab, MusicTab, AbilityTab, ItemTab, JobTab,
-        CrossRefTab, ComparisonTab,
+        FilesTab, ExtractTab, AndroidExportTab, MapTab, MapAnnotationTab,
+        EventScriptTab, TextTab, CharacterTab, AnimationTab, TilesetTab,
+        BackgroundTab, BattleEffectTab, MonsterTab, MusicTab, AbilityTab,
+        ItemTab, JobTab, CrossRefTab, ComparisonTab,
     ]
 
     def __init__(self):

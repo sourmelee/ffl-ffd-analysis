@@ -124,15 +124,27 @@ from ffd.comparison import (
     diff_dicts, diff_bytes, DiffRow, run_cli as _run_comparison_cli,
 )
 
+# Android exporter / ICP encoder re-exports
+from ffd.android_export import (
+    AndroidExportOptions, export_chapter_to_android, export_all_chapters,
+    encode_icp_dat, encode_icp_directory, ICPEncodeError,
+)
+
 
 def main():
-    """Entry point: dispatch to --compare CLI if requested, else launch GUI."""
+    """Entry point: dispatch to --compare or --android-* CLI if requested, else launch GUI."""
     argv = sys.argv[1:]
     # Allow `python ffd_toolkit.py --version` to print and exit, the same
     # way most CLIs handle it.
     if "--version" in argv or "-V" in argv:
         print(f"FFD/FFL Toolkit v{__version__}")
         sys.exit(0)
+    # Android export / encoder CLI -- dispatched before comparison so the
+    # --sp flag isn't ambiguous (both CLIs accept it, but only one of these
+    # dispatcher flags is ever present at a time).
+    from ffd.android_export.cli import is_android_cli, run as _run_android_cli
+    if is_android_cli(argv):
+        sys.exit(_run_android_cli(argv))
     cli_flags = {"--compare", "--list-kinds", "--sp", "--obb", "--apk",
                  "--raw", "--show-identical", "--link-id"}
     if any(a in cli_flags or a.startswith("--compare=") for a in argv):
@@ -143,7 +155,7 @@ def main():
               "cannot start. Parser modules in `ffd.*` still import fine for "
               "headless analysis.", file=sys.stderr)
         sys.exit(1)
-    # Startup banner — handy in bug reports so users can read off the
+    # Startup banner -- handy in bug reports so users can read off the
     # version they were running.
     print(f"FFD/FFL Toolkit v{__version__} -- starting GUI...")
     FFDApp().mainloop()
