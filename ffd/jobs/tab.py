@@ -70,7 +70,7 @@ from ..monsters.parser import (
     parse_enemy_names_android, parse_bem,
 )
 from ..items.parser import parse_items_mobile, parse_items_android
-from ..jobs.parser  import parse_jobs_mobile, parse_jobs_android
+from ..jobs.parser  import parse_jobs_mobile, parse_jobs_android, decode_job_body
 from ..abilities.parser import (
     parse_magic_android, parse_passive_abilities_android,
     parse_command_abilities_android,
@@ -141,19 +141,38 @@ class JobTab(TabBase):
         self.tree.delete(*self.tree.get_children())
         self.details.delete("1.0", "end")
         src = self.src_var.get()
-        bd = self.data.boot_data_mobile() if src == "Mobile" else self.data.boot_data_android()
-        if bd is None:
-            self.note.config(text="boot_data.dat not found in any .sp slot." if src == "Mobile"
-                             else "Android boot_data.dat not found in .obb/.apk.")
-            return
-        try:
-            jobs = parse_jobs_mobile(bd)
-        except Exception as exc:
-            self.note.config(text=f"jobs parse error: {exc}"); return
-        self.note.config(text=f"{len(jobs)} jobs loaded ({src})")
-        for i, jb in enumerate(jobs):
-            row = (str(i), jb.get("name", f"job_{i}"))
-            self.entries.append(jb); self.tree.insert("", "end", iid=str(i), values=row)
+        # Fixed 2026-05-22: dispatch by source radio (the old code
+        # unconditionally called parse_jobs_mobile even for Android),
+        # and use the new namedesc parser shape + decode_job_body.
+        if src == "Mobile":
+            bd = self.data.boot_data_mobile()
+            if bd is None:
+                self.note.config(text="boot_data.dat not found in any .sp slot.")
+                return
+            try:
+                jobs = parse_jobs_mobile(bd)
+            except Exception as exc:
+                self.note.config(text="jobs parse error: %s" % exc); return
+        else:
+            bd = self.data.boot_data_android()
+            if bd is None:
+                self.note.config(text="Android boot_data.dat not found in .obb/.apk.")
+                return
+            try:
+                jobs = parse_jobs_android(bd)
+            except Exception as exc:
+                self.note.config(text="jobs parse error: %s" % exc); return
+        self.note.config(text="%d jobs loaded (%s)" % (len(jobs), src))
+        for i, raw in enumerate(jobs):
+            if raw is None:
+                self.entries.append(None)
+                self.tree.insert("", "end", iid=str(i),
+                                 values=(str(i), "(deleted)"))
+                continue
+            jb = dict(raw); jb.update(decode_job_body(raw.get("body", b"")))
+            row = (str(i), jb.get("name", "job_%d" % i))
+            self.entries.append(jb)
+            self.tree.insert("", "end", iid=str(i), values=row)
 
     def _on_select(self):
         sel = self.tree.selection()
@@ -161,22 +180,21 @@ class JobTab(TabBase):
         idx = int(self.tree.set(sel[0], "idx"))
         if idx >= len(self.entries): return
         jb = self.entries[idx]
-        lines = [f"Job #{idx}: {jb.get('name', '?')}"]
+        if jb is None:
+            self.details.delete("1.0", "end")
+            self.details.insert("1.0", "Job #%d: (deleted slot)" % idx)
+            return
+        lines = ["Job #%d: %s" % (idx, jb.get('name', '?'))]
         for k, v in jb.items():
             if k == "name": continue
-            if k == "abilities" and isinstance(v, list):
-                ab_names = self._lookup_ability_names()
-                lines.append(f"Abilities ({len(v)}):")
-                for a in v:
-                    aid = a.get("id", "?") if isinstance(a, dict) else a
-                    lvl = a.get("level", "") if isinstance(a, dict) else ""
-                    name = ab_names.get(aid, f"ability #{aid}")
-                    lines.append(f"  Lv{lvl}: {name}  ({aid})" if lvl else f"  {aid}: {name}")
-            elif k == "raw" and isinstance(v, (bytes, bytearray)):
-                lines.append("  raw: " + v[:32].hex(" ") + ("…" if len(v) > 32 else ""))
+            if isinstance(v, (bytes, bytearray)):
+                preview = v[:32].hex(" ")
+                lines.append("  %s: <%dB> %s%s" % (
+                    k, len(v), preview, " ..." if len(v) > 32 else ""))
             else:
-                lines.append(f"  {k}: {v}")
-        self.details.delete("1.0", "end"); self.details.insert("1.0", "\n".join(lines))
+                lines.append("  %s: %s" % (k, v))
+        self.details.delete("1.0", "end")
+        self.details.insert("1.0", "\n".join(lines))
 
     def _lookup_ability_names(self) -> dict:
         out = {}; best = -1

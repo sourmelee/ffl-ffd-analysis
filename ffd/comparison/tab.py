@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from ..gui_stub import tk, ttk, ScrolledText
 from ..gui_core.base import TabBase
-from .registry import ASSET_KINDS, compare_records, list_asset_kinds
+from .registry import ASSET_KINDS, compare_records, list_asset_kinds, list_sources
 
 
 class ComparisonTab(TabBase):
@@ -145,11 +145,10 @@ class ComparisonTab(TabBase):
         kind = ASSET_KINDS.get(self.kind_var.get())
         if kind is None:
             self.status_var.set("Unknown asset kind"); return
-        # Refresh source lists for both sides.
-        self._m_sources = (kind.list_sources_mobile(self.data)
-                           if kind.list_sources_mobile else [])
-        self._a_sources = (kind.list_sources_android(self.data)
-                           if kind.list_sources_android else [])
+        # Refresh source lists -- list_sources() prepends "(All chapters)"
+        # when the kind supports it.
+        self._m_sources = list_sources(kind, self.data, "mobile")
+        self._a_sources = list_sources(kind, self.data, "android")
         self.m_source_cb["values"] = [l for _, l in self._m_sources]
         self.a_source_cb["values"] = [l for _, l in self._a_sources]
         # Enable source combobox only when there's a choice.

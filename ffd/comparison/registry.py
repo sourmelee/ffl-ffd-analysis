@@ -6,15 +6,20 @@ Each AssetKind plugs in:
     list_sources_mobile(ffdata)           -> [(key, label), ...] or None
     list_sources_android(ffdata)          -> [(key, label), ...] or None
     record_label(record)                  -> short string for the dropdown
-    decode(record, side)                  -> normalised dict to diff
-    render(m_rec, a_rec)                  -> optional (Pillow_img, Pillow_img)
+    decode(record, side, ffdata=...)      -> normalised dict to diff
 
-`source_key` lets the GUI/CLI pick a non-default source (e.g. per-chapter
-chara_set.dat on Mobile). The selected source is forwarded to the loader.
+Per-side source picker: when `list_sources_*` is non-None, the GUI shows
+a combobox; the chosen `source_key` is forwarded to the loader.
 
-Multi-language names (English / French / etc.) are pulled from Android
-`system_message.msd` via ffd.text.system_message.SystemMessageLookup and
-spliced into the decoded dicts as `en_name`, `en_desc`, etc.
+`supports_all_sources_mobile = True` adds an "(All chapters)" entry at
+the top of the Mobile source picker. The loader receives
+`source_key = ALL_SOURCES_KEY` and is expected to merge across every
+loaded chapter (typically: latest-non-null record per id). Useful for
+chapter-scoped tables (Character, Monster, Job) so you don't have to
+flip the picker just to see late-game records.
+
+Multi-language names from `system_message.msd` (sec 5/7/8/9/10/13)
+are spliced into the decoded dicts via `_splice_names`.
 """
 
 from __future__ import annotations
@@ -31,20 +36,29 @@ from ..characters.parser import (
 from ..monsters.parser import (
     parse_monsters_mobile, parse_monsters_android, decode_monster_body,
 )
+from ..jobs.parser import (
+    parse_jobs_mobile, parse_jobs_android, decode_job_body,
+)
 from ..constants import CHARA_TABLE
 from ..text.system_message import SystemMessageLookup
 from .diff import diff_dicts, diff_bytes
 
 
+# Special source key that asks the loader to merge across every loaded
+# chapter (Mobile only -- Android has one canonical source per kind).
+# The string is intentionally unlikely to clash with a real slot label.
+ALL_SOURCES_KEY = "__all__"
+ALL_SOURCES_LABEL = "(All chapters)"
+
+
 # ---------------------------------------------------------------------------
-# AssetKind dataclass + dispatch helper
+# AssetKind dataclass + dispatch helpers
 # ---------------------------------------------------------------------------
 
 LoaderFn      = Callable[..., List[Any]]
 SourceListFn  = Callable[[Any], List[Tuple[str, str]]]
 LabelFn       = Callable[[Any], str]
 DecodeFn      = Callable[[Any, str], dict]
-RenderFn      = Callable[[Any, Any], Tuple[Any, Any]]
 
 
 @dataclass
@@ -56,8 +70,10 @@ class AssetKind:
     list_sources_android: Optional[SourceListFn] = None
     record_label: Optional[LabelFn] = None
     decode: Optional[DecodeFn] = None
-    render: Optional[RenderFn] = None
     notes: str = ""
+    # When True, the Mobile source picker prepends "(All chapters)" and
+    # passes ALL_SOURCES_KEY to load_mobile. The loader must handle it.
+    supports_all_sources_mobile: bool = False
 
 
 def _call_loader(loader, ffdata, source_key):
@@ -69,14 +85,27 @@ def _call_loader(loader, ffdata, source_key):
         return loader(ffdata) or []
 
 
+def _augmented_sources(base_list, kind, side):
+    """Prepend (All chapters) to the source list when supported."""
+    if base_list is None: return None
+    if side == "mobile" and kind.supports_all_sources_mobile:
+        return [(ALL_SOURCES_KEY, ALL_SOURCES_LABEL)] + list(base_list)
+    return list(base_list)
+
+
+def list_sources(kind: AssetKind, ffdata, side: str):
+    """Public helper used by the tab and CLI to enumerate sources."""
+    if side == "mobile":
+        base = kind.list_sources_mobile(ffdata) if kind.list_sources_mobile else None
+    else:
+        base = kind.list_sources_android(ffdata) if kind.list_sources_android else None
+    if base is None: return []
+    return _augmented_sources(base, kind, side)
+
+
 # ---------------------------------------------------------------------------
-# Multi-language name lookup cache (per FFData identity)
+# system_message.msd cache + name splice
 # ---------------------------------------------------------------------------
-#
-# Parsing system_message.msd is non-trivial (~750KB of UTF-8) so cache
-# the SystemMessageLookup against the underlying bytes object. The cache
-# entry invalidates when FFData reloads its OBB (different bytes -> new
-# key in the WeakValueDictionary).
 import weakref
 _sm_cache: "weakref.WeakKeyDictionary" = weakref.WeakKeyDictionary()
 
@@ -98,45 +127,76 @@ def _system_message(ffdata) -> SystemMessageLookup:
     return sm
 
 
-def _splice_names(out: dict, ffdata, asset_type: str, record_id: int,
-                  langs=("en", "fr"), include_desc=True) -> None:
-    """Add `en_name`, `en_desc`, `fr_name`, etc. into `out` if available."""
-    if ffdata is None or record_id is None:
-        return
+def _splice_names(out, ffdata, asset_type, record_id,
+                  langs=("en", "fr"), include_desc=True):
+    if ffdata is None or record_id is None: return
     sm = _system_message(ffdata)
-    if not sm.has(asset_type):
-        return
+    if not sm.has(asset_type): return
     for lang in langs:
         nm = sm.name(asset_type, record_id, lang)
-        if nm:
-            out[lang + "_name"] = nm
+        if nm: out[lang + "_name"] = nm
         if include_desc:
             ds = sm.desc(asset_type, record_id, lang)
-            if ds:
-                out[lang + "_desc"] = ds
+            if ds: out[lang + "_desc"] = ds
 
 
 # ---------------------------------------------------------------------------
-# Item
+# Merge helper for ALL_SOURCES_KEY loaders
 # ---------------------------------------------------------------------------
 
-def _items_label(rec):
-    if rec is None:
-        return "(deleted)"
-    return "%s -- %s" % (rec.get("id", "?"), rec.get("name", "?"))
+def _merge_records_across_sources(per_source_records, *, prefer_later=True):
+    """Merge per-source record lists into a single id-indexed list.
+
+    Each input is the list returned by load_mobile(ffdata, source_key=K).
+    Records are aligned by list index (the id). For each index, pick the
+    most-developed record across sources: prefer entries that aren't
+    None and whose name doesn't look like a placeholder.
+
+    `prefer_later=True` (default) gives the later source the win when
+    multiple have valid records -- chapters tend to be loaded in
+    chronological order, and later chapters have the populated table.
+    """
+    if not per_source_records: return []
+    max_len = max(len(lst) for lst in per_source_records)
+    merged = [None] * max_len
+    # Iterate sources; either first-wins or last-wins per id depending
+    # on prefer_later. We do "last-non-placeholder wins" so an empty
+    # later record doesn't overwrite a populated earlier one.
+    order = list(range(len(per_source_records)))
+    if prefer_later:
+        order.reverse()
+    for src_idx in order:
+        recs = per_source_records[src_idx]
+        for i, r in enumerate(recs):
+            if r is None or i >= max_len:
+                continue
+            cur = merged[i]
+            if cur is None:
+                merged[i] = r
+                continue
+            # Keep whichever record is "more populated". Heuristic:
+            # prefer one whose name isn't a placeholder.
+            cur_p = _looks_placeholder(cur.get("name", ""))
+            new_p = _looks_placeholder(r.get("name", ""))
+            if cur_p and not new_p:
+                merged[i] = r
+            # if both placeholder or both real, keep current (later
+            # source wins when iterating in reverse so we keep first-seen)
+    return merged
 
 
-def _items_decode(rec, side, ffdata=None):
-    if rec is None:
-        return {}
-    out = {"id": rec.get("id"), "name": rec.get("name"),
-           "desc": rec.get("desc"), "body": rec.get("body", b"")}
-    body = rec.get("body", b"")
-    if body:
-        out.update(decode_item_body(body))
-    _splice_names(out, ffdata, "Item", rec.get("id"))
-    return out
+_PLACEHOLDER_PATTERNS = ("ダミー", "予備", "？？？", "?????")
 
+
+def _looks_placeholder(name: str) -> bool:
+    if not name:
+        return True
+    return any(p in name for p in _PLACEHOLDER_PATTERNS)
+
+
+# ---------------------------------------------------------------------------
+# Item -- single source per side
+# ---------------------------------------------------------------------------
 
 def _items_load_mobile(ffdata, source_key=None):
     bd = ffdata.boot_data_mobile() if ffdata else None
@@ -148,24 +208,35 @@ def _items_load_android(ffdata, source_key=None):
     return parse_items_android(bd) if bd else []
 
 
+def _items_label(rec):
+    if rec is None: return "(deleted)"
+    return "%s -- %s" % (rec.get("id", "?"), rec.get("name", "?"))
+
+
+def _items_decode(rec, side, ffdata=None):
+    if rec is None: return {}
+    out = {"id": rec.get("id"), "name": rec.get("name"),
+           "desc": rec.get("desc"), "body": rec.get("body", b"")}
+    body = rec.get("body", b"")
+    if body: out.update(decode_item_body(body))
+    _splice_names(out, ffdata, "Item", rec.get("id"))
+    return out
+
+
 _ITEMS = AssetKind(
     name="Item",
     load_mobile=_items_load_mobile,
     load_android=_items_load_android,
     record_label=_items_label,
     decode=_items_decode,
-    notes=(
-        "640 records each. Body=54, BE on BOTH platforms (multi-byte fields "
-        "inside the record body don't endian-flip -- only the outer TOC "
-        "pointer does). body[45..46] differ on 100% of items (per-record "
-        "watermark/sort-key the remaster systematically renumbered). "
-        "EN/FR names spliced from system_message.msd sec 7."
-    ),
+    notes=("640 records each. Body=54 BE on BOTH platforms. body[45..46] differ "
+           "on 100% of items (per-record watermark/sort-key). EN/FR from "
+           "system_message.msd sec 7."),
 )
 
 
 # ---------------------------------------------------------------------------
-# Character
+# Character -- per-chapter Mobile, +All chapters
 # ---------------------------------------------------------------------------
 
 _ID_TO_ROMAJI = {row[0]: row[2] for row in CHARA_TABLE}
@@ -193,15 +264,30 @@ def _list_sources_chara_android(ffdata):
     if ffdata is None or not ffdata.obb_files: return []
     if "chara_set.dat" in ffdata.obb_files:
         return [("obb", "Android OBB")]
-    if ffdata.apk_files:
-        for k in ffdata.apk_files:
-            if k.endswith("chara_set.dat"):
-                return [("apk", "Android APK")]
     return []
+
+
+def _resolve_chara_equipment(chars, items):
+    for c in chars:
+        if c is not None:
+            c["equipment_resolved"] = _resolve_equipment(c.get("equipment", []), items)
+    return chars
 
 
 def _load_chara_mobile(ffdata, source_key=None):
     if ffdata is None: return []
+    items = None
+    try:
+        bd = ffdata.boot_data_mobile()
+        if bd is not None: items = parse_items_mobile(bd)
+    except Exception:
+        items = None
+    if source_key == ALL_SOURCES_KEY:
+        per_source = []
+        for slot, blob in ffdata.find_in_sp_any_chapter("chara_set.dat"):
+            per_source.append(_resolve_chara_equipment(
+                parse_chara_set_mobile(blob), items))
+        return _merge_records_across_sources(per_source)
     chosen = None
     for slot, blob in ffdata.find_in_sp_any_chapter("chara_set.dat"):
         if source_key is None or slot == source_key:
@@ -209,28 +295,14 @@ def _load_chara_mobile(ffdata, source_key=None):
             if source_key is not None: break
     if chosen is None: return []
     _, blob = chosen
-    chars = parse_chara_set_mobile(blob)
-    items = None
-    try:
-        bd = ffdata.boot_data_mobile()
-        if bd is not None: items = parse_items_mobile(bd)
-    except Exception:
-        items = None
-    for c in chars:
-        if c is not None:
-            c["equipment_resolved"] = _resolve_equipment(c.get("equipment", []), items)
-    return chars
+    return _resolve_chara_equipment(parse_chara_set_mobile(blob), items)
 
 
 def _load_chara_android(ffdata, source_key=None):
     if ffdata is None: return []
     blob = None
-    if source_key in (None, "obb") and ffdata.obb_files:
+    if source_key in (None, "obb", ALL_SOURCES_KEY) and ffdata.obb_files:
         blob = ffdata.obb_files.get("chara_set.dat")
-    if blob is None and ffdata.apk_files:
-        for k, v in ffdata.apk_files.items():
-            if k.endswith("chara_set.dat"):
-                blob = v; break
     if blob is None: return []
     chars = parse_chara_set_android(blob)
     items = None
@@ -239,10 +311,7 @@ def _load_chara_android(ffdata, source_key=None):
         if bd is not None: items = parse_items_android(bd)
     except Exception:
         items = None
-    for c in chars:
-        if c is not None:
-            c["equipment_resolved"] = _resolve_equipment(c.get("equipment", []), items)
-    return chars
+    return _resolve_chara_equipment(chars, items)
 
 
 def _character_label(rec):
@@ -286,50 +355,46 @@ _CHARACTER = AssetKind(
     list_sources_android=_list_sources_chara_android,
     record_label=_character_label,
     decode=_character_decode,
-    notes=(
-        "chara_set.dat. Mobile = 12-byte BE header per chapter, .sp-local; "
-        "Android = 16-byte LE header in OBB. Records section is BE on both. "
-        "Equipment ids resolved to item names. EN/FR names from "
-        "system_message.msd sec 5."
-    ),
+    supports_all_sources_mobile=True,
+    notes=("chara_set.dat. Mobile = chapter-scoped 12B BE header; Android = 16B "
+           "LE header (OBB). Equipment ids resolved to item names. EN/FR from "
+           "system_message.msd sec 5."),
 )
 
 
 # ---------------------------------------------------------------------------
-# Monster
+# Monster -- per-chapter Mobile, +All chapters
 # ---------------------------------------------------------------------------
 
 def _list_sources_monster_mobile(ffdata):
-    """Each Mobile .sp ships its own boot_data with chapter-scoped §8."""
     if ffdata is None: return []
-    out = []
-    for slot, files in ffdata.sp_slots.items():
-        if files and "boot_data.dat" in files:
-            out.append((slot, slot))
-    return out
+    return [(slot, slot) for slot, files in ffdata.sp_slots.items()
+            if files and "boot_data.dat" in files]
 
 
 def _list_sources_monster_android(ffdata):
-    if ffdata is None: return []
-    if ffdata.boot_data_android() is not None:
-        return [("obb", "Android OBB")]
-    return []
+    if ffdata is None or ffdata.boot_data_android() is None: return []
+    return [("obb", "Android OBB")]
 
 
 def _load_monsters_mobile(ffdata, source_key=None):
     if ffdata is None: return []
+    if source_key == ALL_SOURCES_KEY:
+        per_source = []
+        for slot, files in ffdata.sp_slots.items():
+            if files and "boot_data.dat" in files:
+                per_source.append(parse_monsters_mobile(files["boot_data.dat"]))
+        return _merge_records_across_sources(per_source)
     blob = None
     if source_key is not None:
         files = ffdata.sp_slots.get(source_key)
         if files and "boot_data.dat" in files:
             blob = files["boot_data.dat"]
     if blob is None:
-        # Default: use any slot with boot_data.dat
         for slot, files in ffdata.sp_slots.items():
             if files and "boot_data.dat" in files:
                 blob = files["boot_data.dat"]; break
-    if blob is None: return []
-    return parse_monsters_mobile(blob)
+    return parse_monsters_mobile(blob) if blob else []
 
 
 def _load_monsters_android(ffdata, source_key=None):
@@ -348,8 +413,7 @@ def _monster_decode(rec, side, ffdata=None):
     out = {"id": rec.get("id"), "name": rec.get("name"),
            "body": rec.get("body", b"")}
     body = rec.get("body", b"")
-    if body:
-        out.update(decode_monster_body(body))
+    if body: out.update(decode_monster_body(body))
     _splice_names(out, ffdata, "Monster", rec.get("id"), include_desc=False)
     return out
 
@@ -362,18 +426,87 @@ _MONSTER = AssetKind(
     list_sources_android=_list_sources_monster_android,
     record_label=_monster_label,
     decode=_monster_decode,
-    notes=(
-        "boot_data section 8 (Mobile, BE TOC) / section 9 (Android, LE TOC). "
-        "Body=64, BE on BOTH platforms (no endian flip inside record body). "
-        "No desc field (unlike Item/Magic/Job). Mobile .sp ships chapter-"
-        "scoped tables; pick per-chapter via source picker. EN/FR names "
-        "from system_message.msd sec 13."
-    ),
+    supports_all_sources_mobile=True,
+    notes=("boot_data sec 8 (Mobile, BE) / sec 9 (Android, LE). Body=64 BE "
+           "on both. No desc. Mobile chapter-scoped. EN/FR from "
+           "system_message.msd sec 13."),
 )
 
 
 # ---------------------------------------------------------------------------
-# Stubs
+# Job -- per-chapter Mobile, +All chapters
+# ---------------------------------------------------------------------------
+
+def _list_sources_job_mobile(ffdata):
+    if ffdata is None: return []
+    return [(slot, slot) for slot, files in ffdata.sp_slots.items()
+            if files and "boot_data.dat" in files]
+
+
+def _list_sources_job_android(ffdata):
+    if ffdata is None or ffdata.boot_data_android() is None: return []
+    return [("obb", "Android OBB")]
+
+
+def _load_jobs_mobile(ffdata, source_key=None):
+    if ffdata is None: return []
+    if source_key == ALL_SOURCES_KEY:
+        per_source = []
+        for slot, files in ffdata.sp_slots.items():
+            if files and "boot_data.dat" in files:
+                per_source.append(parse_jobs_mobile(files["boot_data.dat"]))
+        return _merge_records_across_sources(per_source)
+    blob = None
+    if source_key is not None:
+        files = ffdata.sp_slots.get(source_key)
+        if files and "boot_data.dat" in files:
+            blob = files["boot_data.dat"]
+    if blob is None:
+        for slot, files in ffdata.sp_slots.items():
+            if files and "boot_data.dat" in files:
+                blob = files["boot_data.dat"]; break
+    return parse_jobs_mobile(blob) if blob else []
+
+
+def _load_jobs_android(ffdata, source_key=None):
+    if ffdata is None: return []
+    bd = ffdata.boot_data_android()
+    return parse_jobs_android(bd) if bd else []
+
+
+def _job_label(rec):
+    if rec is None: return "(deleted)"
+    return "%2d -- %s" % (rec.get("id", -1), rec.get("name", "?"))
+
+
+def _job_decode(rec, side, ffdata=None):
+    if rec is None: return {}
+    out = {"id": rec.get("id"), "name": rec.get("name"),
+           "desc": rec.get("desc"), "body": rec.get("body", b"")}
+    body = rec.get("body", b"")
+    if body: out.update(decode_job_body(body))
+    _splice_names(out, ffdata, "Job", rec.get("id"))
+    return out
+
+
+_JOB = AssetKind(
+    name="Job",
+    load_mobile=_load_jobs_mobile,
+    load_android=_load_jobs_android,
+    list_sources_mobile=_list_sources_job_mobile,
+    list_sources_android=_list_sources_job_android,
+    record_label=_job_label,
+    decode=_job_decode,
+    supports_all_sources_mobile=True,
+    notes=("boot_data sec 5 (Mobile, BE) / sec 6 (Android, LE). Body=126 BE "
+           "on both. Mobile 31 / Android 33; ids 19, 25, 30 diverge "
+           "(placeholders / Mobile chapter-scoping). EN/FR from "
+           "system_message.msd sec 8."),
+)
+
+
+# ---------------------------------------------------------------------------
+# Stubs for remaining types
 # ---------------------------------------------------------------------------
 
 def _todo_loader(name):
@@ -385,18 +518,15 @@ def _todo_loader(name):
 
 
 _STUB_KINDS = [
-    AssetKind(name="Job",       load_mobile=_todo_loader("Job"),
-              load_android=_todo_loader("Job"),
-              notes="Mobile section 20 BE / Android section 6 LE, body=126."),
     AssetKind(name="Magic",     load_mobile=_todo_loader("Magic"),
               load_android=_todo_loader("Magic"),
-              notes="Android section 2 LE body=54; Mobile equivalent at section 1 (verify)."),
+              notes="Android sec 2 LE body=54; Mobile equivalent at sec 1."),
     AssetKind(name="Sprite",    load_mobile=_todo_loader("Sprite"),
               load_android=_todo_loader("Sprite"),
-              notes="chpk/cpk on Mobile vs cpk/ICP on Android; ic format shared."),
+              notes="chpk/cpk on Mobile vs cpk/ICP on Android; ic shared."),
     AssetKind(name="Animation", load_mobile=_todo_loader("Animation"),
               load_android=_todo_loader("Animation"),
-              notes="Mobile chpk hardcoded layout vs Android field_anm.dat 63 generic anims."),
+              notes="Mobile chpk hardcoded vs Android field_anm.dat 63 generic."),
     AssetKind(name="Map",       load_mobile=_todo_loader("Map"),
               load_android=_todo_loader("Map"),
               notes="Mobile mpk chunk BE vs Android mpkh+mpk streaming chunk LE."),
@@ -406,7 +536,8 @@ _STUB_KINDS = [
 ]
 
 
-ASSET_KINDS = {k.name: k for k in ([_ITEMS, _CHARACTER, _MONSTER] + _STUB_KINDS)}
+ASSET_KINDS = {k.name: k for k in (
+    [_ITEMS, _CHARACTER, _MONSTER, _JOB] + _STUB_KINDS)}
 
 
 def list_asset_kinds():
@@ -418,9 +549,7 @@ def list_asset_kinds():
 # ---------------------------------------------------------------------------
 
 def _safe_decode(decode_fn, rec, side, ffdata):
-    """Call decoder, gracefully handling both 2-arg and 3-arg signatures."""
-    if decode_fn is None:
-        return rec or {}
+    if decode_fn is None: return rec or {}
     try:
         return decode_fn(rec, side, ffdata=ffdata)
     except TypeError:

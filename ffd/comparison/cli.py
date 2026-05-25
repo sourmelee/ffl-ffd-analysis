@@ -31,7 +31,7 @@ from pathlib import Path
 from ..constants import SP_SLOTS
 from ..containers import parse_sp, load_folder_as_archive, load_zip_container
 from ..data.ffdata import FFData
-from .registry import ASSET_KINDS, compare_records, list_asset_kinds
+from .registry import ASSET_KINDS, compare_records, list_asset_kinds, list_sources, ALL_SOURCES_KEY
 
 
 def _build_arg_parser(prog="ffd_toolkit.py"):
@@ -195,8 +195,8 @@ def run_cli(argv):
         if kind is None:
             print("Unknown kind %r" % args.list_sources, file=sys.stderr); return 2
         ffdata = _load_ffdata(args)
-        m_src = kind.list_sources_mobile(ffdata)  if kind.list_sources_mobile  else []
-        a_src = kind.list_sources_android(ffdata) if kind.list_sources_android else []
+        m_src = list_sources(kind, ffdata, "mobile")
+        a_src = list_sources(kind, ffdata, "android")
         print("Mobile sources for %s:" % args.list_sources)
         for k, l in m_src or []: print("  %s  -- %s" % (k, l))
         if not m_src: print("  (none / single implicit source)")
@@ -229,11 +229,9 @@ def run_cli(argv):
 
     kind = ASSET_KINDS[kind_name]
     m_src = _match_source(getattr(args, "m_source", None),
-                          kind.list_sources_mobile(ffdata)
-                          if kind.list_sources_mobile else [])
+                          list_sources(kind, ffdata, "mobile"))
     a_src = _match_source(getattr(args, "a_source", None),
-                          kind.list_sources_android(ffdata)
-                          if kind.list_sources_android else [])
+                          list_sources(kind, ffdata, "android"))
 
     try:
         result = compare_records(
