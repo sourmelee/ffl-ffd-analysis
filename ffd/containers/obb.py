@@ -397,6 +397,187 @@ def load_obb_as_dict(obb_path, mode: str = "proper"):
 
 
 # ---------------------------------------------------------------------------
+# OBB packer (inverse of load_obb_as_dict)
+# ---------------------------------------------------------------------------
+#
+# Format ground truth (from the decompiled libjniproxy.so source in
+# Decomp/Functions/libjniproxy_c.c and from byte-level inspection of a real
+# FFD main.obb):
+#
+#   File [0..4]      : plaintext junk (the real OBB writes "FFDL" here; the
+#                      engine reads but does not use these bytes)
+#   File [4..end]    : XOR-encrypted with the constant key 0x14
+#
+#   After XOR-decrypt, the structure is:
+#     [4..8]         : junk u32
+#     [8..12]        : num_chunks (LE u32)
+#     [12..]         : chunk_offsets[num_chunks+1] (LE u32 each) — chunk i
+#                      occupies bytes [chunk_offsets[i] .. chunk_offsets[i+1])
+#
+#   Chunk 0 is the FAT (file allocation table):
+#     [+0..+4]       : 'FFDL' magic (LE 0x4c444646)
+#     [+4..+8]       : version u32 (the real OBB uses 0x00000010)
+#     [+8..+12]      : info_size = 20 + 24 * num_files  (size of FAT header
+#                      + records area, not counting the name strings)
+#     [+12..+16]     : info_size + total_string_bytes_used (this lets the
+#                      engine know where the string area ends; trailing
+#                      padding to chunk alignment is excluded)
+#     [+16..+20]     : num_files (LE u32)
+#     [+20..+20+24*num_files] : file records (24 bytes each):
+#         u32 name_offset  — offset into the string block (NOT including
+#                            fat_start + info_size); points at the length
+#                            byte of the name
+#         u32 c_size       — compressed size; equal to u_size when not
+#                            compressed (this engine doesn't compress)
+#         u_size           — uncompressed size
+#         u32 chunk_id     — index into chunk_offsets[] (1..num_chunks)
+#         u32 d_offset     — byte offset within that chunk
+#         u32 d_high       — observed always 0 in the real OBB
+#     [+info_size..]  : name strings — each is a length-prefixed Pascal
+#                       string followed by a null terminator:
+#                       len:u8, name:bytes[len], 0x00
+#                       The parser reads them as null-terminated and skips
+#                       the length byte (str_block_abs + name_offset + 1).
+#
+#   Chunks 1..N hold the actual file data. In the real OBB multiple files
+#   share a chunk (offset-addressed inside the chunk via d_offset), but the
+#   reader doesn't require this — one chunk per file with d_offset=0 is
+#   perfectly valid, and that's the layout dict_to_obb() emits because it's
+#   the simplest correct shape.
+
+def dict_to_obb(files, out_path, *, junk_bytes=b"FFDL"):
+    """
+    Pack a {filename: bytes} mapping into a Final Fantasy Dimensions Android
+    .obb file at ``out_path``.
+
+    Uses one chunk per file (the simplest correct layout the FFD engine
+    accepts). The first 4 bytes of the output file are the literal
+    ``junk_bytes`` (plaintext, not XOR-encrypted). Everything else is
+    XOR-0x14 encrypted, matching what ``load_obb_as_dict()`` reads.
+
+    Returns the size of the written file in bytes.
+
+    Round-trip: ``load_obb_as_dict(out_path, mode="raw")`` on the produced
+    file yields a dict whose items match ``files`` exactly.
+    """
+    if len(junk_bytes) != 4:
+        raise ValueError("junk_bytes must be exactly 4 bytes")
+
+    # Preserve insertion order. Caller controls ordering.
+    items = list(files.items())
+    num_files = len(items)
+    num_chunks = num_files + 1  # chunk 0 is the FAT; chunks 1..N are file data
+
+    # --- Build the string block (length-prefixed, null-terminated names) ---
+    str_block = bytearray()
+    name_offsets = []
+    for filename, _data in items:
+        name_bytes = filename.encode("utf-8")
+        if len(name_bytes) > 255:
+            raise ValueError(
+                f"filename too long for the length-byte prefix (max 255): {filename!r}"
+            )
+        name_offsets.append(len(str_block))
+        str_block.append(len(name_bytes))   # u8 length
+        str_block += name_bytes
+        str_block.append(0)                 # null terminator
+
+    # --- FAT layout sizes ---
+    info_size = 20 + 24 * num_files          # records area only (no strings)
+    str_used  = len(str_block)               # actually-used string bytes
+    mystery   = info_size + str_used         # FAT[+12..+16] in the real OBB
+    fat_pad   = (-str_used) & 3              # 4-byte align before next chunk
+    fat_size  = info_size + str_used + fat_pad
+
+    # --- Top-level header sizes ---
+    header_top = 12 + 4 * (num_chunks + 1)   # u32 num_chunks + N+1 chunk_offsets
+    fat_start  = header_top
+
+    # --- Lay out chunks (one file per chunk, ordered as input) ---
+    chunk_offsets = [fat_start]              # chunk 0 = FAT
+    pos = fat_start + fat_size
+    for _filename, file_data in items:
+        chunk_offsets.append(pos)
+        pos += len(file_data)
+    chunk_offsets.append(pos)                # one extra: end-of-last-chunk
+    assert len(chunk_offsets) == num_chunks + 1
+
+    total_size = pos
+
+    # --- Assemble bytes ---
+    out = bytearray(total_size)
+
+    # File top header
+    out[0:4] = junk_bytes                     # plaintext 'FFDL' (or whatever)
+    out[4:8] = b"\x00\x00\x00\x00"            # junk u32 (gets XOR-encrypted)
+    out[8:12] = struct.pack("<I", num_chunks)
+    for i, off in enumerate(chunk_offsets):
+        out[12 + i*4 : 16 + i*4] = struct.pack("<I", off)
+
+    # FAT header
+    out[fat_start +  0:fat_start +  4] = b"FFDL"               # FAT magic
+    out[fat_start +  4:fat_start +  8] = struct.pack("<I", 0x10)
+    out[fat_start +  8:fat_start + 12] = struct.pack("<I", info_size)
+    out[fat_start + 12:fat_start + 16] = struct.pack("<I", mystery)
+    out[fat_start + 16:fat_start + 20] = struct.pack("<I", num_files)
+
+    # File records (24 bytes each)
+    rec_off = fat_start + 20
+    for i, (_filename, file_data) in enumerate(items):
+        c_size = u_size = len(file_data)
+        chunk_id = i + 1
+        d_offset = 0
+        d_high = 0
+        out[rec_off : rec_off + 24] = struct.pack(
+            "<IIIIII", name_offsets[i], c_size, u_size, chunk_id, d_offset, d_high
+        )
+        rec_off += 24
+
+    # String block
+    str_block_abs = fat_start + info_size
+    out[str_block_abs : str_block_abs + str_used] = str_block
+    # (the fat_pad bytes between the string block and chunk 1 are already 0)
+
+    # File data (one chunk per file)
+    for i, (_filename, file_data) in enumerate(items):
+        cstart = chunk_offsets[i + 1]
+        out[cstart : cstart + len(file_data)] = file_data
+
+    # XOR-encrypt from byte 4 onwards (bytes 0..4 stay plaintext)
+    for i in range(4, total_size):
+        out[i] ^= 0x14
+
+    with open(out_path, "wb") as f:
+        f.write(out)
+    return total_size
+
+
+def folder_to_obb(folder, out_path, *, junk_bytes=b"FFDL"):
+    """
+    Pack every file under ``folder`` (recursively) into an FFD .obb.
+
+    Filenames in the OBB are relative to ``folder`` and use forward slashes.
+    Files are added in sorted order so output is reproducible. Empty files
+    are included verbatim.
+
+    Returns the number of bytes written.
+    """
+    folder = os.path.normpath(folder)
+    if not os.path.isdir(folder):
+        raise FileNotFoundError(f"not a directory: {folder}")
+
+    from collections import OrderedDict
+    files = OrderedDict()
+    for root, _dirs, names in sorted(os.walk(folder)):
+        for name in sorted(names):
+            full = os.path.join(root, name)
+            rel = os.path.relpath(full, folder).replace(os.sep, "/")
+            with open(full, "rb") as f:
+                files[rel] = f.read()
+    return dict_to_obb(files, out_path, junk_bytes=junk_bytes)
+
+
+# ---------------------------------------------------------------------------
 # Main extractor
 # ---------------------------------------------------------------------------
 
@@ -440,24 +621,4 @@ def extract(obb_path, out_dir, mode):
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Extract files from a Final Fantasy Dimensions main.obb."
-    )
-    parser.add_argument("obb_path", help="Path to main.obb")
-    parser.add_argument(
-        "--mode", choices=("raw", "proper"), default="raw",
-        help="raw = verbatim payloads (.dat); proper = decode into .png/.ogg/.msd",
-    )
-    parser.add_argument(
-        "--out", default=None,
-        help="Output directory (default: obb_extracted_perfect for raw, obb_extracted_proper for proper)",
-    )
-    args = parser.parse_args()
-    out_dir = args.out or (
-        "obb_extracted_proper" if args.mode == "proper" else "obb_extracted_perfect"
-    )
-    extract(args.obb_path, out_dir, args.mode)
-
-
-if __name__ == "__main__":
-    main()
+    parser = argparse.Argum

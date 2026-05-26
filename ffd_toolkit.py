@@ -46,6 +46,9 @@ from ffd.containers import (
     load_zip_container, load_folder_as_archive,
     load_jam_manifest,
 )
+from ffd.containers.obb import (
+    load_obb_as_dict, dict_to_obb, folder_to_obb,
+)
 from ffd.images.ic import (
     ICImage, parse_ic, render_ic, find_ic_offsets,
     _decode_palette_bgr, _decode_palette_rgb,
@@ -145,6 +148,21 @@ def main():
     from ffd.android_export.cli import is_android_cli, run as _run_android_cli
     if is_android_cli(argv):
         sys.exit(_run_android_cli(argv))
+    # --pack-obb <input-folder> <output.obb>
+    # Pack the contents of <input-folder> (recursively) into an FFD-format
+    # main.obb. Used to rebuild the OBB the modded engine reads from
+    # /sdcard/FFD_assets/main.obb after the loadAsset smali redirect.
+    if "--pack-obb" in argv:
+        idx = argv.index("--pack-obb")
+        rest = argv[idx+1:]
+        if len(rest) < 2:
+            print("usage: python ffd_toolkit.py --pack-obb <input-folder> <output.obb>",
+                  file=sys.stderr)
+            sys.exit(2)
+        in_folder, out_obb = rest[0], rest[1]
+        n = folder_to_obb(in_folder, out_obb)
+        print(f"Packed {in_folder!r} -> {out_obb!r} ({n:,} bytes)")
+        sys.exit(0)
     cli_flags = {"--compare", "--list-kinds", "--sp", "--obb", "--apk",
                  "--raw", "--show-identical", "--link-id"}
     if any(a in cli_flags or a.startswith("--compare=") for a in argv):
