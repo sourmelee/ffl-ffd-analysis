@@ -39,6 +39,7 @@ from ..cross_ref.tab import CrossRefTab
 from ..comparison.tab import ComparisonTab
 from ..maps.annotation_tab import MapAnnotationTab
 from ..android_export.tab import AndroidExportTab
+from ..sprites.converter_tab import SpriteConverterTab
 
 
 class FFDApp(tk.Tk):
@@ -48,7 +49,7 @@ class FFDApp(tk.Tk):
         FilesTab, ExtractTab, AndroidExportTab, MapTab, MapAnnotationTab,
         EventScriptTab, TextTab, CharacterTab, AnimationTab, TilesetTab,
         BackgroundTab, BattleEffectTab, MonsterTab, MusicTab, AbilityTab,
-        ItemTab, JobTab, CrossRefTab, ComparisonTab,
+        ItemTab, JobTab, CrossRefTab, ComparisonTab, SpriteConverterTab,
     ]
 
     def __init__(self):

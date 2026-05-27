@@ -1,0 +1,336 @@
+{
+  "name": "sol",
+  "mobile_source": {
+    "chpk_entry": 13,
+    "palette": 0,
+    "cell_w": 16,
+    "cell_h": 24,
+    "cols": 5,
+    "rows": 6
+  },
+  "android_target": {
+    "fldchr_id": 13,
+    "field_anm_entry": 1,
+    "output_size": [
+      256,
+      512
+    ],
+    "scale": 2,
+    "h_align": "center",
+    "v_align": "bottom"
+  },
+  "frame_map": {
+    "0": {
+      "mobile_col": 0,
+      "mobile_row": 0,
+      "mobile_cells_w": 1,
+      "mobile_cells_h": 1,
+      "flip_h": false,
+      "comment": "south idle"
+    },
+    "1": {
+      "mobile_col": 0,
+      "mobile_row": 1,
+      "mobile_cells_w": 1,
+      "mobile_cells_h": 1,
+      "flip_h": false,
+      "comment": "south walk A"
+    },
+    "2": {
+      "mobile_col": 0,
+      "mobile_row": 2,
+      "mobile_cells_w": 1,
+      "mobile_cells_h": 1,
+      "flip_h": false,
+      "comment": "south walk B"
+    },
+    "3": {
+      "mobile_col": 1,
+      "mobile_row": 0,
+      "mobile_cells_w": 1,
+      "mobile_cells_h": 1,
+      "flip_h": false,
+      "comment": "north idle"
+    },
+    "4": {
+      "mobile_col": 1,
+      "mobile_row": 1,
+      "mobile_cells_w": 1,
+      "mobile_cells_h": 1,
+      "flip_h": false,
+      "comment": "north walk A"
+    },
+    "5": {
+      "mobile_col": 1,
+      "mobile_row": 2,
+      "mobile_cells_w": 1,
+      "mobile_cells_h": 1,
+      "flip_h": false,
+      "comment": "north walk B"
+    },
+    "6": {
+      "mobile_col": 2,
+      "mobile_row": 0,
+      "mobile_cells_w": 1,
+      "mobile_cells_h": 1,
+      "flip_h": false,
+      "comment": "east idle"
+    },
+    "7": {
+      "mobile_col": 2,
+      "mobile_row": 1,
+      "mobile_cells_w": 1,
+      "mobile_cells_h": 1,
+      "flip_h": false,
+      "comment": "east walk A"
+    },
+    "8": {
+      "mobile_col": 2,
+      "mobile_row": 2,
+      "mobile_cells_w": 1,
+      "mobile_cells_h": 1,
+      "flip_h": false,
+      "comment": "east walk B"
+    },
+    "9": {
+      "mobile_col": null,
+      "mobile_row": null,
+      "mobile_cells_w": 1,
+      "mobile_cells_h": 1,
+      "flip_h": false,
+      "comment": "TODO: annotate manually"
+    },
+    "10": {
+      "mobile_col": null,
+      "mobile_row": null,
+      "mobile_cells_w": 1,
+      "mobile_cells_h": 1,
+      "flip_h": false,
+      "comment": "TODO: annotate manually"
+    },
+    "11": {
+      "mobile_col": null,
+      "mobile_row": null,
+      "mobile_cells_w": 1,
+      "mobile_cells_h": 1,
+      "flip_h": false,
+      "comment": "TODO: annotate manually"
+    },
+    "12": {
+      "mobile_col": null,
+      "mobile_row": null,
+      "mobile_cells_w": 1,
+      "mobile_cells_h": 1,
+      "flip_h": false,
+      "comment": "TODO: annotate manually"
+    },
+    "13": {
+      "mobile_col": null,
+      "mobile_row": null,
+      "mobile_cells_w": 1,
+      "mobile_cells_h": 1,
+      "flip_h": false,
+      "comment": "TODO: annotate manually"
+    },
+    "14": {
+      "mobile_col": null,
+      "mobile_row": null,
+      "mobile_cells_w": 1,
+      "mobile_cells_h": 1,
+      "flip_h": false,
+      "comment": "TODO: annotate manually"
+    },
+    "15": {
+      "mobile_col": null,
+      "mobile_row": null,
+      "mobile_cells_w": 1,
+      "mobile_cells_h": 1,
+      "flip_h": false,
+      "comment": "TODO: annotate manually"
+    },
+    "16": {
+      "mobile_col": null,
+      "mobile_row": null,
+      "mobile_cells_w": 1,
+      "mobile_cells_h": 1,
+      "flip_h": false,
+      "comment": "TODO: annotate manually"
+    },
+    "17": {
+      "mobile_col": null,
+      "mobile_row": null,
+      "mobile_cells_w": 1,
+      "mobile_cells_h": 1,
+      "flip_h": false,
+      "comment": "TODO: annotate manually"
+    },
+    "18": {
+      "mobile_col": null,
+      "mobile_row": null,
+      "mobile_cells_w": 1,
+      "mobile_cells_h": 1,
+      "flip_h": false,
+      "comment": "TODO: annotate manually"
+    },
+    "19": {
+      "mobile_col": 3,
+      "mobile_row": 1,
+      "mobile_cells_w": 2,
+      "mobile_cells_h": 1,
+      "flip_h": false,
+      "scale": 2,
+      "h_align": "left",
+      "v_align": "bottom",
+      "x_offset": -8,
+      "y_offset": 0,
+      "comment": "carry overhead: Mobile (3,1)+(4,1), scale=2, x_offset=-8"
+    },
+    "20": {
+      "mobile_col": null,
+      "mobile_row": null,
+      "mobile_cells_w": 1,
+      "mobile_cells_h": 1,
+      "flip_h": false,
+      "comment": "TODO: annotate manually"
+    },
+    "21": {
+      "mobile_col": null,
+      "mobile_row": null,
+      "mobile_cells_w": 1,
+      "mobile_cells_h": 1,
+      "flip_h": false,
+      "comment": "TODO: annotate manually"
+    },
+    "22": {
+      "mobile_col": null,
+      "mobile_row": null,
+      "mobile_cells_w": 1,
+      "mobile_cells_h": 1,
+      "flip_h": false,
+      "comment": "TODO: annotate manually"
+    },
+    "23": {
+      "mobile_col": null,
+      "mobile_row": null,
+      "mobile_cells_w": 1,
+      "mobile_cells_h": 1,
+      "flip_h": false,
+      "comment": "TODO: annotate manually"
+    },
+    "24": {
+      "mobile_col": null,
+      "mobile_row": null,
+      "mobile_cells_w": 1,
+      "mobile_cells_h": 1,
+      "flip_h": false,
+      "comment": "TODO: annotate manually"
+    }
+  },
+  "extra_frames": [
+    {
+      "name": "grid_51_151_unused",
+      "android_rect": [
+        51,
+        151,
+        48,
+        48
+      ],
+      "mobile_col": null,
+      "mobile_row": null,
+      "mobile_cells_w": 1,
+      "mobile_cells_h": 1,
+      "flip_h": false,
+      "comment": "TODO: between Android frames 11 and 9 (col x=51 row 4)"
+    },
+    {
+      "name": "grid_101_201_unused",
+      "android_rect": [
+        101,
+        201,
+        48,
+        48
+      ],
+      "mobile_col": null,
+      "mobile_row": null,
+      "mobile_cells_w": 1,
+      "mobile_cells_h": 1,
+      "flip_h": false,
+      "comment": "TODO: between Android frames 10 and 17 (col x=101 row 5)"
+    },
+    {
+      "name": "grid_251_101",
+      "android_rect": [
+        251,
+        101,
+        48,
+        48
+      ],
+      "mobile_col": null,
+      "mobile_row": null,
+      "mobile_cells_w": 1,
+      "mobile_cells_h": 1,
+      "flip_h": false,
+      "comment": "TODO: col x=251 row 3"
+    },
+    {
+      "name": "grid_251_151",
+      "android_rect": [
+        251,
+        151,
+        48,
+        48
+      ],
+      "mobile_col": null,
+      "mobile_row": null,
+      "mobile_cells_w": 1,
+      "mobile_cells_h": 1,
+      "flip_h": false,
+      "comment": "TODO: col x=251 row 4"
+    },
+    {
+      "name": "grid_251_201",
+      "android_rect": [
+        251,
+        201,
+        48,
+        48
+      ],
+      "mobile_col": null,
+      "mobile_row": null,
+      "mobile_cells_w": 1,
+      "mobile_cells_h": 1,
+      "flip_h": false,
+      "comment": "TODO: col x=251 row 5"
+    },
+    {
+      "name": "ko_lying_a",
+      "android_rect": [
+        1,
+        252,
+        48,
+        48
+      ],
+      "mobile_col": 0,
+      "mobile_row": 5,
+      "mobile_cells_w": 2,
+      "mobile_cells_h": 1,
+      "flip_h": false,
+      "comment": "EXAMPLE: KO pose A (Mobile 0,5 + 1,5 wide span)"
+    },
+    {
+      "name": "ko_lying_b",
+      "android_rect": [
+        51,
+        252,
+        48,
+        48
+      ],
+      "mobile_col": null,
+      "mobile_row": null,
+      "mobile_cells_w": 2,
+      "mobile_cells_h": 1,
+      "flip_h": false,
+      "comment": "TODO: KO/dead lying pose B"
+    }
+  ]
+}
