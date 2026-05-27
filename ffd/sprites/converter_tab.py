@@ -46,9 +46,12 @@ from .mobile_to_android import (
 )
 
 
-MOBILE_ZOOM  = 4     # 80x144 source -> 320x576 view (clear cells, 16x24 -> 64x96)
-ANDROID_ZOOM = 2     # 256x512 source -> 512x1024 view (cells 96x96)
-PREVIEW_ZOOM = 2     # same as Android so they align
+# Default integer-only zoom levels (per-canvas, user-adjustable via the
+# dropdown in each pane's LabelFrame title). Always integer nearest-neighbor.
+ZOOM_CHOICES = ("1", "2", "3", "4", "6")
+DEFAULT_MOBILE_ZOOM  = 4
+DEFAULT_ANDROID_ZOOM = 2
+DEFAULT_PREVIEW_ZOOM = 2
 
 
 class SpriteConverterTab(TabBase):
@@ -82,6 +85,16 @@ class SpriteConverterTab(TabBase):
         self._photo_mobile = None
         self._photo_android = None
         self._photo_preview = None
+        # Per-canvas zoom (integer nearest-neighbor only -- pixel art rule).
+        self._zoom_mobile  = tk.IntVar(value=DEFAULT_MOBILE_ZOOM)
+        self._zoom_android = tk.IntVar(value=DEFAULT_ANDROID_ZOOM)
+        self._zoom_preview = tk.IntVar(value=DEFAULT_PREVIEW_ZOOM)
+        for v, redraw in [
+            (self._zoom_mobile,  self._draw_mobile),
+            (self._zoom_android, self._draw_android),
+            (self._zoom_preview, self._draw_preview),
+        ]:
+            v.trace_add("write", lambda *a, r=redraw: r())
 
         self._build_top_bars()
         self._build_three_panes()
@@ -143,47 +156,63 @@ class SpriteConverterTab(TabBase):
         body = ttk.Frame(self); body.pack(fill="both", expand=True,
                                           padx=4, pady=4)
 
-        # Mobile canvas
-        m_frame = ttk.LabelFrame(body, text="Mobile (click to select; "
-                                            "shift-click to extend wide)")
-        m_frame.pack(side="left", fill="y", padx=2)
-        self._mobile_canvas = tk.Canvas(
-            m_frame, width=MOBILE_NATIVE_W * MOBILE_ZOOM,
-            height=MOBILE_NATIVE_H * MOBILE_ZOOM,
-            bg="#222", highlightthickness=0)
-        self._mobile_canvas.pack()
-        self._mobile_canvas.bind("<Button-1>", self._on_click_mobile)
-        self._mobile_canvas.bind("<Shift-Button-1>",
-                                 lambda e: self._on_click_mobile(e, shift=True))
+        def make_scrollable_pane(parent, title, zoom_var,
+                                 click_handler=None, shift_handler=None,
+                                 width=320, height=600):
+            """Build a LabelFrame containing: a zoom dropdown in the title
+            row + a Canvas with both H and V scrollbars."""
+            frame = ttk.LabelFrame(parent, text=title)
+            frame.pack(side="left", fill="both", expand=True, padx=2)
+            # Title row with zoom selector
+            tr = ttk.Frame(frame); tr.pack(side="top", fill="x")
+            ttk.Label(tr, text="Zoom:").pack(side="left", padx=(4,0))
+            cb = ttk.Combobox(tr, textvariable=zoom_var, values=ZOOM_CHOICES,
+                              width=3, state="readonly")
+            cb.pack(side="left", padx=2)
+            ttk.Label(tr, text="x",
+                      foreground="#888").pack(side="left")
+            # Canvas + scrollbars
+            inner = ttk.Frame(frame); inner.pack(side="top", fill="both",
+                                                 expand=True)
+            canvas = tk.Canvas(inner, bg="#222", highlightthickness=0,
+                               width=width, height=height)
+            vsb = ttk.Scrollbar(inner, orient="vertical",
+                                command=canvas.yview)
+            hsb = ttk.Scrollbar(inner, orient="horizontal",
+                                command=canvas.xview)
+            canvas.configure(yscrollcommand=vsb.set,
+                             xscrollcommand=hsb.set)
+            # Place via grid so both scrollbars work together
+            canvas.grid(row=0, column=0, sticky="nsew")
+            vsb.grid(row=0, column=1, sticky="ns")
+            hsb.grid(row=1, column=0, sticky="ew")
+            inner.rowconfigure(0, weight=1)
+            inner.columnconfigure(0, weight=1)
+            if click_handler:
+                canvas.bind("<Button-1>", click_handler)
+            if shift_handler:
+                canvas.bind("<Shift-Button-1>", shift_handler)
+            return canvas
 
-        # Android canvas (scrollable -- 256x512 * 2 = 512x1024)
-        a_frame = ttk.LabelFrame(body, text="Android (click frame to map / inspect)")
-        a_frame.pack(side="left", fill="both", expand=True, padx=2)
-        a_inner = ttk.Frame(a_frame); a_inner.pack(fill="both", expand=True)
-        self._android_canvas = tk.Canvas(
-            a_inner, bg="#222", highlightthickness=0,
-            width=512, height=600)
-        a_ys = ttk.Scrollbar(a_inner, orient="vertical",
-                             command=self._android_canvas.yview)
-        self._android_canvas.configure(yscrollcommand=a_ys.set)
-        a_ys.pack(side="right", fill="y")
-        self._android_canvas.pack(side="left", fill="both", expand=True)
-        self._android_canvas.bind("<Button-1>", self._on_click_android)
+        self._mobile_canvas = make_scrollable_pane(
+            body, "Mobile (click cell; shift-click adjacent to extend)",
+            self._zoom_mobile,
+            click_handler=self._on_click_mobile,
+            shift_handler=lambda e: self._on_click_mobile(e, shift=True),
+            width=340, height=600)
 
-        # Preview canvas (live render of converted output)
-        p_frame = ttk.LabelFrame(body, text="Preview (live converted output)")
-        p_frame.pack(side="left", fill="both", expand=True, padx=2)
-        p_inner = ttk.Frame(p_frame); p_inner.pack(fill="both", expand=True)
-        self._preview_canvas = tk.Canvas(
-            p_inner, bg="#222", highlightthickness=0,
-            width=512, height=600)
-        p_ys = ttk.Scrollbar(p_inner, orient="vertical",
-                             command=self._preview_canvas.yview)
-        self._preview_canvas.configure(yscrollcommand=p_ys.set)
-        p_ys.pack(side="right", fill="y")
-        self._preview_canvas.pack(side="left", fill="both", expand=True)
+        self._android_canvas = make_scrollable_pane(
+            body, "Android (click frame to map / inspect)",
+            self._zoom_android,
+            click_handler=self._on_click_android,
+            width=520, height=600)
 
-        # Inspector sidebar
+        self._preview_canvas = make_scrollable_pane(
+            body, "Preview (live converted output)",
+            self._zoom_preview,
+            width=520, height=600)
+
+        # Inspector sidebar (unchanged)
         ins = ttk.LabelFrame(body, text="Inspector (selected mapping)")
         ins.pack(side="left", fill="y", padx=2)
         self._build_inspector(ins)
@@ -427,29 +456,29 @@ class SpriteConverterTab(TabBase):
         if self._mobile_img is None:
             return
         from .mobile_to_android import _normalize_mobile_sheet
+        zoom = max(1, int(self._zoom_mobile.get() or 1))
         native = _normalize_mobile_sheet(self._mobile_img)
-        zoomed = native.resize((MOBILE_NATIVE_W*MOBILE_ZOOM,
-                                MOBILE_NATIVE_H*MOBILE_ZOOM), Image.NEAREST)
+        zoomed = native.resize((MOBILE_NATIVE_W*zoom,
+                                MOBILE_NATIVE_H*zoom), Image.NEAREST)
         self._photo_mobile = ImageTk.PhotoImage(zoomed)
         c.create_image(0, 0, image=self._photo_mobile, anchor="nw")
-        # Grid + cell labels
+        c.configure(scrollregion=(0, 0, zoomed.size[0], zoomed.size[1]))
         for col in range(MOBILE_COLS):
             for row in range(MOBILE_ROWS):
-                x = col * MOBILE_CELL_W * MOBILE_ZOOM
-                y = row * MOBILE_CELL_H * MOBILE_ZOOM
-                w = MOBILE_CELL_W * MOBILE_ZOOM
-                h = MOBILE_CELL_H * MOBILE_ZOOM
+                x = col * MOBILE_CELL_W * zoom
+                y = row * MOBILE_CELL_H * zoom
+                w = MOBILE_CELL_W * zoom
+                h = MOBILE_CELL_H * zoom
                 c.create_rectangle(x, y, x+w, y+h,
                                    outline="#c00", width=1)
                 c.create_text(x+2, y+2, anchor="nw",
                               text=f"{col},{row}", fill="#ffff80",
                               font=("TkDefaultFont", 7))
-        # Selection highlight (lime green)
         for (col, row) in self._sel_mobile:
-            x = col * MOBILE_CELL_W * MOBILE_ZOOM
-            y = row * MOBILE_CELL_H * MOBILE_ZOOM
-            w = MOBILE_CELL_W * MOBILE_ZOOM
-            h = MOBILE_CELL_H * MOBILE_ZOOM
+            x = col * MOBILE_CELL_W * zoom
+            y = row * MOBILE_CELL_H * zoom
+            w = MOBILE_CELL_W * zoom
+            h = MOBILE_CELL_H * zoom
             c.create_rectangle(x, y, x+w, y+h, outline="#0f0", width=3)
 
     def _draw_android(self):
@@ -461,18 +490,18 @@ class SpriteConverterTab(TabBase):
             entry = self._field_anm_entries[self._field_anm_entry_idx]
         except IndexError:
             return
+        zoom = max(1, int(self._zoom_android.get() or 1))
         zoomed = self._android_img.resize(
-            (self._android_img.size[0]*ANDROID_ZOOM,
-             self._android_img.size[1]*ANDROID_ZOOM),
+            (self._android_img.size[0]*zoom,
+             self._android_img.size[1]*zoom),
             Image.NEAREST)
         self._photo_android = ImageTk.PhotoImage(zoomed)
         c.create_image(0, 0, image=self._photo_android, anchor="nw")
         c.configure(scrollregion=(0, 0, zoomed.size[0], zoomed.size[1]))
 
-        # Field_anm rects in RED with frame index
         for fi, f in enumerate(entry['frames']):
-            x = f['x']*ANDROID_ZOOM; y = f['y']*ANDROID_ZOOM
-            w = f['w']*ANDROID_ZOOM; h = f['h']*ANDROID_ZOOM
+            x = f['x']*zoom; y = f['y']*zoom
+            w = f['w']*zoom; h = f['h']*zoom
             sel = self._sel_android == ("frame", fi)
             color = "#0f0" if sel else "#f44"
             width = 3 if sel else 1
@@ -481,15 +510,14 @@ class SpriteConverterTab(TabBase):
             c.create_text(x+2, y+2, anchor="nw", text=str(fi),
                           fill="#ffff80", font=("TkDefaultFont", 8, "bold"))
 
-        # Extra-frame rects in CYAN with name
         if self._spec:
             for ei, ef in enumerate(self._spec.get("extra_frames", []) or []):
                 rect = ef.get("android_rect")
                 if not rect or len(rect) != 4:
                     continue
                 ex, ey, ew, eh = rect
-                x = ex*ANDROID_ZOOM; y = ey*ANDROID_ZOOM
-                w = ew*ANDROID_ZOOM; h = eh*ANDROID_ZOOM
+                x = ex*zoom; y = ey*zoom
+                w = ew*zoom; h = eh*zoom
                 sel = self._sel_android == ("extra", ei)
                 color = "#0f0" if sel else "#0ff"
                 width = 3 if sel else 1
@@ -513,19 +541,19 @@ class SpriteConverterTab(TabBase):
             c.create_text(10, 10, anchor="nw",
                           text=f"Convert error: {e}", fill="red")
             return
-        zoomed = out.resize((out.size[0]*PREVIEW_ZOOM,
-                             out.size[1]*PREVIEW_ZOOM), Image.NEAREST)
+        zoom = max(1, int(self._zoom_preview.get() or 1))
+        zoomed = out.resize((out.size[0]*zoom,
+                             out.size[1]*zoom), Image.NEAREST)
         self._photo_preview = ImageTk.PhotoImage(zoomed)
         c.create_image(0, 0, image=self._photo_preview, anchor="nw")
         c.configure(scrollregion=(0, 0, zoomed.size[0], zoomed.size[1]))
-        # Highlight selected android frame in preview too
         if self._sel_android:
             kind, idx = self._sel_android
             if kind == "frame":
                 try:
                     f = entry['frames'][idx]
-                    x = f['x']*PREVIEW_ZOOM; y = f['y']*PREVIEW_ZOOM
-                    w = f['w']*PREVIEW_ZOOM; h = f['h']*PREVIEW_ZOOM
+                    x = f['x']*zoom; y = f['y']*zoom
+                    w = f['w']*zoom; h = f['h']*zoom
                     c.create_rectangle(x,y,x+w,y+h, outline="#0f0", width=3)
                 except IndexError:
                     pass
@@ -533,8 +561,8 @@ class SpriteConverterTab(TabBase):
                 try:
                     ef = self._spec['extra_frames'][idx]
                     ex, ey, ew, eh = ef['android_rect']
-                    x = ex*PREVIEW_ZOOM; y = ey*PREVIEW_ZOOM
-                    w = ew*PREVIEW_ZOOM; h = eh*PREVIEW_ZOOM
+                    x = ex*zoom; y = ey*zoom
+                    w = ew*zoom; h = eh*zoom
                     c.create_rectangle(x,y,x+w,y+h, outline="#0f0", width=3)
                 except (IndexError, KeyError, TypeError):
                     pass
@@ -545,8 +573,11 @@ class SpriteConverterTab(TabBase):
 
     def _on_click_mobile(self, ev, shift=False):
         if self._mobile_img is None: return
-        col = ev.x // (MOBILE_CELL_W * MOBILE_ZOOM)
-        row = ev.y // (MOBILE_CELL_H * MOBILE_ZOOM)
+        zoom = max(1, int(self._zoom_mobile.get() or 1))
+        cx = self._mobile_canvas.canvasx(ev.x)
+        cy = self._mobile_canvas.canvasy(ev.y)
+        col = int(cx // (MOBILE_CELL_W * zoom))
+        row = int(cy // (MOBILE_CELL_H * zoom))
         if not (0 <= col < MOBILE_COLS and 0 <= row < MOBILE_ROWS):
             return
         if shift and self._sel_mobile:
@@ -575,9 +606,9 @@ class SpriteConverterTab(TabBase):
             return
         cx = self._android_canvas.canvasx(ev.x)
         cy = self._android_canvas.canvasy(ev.y)
-        # Hit-test: scan all frames + extras
-        ax = cx / ANDROID_ZOOM
-        ay = cy / ANDROID_ZOOM
+        zoom = max(1, int(self._zoom_android.get() or 1))
+        ax = cx / zoom
+        ay = cy / zoom
         entry = self._field_anm_entries[self._field_anm_entry_idx]
         hit = None
         for fi, f in enumerate(entry['frames']):
