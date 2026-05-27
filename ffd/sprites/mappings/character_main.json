@@ -1,8 +1,8 @@
 {
-  "name": "sol",
+  "name": "char13_0",
   "mobile_source": {
     "chpk_entry": 13,
-    "palette": 0,
+    "palette": 1,
     "cell_w": 16,
     "cell_h": 24,
     "cols": 5,
@@ -26,7 +26,9 @@
       "mobile_cells_w": 1,
       "mobile_cells_h": 1,
       "flip_h": false,
-      "comment": "south idle"
+      "comment": "south idle",
+      "x_offset": 0,
+      "y_offset": 0
     },
     "1": {
       "mobile_col": 0,
@@ -34,7 +36,7 @@
       "mobile_cells_w": 1,
       "mobile_cells_h": 1,
       "flip_h": false,
-      "comment": "south walk A"
+      "comment": "north idle"
     },
     "2": {
       "mobile_col": 0,
@@ -42,7 +44,7 @@
       "mobile_cells_w": 1,
       "mobile_cells_h": 1,
       "flip_h": false,
-      "comment": "south walk B"
+      "comment": "west idle"
     },
     "3": {
       "mobile_col": 1,
@@ -50,7 +52,7 @@
       "mobile_cells_w": 1,
       "mobile_cells_h": 1,
       "flip_h": false,
-      "comment": "north idle"
+      "comment": "south walk A"
     },
     "4": {
       "mobile_col": 1,
@@ -66,7 +68,7 @@
       "mobile_cells_w": 1,
       "mobile_cells_h": 1,
       "flip_h": false,
-      "comment": "north walk B"
+      "comment": "west walk A"
     },
     "6": {
       "mobile_col": 2,
@@ -74,7 +76,7 @@
       "mobile_cells_w": 1,
       "mobile_cells_h": 1,
       "flip_h": false,
-      "comment": "east idle"
+      "comment": "south walk B"
     },
     "7": {
       "mobile_col": 2,
@@ -82,7 +84,7 @@
       "mobile_cells_w": 1,
       "mobile_cells_h": 1,
       "flip_h": false,
-      "comment": "east walk A"
+      "comment": "north walk b"
     },
     "8": {
       "mobile_col": 2,
@@ -90,87 +92,107 @@
       "mobile_cells_w": 1,
       "mobile_cells_h": 1,
       "flip_h": false,
-      "comment": "east walk B"
+      "comment": "west walk B"
     },
     "9": {
-      "mobile_col": null,
-      "mobile_row": null,
+      "mobile_col": 2,
+      "mobile_row": 3,
       "mobile_cells_w": 1,
       "mobile_cells_h": 1,
       "flip_h": false,
-      "comment": "TODO: annotate manually"
+      "comment": "battle attack A",
+      "x_offset": 0,
+      "y_offset": 0
     },
     "10": {
-      "mobile_col": null,
-      "mobile_row": null,
+      "mobile_col": 1,
+      "mobile_row": 4,
       "mobile_cells_w": 1,
       "mobile_cells_h": 1,
       "flip_h": false,
-      "comment": "TODO: annotate manually"
+      "comment": "battle casting A",
+      "x_offset": 0,
+      "y_offset": 0
     },
     "11": {
-      "mobile_col": null,
-      "mobile_row": null,
+      "mobile_col": 0,
+      "mobile_row": 3,
       "mobile_cells_w": 1,
       "mobile_cells_h": 1,
       "flip_h": false,
-      "comment": "TODO: annotate manually"
+      "comment": "battle idle",
+      "x_offset": 0,
+      "y_offset": 0
     },
     "12": {
-      "mobile_col": null,
-      "mobile_row": null,
+      "mobile_col": 0,
+      "mobile_row": 4,
       "mobile_cells_w": 1,
       "mobile_cells_h": 1,
       "flip_h": false,
-      "comment": "TODO: annotate manually"
+      "comment": "battle hit",
+      "x_offset": 0,
+      "y_offset": 0
     },
     "13": {
-      "mobile_col": null,
-      "mobile_row": null,
+      "mobile_col": 3,
+      "mobile_row": 0,
       "mobile_cells_w": 1,
       "mobile_cells_h": 1,
       "flip_h": false,
-      "comment": "TODO: annotate manually"
+      "comment": "down vertical",
+      "x_offset": 0,
+      "y_offset": 0
     },
     "14": {
-      "mobile_col": null,
-      "mobile_row": null,
+      "mobile_col": 4,
+      "mobile_row": 5,
       "mobile_cells_w": 1,
       "mobile_cells_h": 1,
       "flip_h": false,
-      "comment": "TODO: annotate manually"
+      "comment": "blank",
+      "x_offset": 0,
+      "y_offset": 0
     },
     "15": {
-      "mobile_col": null,
-      "mobile_row": null,
+      "mobile_col": 3,
+      "mobile_row": 2,
       "mobile_cells_w": 1,
       "mobile_cells_h": 1,
       "flip_h": false,
-      "comment": "TODO: annotate manually"
+      "comment": "sad",
+      "x_offset": 0,
+      "y_offset": 0
     },
     "16": {
-      "mobile_col": null,
-      "mobile_row": null,
+      "mobile_col": 3,
+      "mobile_row": 3,
       "mobile_cells_w": 1,
       "mobile_cells_h": 1,
       "flip_h": false,
-      "comment": "TODO: annotate manually"
+      "comment": "battle attack B",
+      "x_offset": 0,
+      "y_offset": 0
     },
     "17": {
-      "mobile_col": null,
-      "mobile_row": null,
+      "mobile_col": 3,
+      "mobile_row": 4,
       "mobile_cells_w": 1,
       "mobile_cells_h": 1,
       "flip_h": false,
-      "comment": "TODO: annotate manually"
+      "comment": "battle casting C",
+      "x_offset": 0,
+      "y_offset": 0
     },
     "18": {
-      "mobile_col": null,
-      "mobile_row": null,
+      "mobile_col": 4,
+      "mobile_row": 0,
       "mobile_cells_w": 1,
       "mobile_cells_h": 1,
       "flip_h": false,
-      "comment": "TODO: annotate manually"
+      "comment": "greet A",
+      "x_offset": 0,
+      "y_offset": 0
     },
     "19": {
       "mobile_col": 3,
@@ -178,52 +200,62 @@
       "mobile_cells_w": 2,
       "mobile_cells_h": 1,
       "flip_h": false,
-      "scale": 2,
-      "h_align": "left",
-      "v_align": "bottom",
-      "x_offset": -8,
-      "y_offset": 0,
-      "comment": "carry overhead: Mobile (3,1)+(4,1), scale=2, x_offset=-8"
+      "comment": "greet B",
+      "x_offset": -16,
+      "y_offset": 0
     },
     "20": {
-      "mobile_col": null,
-      "mobile_row": null,
+      "mobile_col": 4,
+      "mobile_row": 5,
       "mobile_cells_w": 1,
       "mobile_cells_h": 1,
       "flip_h": false,
-      "comment": "TODO: annotate manually"
+      "comment": "blank",
+      "x_offset": 0,
+      "y_offset": 0
     },
     "21": {
-      "mobile_col": null,
-      "mobile_row": null,
+      "mobile_col": 4,
+      "mobile_row": 3,
       "mobile_cells_w": 1,
       "mobile_cells_h": 1,
       "flip_h": false,
-      "comment": "TODO: annotate manually"
+      "comment": "battle critical",
+      "x_offset": 0,
+      "y_offset": 0,
+      "scale": 2,
+      "v_align": "bottom",
+      "h_align": "center"
     },
     "22": {
-      "mobile_col": null,
-      "mobile_row": null,
+      "mobile_col": 4,
+      "mobile_row": 4,
       "mobile_cells_w": 1,
       "mobile_cells_h": 1,
       "flip_h": false,
-      "comment": "TODO: annotate manually"
+      "comment": "battle fanfare",
+      "x_offset": 0,
+      "y_offset": 0
     },
     "23": {
-      "mobile_col": null,
-      "mobile_row": null,
+      "mobile_col": 4,
+      "mobile_row": 5,
       "mobile_cells_w": 1,
       "mobile_cells_h": 1,
       "flip_h": false,
-      "comment": "TODO: annotate manually"
+      "comment": "blank",
+      "x_offset": 0,
+      "y_offset": 0
     },
     "24": {
-      "mobile_col": null,
-      "mobile_row": null,
+      "mobile_col": 4,
+      "mobile_row": 5,
       "mobile_cells_w": 1,
       "mobile_cells_h": 1,
       "flip_h": false,
-      "comment": "TODO: annotate manually"
+      "comment": "blank",
+      "x_offset": 0,
+      "y_offset": 0
     }
   },
   "extra_frames": [
@@ -235,12 +267,14 @@
         48,
         48
       ],
-      "mobile_col": null,
-      "mobile_row": null,
+      "mobile_col": 1,
+      "mobile_row": 3,
       "mobile_cells_w": 1,
       "mobile_cells_h": 1,
       "flip_h": false,
-      "comment": "TODO: between Android frames 11 and 9 (col x=51 row 4)"
+      "comment": "battle ready",
+      "x_offset": 0,
+      "y_offset": 0
     },
     {
       "name": "grid_101_201_unused",
@@ -250,12 +284,14 @@
         48,
         48
       ],
-      "mobile_col": null,
-      "mobile_row": null,
+      "mobile_col": 2,
+      "mobile_row": 4,
       "mobile_cells_w": 1,
       "mobile_cells_h": 1,
       "flip_h": false,
-      "comment": "TODO: between Android frames 10 and 17 (col x=101 row 5)"
+      "comment": "battle casting B",
+      "x_offset": 0,
+      "y_offset": 0
     },
     {
       "name": "grid_251_101",
@@ -265,12 +301,14 @@
         48,
         48
       ],
-      "mobile_col": null,
-      "mobile_row": null,
+      "mobile_col": 4,
+      "mobile_row": 5,
       "mobile_cells_w": 1,
       "mobile_cells_h": 1,
       "flip_h": false,
-      "comment": "TODO: col x=251 row 3"
+      "comment": "blank",
+      "x_offset": 0,
+      "y_offset": 0
     },
     {
       "name": "grid_251_151",
@@ -280,12 +318,14 @@
         48,
         48
       ],
-      "mobile_col": null,
-      "mobile_row": null,
+      "mobile_col": 4,
+      "mobile_row": 5,
       "mobile_cells_w": 1,
       "mobile_cells_h": 1,
       "flip_h": false,
-      "comment": "TODO: col x=251 row 4"
+      "comment": "blank",
+      "x_offset": 0,
+      "y_offset": 0
     },
     {
       "name": "grid_251_201",
@@ -295,12 +335,14 @@
         48,
         48
       ],
-      "mobile_col": null,
-      "mobile_row": null,
+      "mobile_col": 4,
+      "mobile_row": 5,
       "mobile_cells_w": 1,
       "mobile_cells_h": 1,
       "flip_h": false,
-      "comment": "TODO: col x=251 row 5"
+      "comment": "blank",
+      "x_offset": 0,
+      "y_offset": 0
     },
     {
       "name": "ko_lying_a",
@@ -315,7 +357,10 @@
       "mobile_cells_w": 2,
       "mobile_cells_h": 1,
       "flip_h": false,
-      "comment": "EXAMPLE: KO pose A (Mobile 0,5 + 1,5 wide span)"
+      "comment": "down horizontal",
+      "x_offset": 8,
+      "y_offset": 0,
+      "h_align": "center"
     },
     {
       "name": "ko_lying_b",
@@ -325,12 +370,14 @@
         48,
         48
       ],
-      "mobile_col": null,
-      "mobile_row": null,
-      "mobile_cells_w": 2,
+      "mobile_col": 2,
+      "mobile_row": 5,
+      "mobile_cells_w": 1,
       "mobile_cells_h": 1,
       "flip_h": false,
-      "comment": "TODO: KO/dead lying pose B"
+      "comment": "battle attack C",
+      "x_offset": 0,
+      "y_offset": 0
     }
   ]
 }

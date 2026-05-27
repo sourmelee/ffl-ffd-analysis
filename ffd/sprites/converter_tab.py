@@ -30,6 +30,7 @@ Spec extensions consumed:
 from __future__ import annotations
 
 import os
+import json
 import traceback
 
 from PIL import Image
@@ -128,6 +129,8 @@ class SpriteConverterTab(TabBase):
                    command=self._save_spec).pack(side="left")
         ttk.Button(bar2, text="Save spec as...",
                    command=lambda: self._save_spec(prompt_path=True)).pack(side="left", padx=4)
+        ttk.Button(bar2, text="Clone for new character...",
+                   command=self._clone_for_new_character).pack(side="left", padx=4)
         self._spec_label = ttk.Label(bar2, text="No spec loaded", width=40,
                                      relief="sunken", anchor="w")
         self._spec_label.pack(side="left", padx=4)
@@ -556,11 +559,16 @@ class SpriteConverterTab(TabBase):
                 self._sel_mobile = [(col, row)]
         else:
             self._sel_mobile = [(col, row)]
-        self._status.config(text=f"Mobile selection: {self._sel_mobile}")
+        # NOTE: do NOT auto-apply here even if Android is selected --
+        # otherwise the first Mobile click clears the selection and the
+        # user can't shift-click an adjacent cell to extend to 2-cell.
+        # Apply is triggered explicitly by the next Android click.
+        nshown = len(self._sel_mobile)
+        hint = (" (shift-click adjacent to extend; then click Android to apply)"
+                if nshown == 1 else
+                " (click Android to apply)" if nshown == 2 else "")
+        self._status.config(text=f"Mobile selection: {self._sel_mobile}{hint}")
         self._draw_mobile()
-        # If an Android target is also selected, auto-apply
-        if self._sel_android:
-            self._apply_mapping()
 
     def _on_click_android(self, ev):
         if self._android_img is None or not self._field_anm_entries:
@@ -850,3 +858,104 @@ class SpriteConverterTab(TabBase):
         ttk.Button(bb, text="Add", command=add).pack(side="left")
         ttk.Button(bb, text="Delete", command=delete).pack(side="left", padx=4)
         ttk.Button(bb, text="Close", command=d.destroy).pack(side="right")
+
+    # ------------------------------------------------------------------
+    # Template-reuse: clone the current spec for a different character
+    # ------------------------------------------------------------------
+
+    def _clone_for_new_character(self):
+        """Take the currently-loaded spec (which encodes character-type
+        mappings like 'main party', 'chibi', 'frog') and clone it for
+        a different character by changing only the source/target ids.
+
+        All ``frame_map`` and ``extra_frames`` mappings are preserved
+        unchanged -- they describe HOW the cells are laid out, which is
+        per character-type, not per character. Only the Mobile chpk
+        entry / palette and the Android fldchr_id need to change to
+        retarget the spec at a new character.
+        """
+        if self._spec is None:
+            messagebox.showinfo("No spec",
+                "Load a template spec first (e.g. character_main.json).")
+            return
+        cur_target = self._spec.get("android_target", {})
+        cur_src    = self._spec.get("mobile_source", {})
+
+        d = tk.Toplevel(self)
+        d.title("Clone spec for a new character")
+        d.geometry("420x260")
+        d.transient(self.winfo_toplevel()); d.grab_set()
+
+        ttk.Label(d, text="Template:  "
+                  + (os.path.basename(self._spec_path) if self._spec_path
+                     else "(unsaved)"),
+                  foreground="#666").grid(row=0, column=0, columnspan=2,
+                                          sticky="w", padx=8, pady=(8,2))
+        ttk.Label(d, text=f"Inherits {len(self._spec.get('frame_map',{}))} "
+                          f"frame mappings + "
+                          f"{len(self._spec.get('extra_frames',[]) or [])} extras.",
+                  foreground="#080").grid(row=1, column=0, columnspan=2,
+                                          sticky="w", padx=8)
+
+        # Editable fields
+        ttk.Separator(d).grid(row=2, column=0, columnspan=2,
+                              sticky="ew", pady=8, padx=4)
+        rows = [
+            ("name", str(self._spec.get("name", "char"))),
+            ("Mobile chpk_entry", str(cur_src.get("chpk_entry", 13))),
+            ("Mobile palette",    str(cur_src.get("palette", 0))),
+            ("Android fldchr_id", str(cur_target.get("fldchr_id", 13))),
+            ("Android field_anm_entry", str(cur_target.get("field_anm_entry", 1))),
+        ]
+        vars = {}
+        for i, (lab, default) in enumerate(rows):
+            ttk.Label(d, text=lab).grid(row=3+i, column=0,
+                                        sticky="w", padx=8, pady=2)
+            v = tk.StringVar(value=default)
+            vars[lab] = v
+            ttk.Entry(d, textvariable=v, width=24
+                      ).grid(row=3+i, column=1, sticky="w", padx=8, pady=2)
+
+        def commit():
+            try:
+                new_spec = json.loads(json.dumps(self._spec))  # deep copy
+                new_spec["name"] = vars["name"].get().strip() or "char"
+                new_spec["mobile_source"]["chpk_entry"] = int(vars["Mobile chpk_entry"].get())
+                new_spec["mobile_source"]["palette"]    = int(vars["Mobile palette"].get())
+                new_spec["android_target"]["fldchr_id"] = int(vars["Android fldchr_id"].get())
+                new_spec["android_target"]["field_anm_entry"] = int(vars["Android field_anm_entry"].get())
+            except ValueError as e:
+                messagebox.showerror("Invalid", f"Numeric field failed: {e}")
+                return
+            # Prompt save location
+            default_name = f"{new_spec['name']}.json"
+            init_dir = (os.path.dirname(self._spec_path)
+                        if self._spec_path else None)
+            p = filedialog.asksaveasfilename(
+                title="Save cloned spec",
+                defaultextension=".json", filetypes=[("JSON","*.json")],
+                initialfile=default_name, initialdir=init_dir)
+            if not p:
+                return
+            try:
+                save_mapping_spec(new_spec, p)
+            except Exception as e:
+                messagebox.showerror("Save failed", str(e))
+                return
+            self._spec = new_spec
+            self._spec_path = p
+            self._spec_label.config(text=os.path.basename(p))
+            # If the user changed field_anm_entry, switch combo too
+            self._entry_var.set(str(new_spec["android_target"]["field_anm_entry"]))
+            self._on_entry_change()
+            self._refresh_all()
+            self._status.config(text=f"Cloned to {os.path.basename(p)}")
+            d.destroy()
+
+        bb = ttk.Frame(d); bb.grid(row=9, column=0, columnspan=2,
+                                   sticky="ew", pady=8, padx=4)
+        ttk.Button(bb, text="Clone and save",
+                   command=commit).pack(side="left")
+        ttk.Button(bb, text="Cancel",
+                   command=d.destroy).pack(side="right")
+
