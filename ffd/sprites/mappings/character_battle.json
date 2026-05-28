@@ -1,15 +1,15 @@
 {
   "name": "char",
   "mobile_source": {
-    "chpk_entry": 13,
-    "palette": 1,
+    "chpk_entry": 30,
+    "palette": 0,
     "cell_w": 16,
     "cell_h": 24,
     "cols": 7,
     "rows": 3
   },
   "android_target": {
-    "fldchr_id": 0,
+    "fldchr_id": 300,
     "field_anm_entry": 1,
     "output_size": [
       512,
@@ -27,7 +27,7 @@
       "mobile_cells_w": 1,
       "mobile_cells_h": 1,
       "flip_h": false,
-      "comment": "south idle",
+      "comment": "battle attack B",
       "x_offset": 0,
       "y_offset": 0
     },
@@ -37,7 +37,7 @@
       "mobile_cells_w": 1,
       "mobile_cells_h": 1,
       "flip_h": false,
-      "comment": "south walk A",
+      "comment": "battle walk C",
       "x_offset": 0,
       "y_offset": 0
     },
@@ -77,7 +77,7 @@
       "mobile_cells_w": 1,
       "mobile_cells_h": 1,
       "flip_h": false,
-      "comment": "north walk B",
+      "comment": "battle fanfare A",
       "x_offset": 0,
       "y_offset": 0
     },
@@ -125,7 +125,7 @@
       "mobile_cells_w": 1,
       "mobile_cells_h": 1,
       "flip_h": false,
-      "comment": "TODO: annotate manually",
+      "comment": "battle attack C",
       "x_offset": 0,
       "y_offset": 0
     },
@@ -145,7 +145,7 @@
       "mobile_cells_w": 1,
       "mobile_cells_h": 1,
       "flip_h": false,
-      "comment": "TODO: annotate manually",
+      "comment": "battle attack A",
       "x_offset": 0,
       "y_offset": 0
     },
@@ -155,7 +155,7 @@
       "mobile_cells_w": 1,
       "mobile_cells_h": 1,
       "flip_h": false,
-      "comment": "TODO: annotate manually",
+      "comment": "battle walk B",
       "x_offset": 0,
       "y_offset": 0
     },
@@ -175,7 +175,7 @@
       "mobile_cells_w": 1,
       "mobile_cells_h": 1,
       "flip_h": false,
-      "comment": "TODO: annotate manually",
+      "comment": "battle idle",
       "x_offset": 0,
       "y_offset": 0
     },
@@ -190,16 +190,16 @@
       "y_offset": 0
     },
     "17": {
-      "mobile_col": null,
-      "mobile_row": null,
+      "mobile_col": 6,
+      "mobile_row": 2,
       "mobile_cells_w": 1,
       "mobile_cells_h": 1,
       "flip_h": false,
       "comment": "TODO: annotate manually"
     },
     "18": {
-      "mobile_col": 3,
-      "mobile_row": 0,
+      "mobile_col": 6,
+      "mobile_row": 2,
       "mobile_cells_w": 1,
       "mobile_cells_h": 1,
       "flip_h": false,
@@ -393,7 +393,7 @@
       "flip_h": false,
       "x_offset": 0,
       "y_offset": 0,
-      "comment": "added via Android grid click"
+      "comment": "battle ground"
     },
     {
       "name": "grid_351_1",
@@ -410,7 +410,7 @@
       "flip_h": false,
       "x_offset": 0,
       "y_offset": 0,
-      "comment": "added via Android grid click"
+      "comment": "battle hit"
     },
     {
       "name": "grid_401_1",
@@ -427,7 +427,7 @@
       "flip_h": false,
       "x_offset": 0,
       "y_offset": 0,
-      "comment": "added via Android grid click"
+      "comment": "battle casting A"
     },
     {
       "name": "grid_451_1",
@@ -444,7 +444,7 @@
       "flip_h": false,
       "x_offset": 0,
       "y_offset": 0,
-      "comment": "added via Android grid click"
+      "comment": "battle casting B"
     },
     {
       "name": "grid_51_1",
@@ -461,7 +461,7 @@
       "flip_h": false,
       "x_offset": 0,
       "y_offset": 0,
-      "comment": "added via Android grid click"
+      "comment": "battle ready"
     },
     {
       "name": "grid_1_51",
@@ -478,7 +478,7 @@
       "flip_h": false,
       "x_offset": 0,
       "y_offset": 0,
-      "comment": "added via Android grid click"
+      "comment": "battle fanfare B"
     },
     {
       "name": "grid_51_51",
@@ -495,7 +495,7 @@
       "flip_h": false,
       "x_offset": 0,
       "y_offset": 0,
-      "comment": "added via Android grid click"
+      "comment": "battle walk A"
     }
   ]
 }
