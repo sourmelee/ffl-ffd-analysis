@@ -1364,6 +1364,11 @@ class SpriteConverterTab(TabBase):
                     ms["palette"] = opt["palette"]
                 self._refresh_all()
                 self._status.config(text=f"Loaded Mobile: {opt['label']}")
+                # Auto-match Android target to this Mobile selection.
+                # Guard against the reverse callback loop with a flag.
+                if not getattr(self, "_suppress_auto_match", False):
+                    self._auto_match_android(opt.get("chpk_entry"),
+                                              opt.get("palette"))
                 return
 
     def _guess_mobile_dims_from_shape(self, w, h):
@@ -1430,6 +1435,9 @@ class SpriteConverterTab(TabBase):
                             pass
                 self._refresh_all()
                 self._status.config(text=f"Loaded Android: {opt['filename']}")
+                if not getattr(self, "_suppress_auto_match", False):
+                    fid, pal = self._parse_fldchr_filename(opt.get("filename"))
+                    self._auto_match_mobile(fid, pal)
                 return
 
     def _try_autoload_field_anm(self):
@@ -1555,4 +1563,118 @@ class SpriteConverterTab(TabBase):
             self._a_origin_y.set(str(g.get("origin_y", 1)))
         finally:
             self._suppress_a_grid_cb = False
+
+    # ------------------------------------------------------------------
+    # Auto-match: bidirectional ID-based linking between Mobile and Android
+    # combos. Picking one side auto-selects the closest-ID match on the
+    # other. Closest = smallest absolute integer-ID distance; ties broken
+    # by first occurrence in the combo's value list. The reverse-callback
+    # loop is broken by the `_suppress_auto_match` guard flag.
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _parse_fldchr_filename(filename: str):
+        """Extract (fldchr_id, palette) from filenames like 'fldchr13_0.png'
+        or 'fldchr13_0_1.png'. Returns (None, None) on parse failure.
+        Handles the _1 'small variant' suffix by treating the LAST numeric
+        token after _ as palette."""
+        if not filename:
+            return (None, None)
+        base = filename
+        if base.lower().endswith(".png"):
+            base = base[:-4]
+        if not base.lower().startswith("fldchr"):
+            return (None, None)
+        body = base[len("fldchr"):]
+        parts = body.split("_")
+        try:
+            fid = int(parts[0])
+        except (ValueError, IndexError):
+            return (None, None)
+        # Palette: take parts[1] if numeric, else 0
+        pal = 0
+        if len(parts) >= 2:
+            try:
+                pal = int(parts[1])
+            except ValueError:
+                pal = 0
+        return (fid, pal)
+
+    def _auto_match_android(self, chpk_entry, palette):
+        """Mobile->Android: pick the Android fldchr option whose
+        (fldchr_id, palette) best matches (chpk_entry, palette).
+        Falls back to closest fldchr_id."""
+        if chpk_entry is None:
+            return
+        opts = getattr(self, "_android_pick_options", [])
+        if not opts:
+            return
+        target_pal = palette if palette is not None else 0
+        # Score each option: (id_distance, palette_mismatch, list_index)
+        scored = []
+        for i, opt in enumerate(opts):
+            fid, pal = self._parse_fldchr_filename(opt.get("filename"))
+            if fid is None:
+                continue
+            id_dist = abs(fid - chpk_entry)
+            pal_mismatch = 0 if pal == target_pal else 1
+            scored.append((id_dist, pal_mismatch, i, opt))
+        if not scored:
+            return
+        scored.sort()
+        best = scored[0]
+        chosen = best[3]
+        exact = (best[0] == 0 and best[1] == 0)
+        # Only update if it differs from the current selection
+        if self._android_pick_var.get() == chosen["label"]:
+            return
+        # Suppress the reverse auto-match while we programmatically pick
+        self._suppress_auto_match = True
+        try:
+            self._android_pick_var.set(chosen["label"])
+            self._on_android_pick_selected()
+        finally:
+            self._suppress_auto_match = False
+        tag = "exact" if exact else f"closest (id±{best[0]})"
+        self._status.config(
+            text=f"Auto-match Android → {chosen['filename']} [{tag}]")
+
+    def _auto_match_mobile(self, fldchr_id, palette):
+        """Android->Mobile: pick the Mobile chpk option whose
+        (chpk_entry, palette) best matches (fldchr_id, palette).
+        Falls back to closest chpk_entry; among equally close
+        candidates the first occurrence in the combo wins (per Jack's
+        scoping choice -- no chapter preference)."""
+        if fldchr_id is None:
+            return
+        opts = getattr(self, "_mobile_pick_options", [])
+        if not opts:
+            return
+        target_pal = palette if palette is not None else 0
+        scored = []
+        for i, opt in enumerate(opts):
+            e = opt.get("chpk_entry")
+            p = opt.get("palette")
+            if e is None:
+                continue
+            id_dist = abs(e - fldchr_id)
+            pal_mismatch = 0 if p == target_pal else 1
+            scored.append((id_dist, pal_mismatch, i, opt))
+        if not scored:
+            return
+        scored.sort()
+        best = scored[0]
+        chosen = best[3]
+        exact = (best[0] == 0 and best[1] == 0)
+        if self._mobile_pick_var.get() == chosen["label"]:
+            return
+        self._suppress_auto_match = True
+        try:
+            self._mobile_pick_var.set(chosen["label"])
+            self._on_mobile_pick_selected()
+        finally:
+            self._suppress_auto_match = False
+        tag = "exact" if exact else f"closest (id±{best[0]})"
+        self._status.config(
+            text=f"Auto-match Mobile → {chosen['label']} [{tag}]")
 
