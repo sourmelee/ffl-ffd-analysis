@@ -40,6 +40,11 @@ class AndroidExportTab(TabBase):
         notebook.add(enc_frame, text="Encode PNG -> .dat")
         self._build_encode_tab(enc_frame)
 
+        # Sub-tab 3: Mass convert character sheets -------------------------
+        mc_frame = ttk.Frame(notebook)
+        notebook.add(mc_frame, text="Mass convert characters")
+        self._build_mass_convert_tab(mc_frame)
+
     def _build_extract_tab(self, parent):
         intro = ttk.Label(parent, text=(
             "Extract assets from every loaded .sp scratchpad in the "
@@ -256,3 +261,245 @@ class AndroidExportTab(TabBase):
                 self._enc_btn.configure(state="normal")
 
         threading.Thread(target=worker, daemon=True).start()
+
+    # ------------------------------------------------------------------ #
+    # Sub-tab 3: Mass convert characters
+    # ------------------------------------------------------------------ #
+    def _build_mass_convert_tab(self, parent):
+        intro = ttk.Label(parent, text=(
+            "Run the Mobile -> Android sprite converter over every Mobile "
+            "chpk entry / palette across the loaded .sp slots. Each entry "
+            "is matched against the appropriate template "
+            "(character_main.json by default, character_frog.json for "
+            "chpk[2], character_mini.json for chpk[4], or "
+            "character_battle.json for 112x48 sheets) and written as "
+            "fldchr<id>_<palette>.png in the chosen folder. Existing "
+            "files in that folder are overwritten."),
+            wraplength=820)
+        intro.pack(anchor="w", padx=4, pady=4)
+
+        outf = ttk.Frame(parent)
+        outf.pack(fill="x", padx=4, pady=4)
+        ttk.Label(outf, text="Output folder:").pack(side="left")
+        self._mc_out_var = tk.StringVar(
+            value=str(Path.home() / "ffd_converted_characters"))
+        ttk.Entry(outf, textvariable=self._mc_out_var).pack(
+            side="left", fill="x", expand=True, padx=4)
+        ttk.Button(outf, text="Choose...",
+                   command=lambda: self._pick_dir(self._mc_out_var)
+                   ).pack(side="left")
+
+        # Filter options
+        optf = ttk.LabelFrame(parent, text="Filter")
+        optf.pack(fill="x", padx=4, pady=4)
+        self._mc_only_first_pal = tk.BooleanVar(value=False)
+        ttk.Checkbutton(optf, text=
+            "Only emit palette 0 (skip _1.._N variants)",
+            variable=self._mc_only_first_pal
+            ).grid(row=0, column=0, sticky="w", padx=6, pady=2)
+        self._mc_skip_existing = tk.BooleanVar(value=False)
+        ttk.Checkbutton(optf, text=
+            "Skip if output file already exists",
+            variable=self._mc_skip_existing
+            ).grid(row=0, column=1, sticky="w", padx=6, pady=2)
+
+        runf = ttk.Frame(parent); runf.pack(fill="x", padx=4, pady=4)
+        self._mc_run_btn = ttk.Button(runf, text="Mass convert",
+                                       command=self._run_mass_convert)
+        self._mc_run_btn.pack(side="left")
+        self._mc_prog = ttk.Progressbar(runf, mode="indeterminate")
+        self._mc_prog.pack(side="left", fill="x", expand=True, padx=8)
+
+        logf = ttk.LabelFrame(parent, text="Log")
+        logf.pack(fill="both", expand=True, padx=4, pady=4)
+        self._mc_log = ScrolledText(logf, height=20, wrap="word",
+                                    font=("TkFixedFont", 9))
+        self._mc_log.pack(fill="both", expand=True, padx=4, pady=4)
+
+    def _mc_logln(self, msg):
+        self._mc_log.insert("end", msg + "\n")
+        self._mc_log.see("end")
+        self._mc_log.update_idletasks()
+
+    def _run_mass_convert(self):
+        """Kick off mass conversion in a worker thread."""
+        out_path = self._mc_out_var.get().strip()
+        if not out_path:
+            messagebox.showinfo("Output folder",
+                "Choose an output folder first.")
+            return
+        try:
+            Path(out_path).mkdir(parents=True, exist_ok=True)
+        except Exception as e:
+            messagebox.showerror("Error", f"Cannot create output folder:\n{e}")
+            return
+        self._mc_log.delete("1.0", "end")
+        self._mc_run_btn.config(state="disabled")
+        self._mc_prog.start(10)
+        t = threading.Thread(target=self._mass_convert_worker,
+                             args=(out_path,), daemon=True)
+        t.start()
+
+    def _mass_convert_worker(self, out_path):
+        """Iterate every Mobile chpk entry across loaded .sp slots,
+        pick the appropriate template + convert + save."""
+        try:
+            self._mass_convert_impl(out_path)
+        except Exception as e:
+            self._mc_logln(f"FATAL: {e}")
+            self._mc_logln(traceback.format_exc())
+        finally:
+            self.after(0, self._mass_convert_done)
+
+    def _mass_convert_done(self):
+        self._mc_prog.stop()
+        self._mc_run_btn.config(state="normal")
+
+    def _mass_convert_impl(self, out_path):
+        # Imports kept local so the tab module loads cleanly without
+        # PIL/Tk during headless test
+        import os
+        from PIL import Image
+        from ..sprites.container import parse_sprite_container
+        from ..images.ic import render_ic
+        from ..sprites.mobile_to_android import (
+            load_mapping_spec, convert_mobile_sheet_to_android,
+        )
+        from ..animation.parser import parse_field_anm, parse_btl_anm
+
+        # Cache the parsed anim files (loaded once per run)
+        obb = self.data.obb_files or {}
+        field_entries = None
+        btl_entries = None
+        if "field_anm.dat" in obb:
+            try: field_entries = parse_field_anm(obb["field_anm.dat"])
+            except Exception as e: self._mc_logln(f"WARN field_anm: {e}")
+        if "btlanm_sp.dat" in obb:
+            try: btl_entries = parse_btl_anm(obb["btlanm_sp.dat"])
+            except Exception as e: self._mc_logln(f"WARN btlanm_sp: {e}")
+
+        # Locate templates folder
+        here = os.path.dirname(os.path.abspath(__file__))
+        templates_dir = os.path.normpath(
+            os.path.join(here, "..", "sprites", "mappings"))
+        self._mc_logln(f"Templates: {templates_dir}")
+        self._mc_logln(f"Output:    {out_path}")
+        self._mc_logln(f"Has field_anm: {field_entries is not None}, "
+                       f"has btlanm: {btl_entries is not None}")
+        self._mc_logln("")
+
+        # Size-based default rule (mirrors SpriteConverterTab)
+        MAIN_SIZES = ((80,144),(80,72),(64,72),(48,72))
+        BATTLE_SIZE = (112,48)
+        ENTRY_OVR = {2: "character_frog.json", 4: "character_mini.json"}
+
+        def default_template(size, entry):
+            if size == BATTLE_SIZE: return "character_battle.json"
+            if size in MAIN_SIZES:
+                return ENTRY_OVR.get(entry, "character_main.json")
+            return None
+
+        # Cache loaded templates so we don't re-read JSON for each entry
+        tpl_cache = {}
+        def load_template(name):
+            if name not in tpl_cache:
+                p = os.path.join(templates_dir, name)
+                if not os.path.exists(p):
+                    tpl_cache[name] = None
+                else:
+                    try:
+                        tpl_cache[name] = load_mapping_spec(p)
+                    except Exception as e:
+                        self._mc_logln(f"WARN template {name}: {e}")
+                        tpl_cache[name] = None
+            return tpl_cache[name]
+
+        n_done = 0
+        n_skipped = 0
+        n_failed = 0
+        for slot_label, files in (self.data.sp_slots or {}).items():
+            if not files:
+                continue
+            chpk = files.get("chpk.dat") if hasattr(files, "get") else None
+            if chpk is None:
+                continue
+            self._mc_logln(f"[{slot_label}] scanning chpk.dat...")
+            try:
+                entries = list(parse_sprite_container(chpk))
+            except Exception as e:
+                self._mc_logln(f"  parse failed: {e}")
+                continue
+            for (e_idx, v_idx, ic, _raw) in entries:
+                if self._mc_only_first_pal.get() and v_idx != 0:
+                    continue
+                size = (ic.width, ic.height)
+                tpl_name = default_template(size, e_idx)
+                if tpl_name is None:
+                    n_skipped += 1
+                    continue
+                tpl = load_template(tpl_name)
+                if tpl is None:
+                    self._mc_logln(
+                        f"  chpk[{e_idx:02d}] pal{v_idx:02d} {size}: "
+                        f"NO TEMPLATE ({tpl_name})")
+                    n_skipped += 1
+                    continue
+
+                out_file = os.path.join(
+                    out_path, f"fldchr{e_idx}_{v_idx}.png")
+                if (self._mc_skip_existing.get()
+                        and os.path.exists(out_file)):
+                    n_skipped += 1
+                    continue
+
+                # Customize template for this specific (entry, palette)
+                import copy
+                spec = copy.deepcopy(tpl)
+                ms = spec.setdefault("mobile_source", {})
+                ms["chpk_entry"] = e_idx
+                ms["palette"] = v_idx
+                at = spec.setdefault("android_target", {})
+                at["fldchr_id"] = e_idx
+
+                # Pick the right anim entry from the right parser
+                mode = at.get("mode", "field")
+                anim_entry = None
+                if mode == "battle":
+                    be = at.get("btl_entry", 0)
+                    bs = at.get("btl_sub", 0)
+                    if btl_entries:
+                        for be_obj in btl_entries:
+                            if (be_obj.get("btl_entry") == be
+                                    and be_obj.get("btl_sub") == bs):
+                                anim_entry = be_obj
+                                break
+                else:
+                    fae = at.get("field_anm_entry", 1)
+                    if field_entries and 0 <= fae < len(field_entries):
+                        anim_entry = field_entries[fae]
+
+                if anim_entry is None:
+                    self._mc_logln(
+                        f"  chpk[{e_idx:02d}] pal{v_idx:02d}: "
+                        f"no anim entry for {mode} (skipped)")
+                    n_skipped += 1
+                    continue
+
+                try:
+                    mobile_img = render_ic(ic).convert("RGBA")
+                    out_img = convert_mobile_sheet_to_android(
+                        mobile_img, anim_entry, spec, fill_missing=False)
+                    out_img.save(out_file)
+                    n_done += 1
+                    self._mc_logln(
+                        f"  chpk[{e_idx:02d}] pal{v_idx:02d} {size} "
+                        f"-> {os.path.basename(out_file)} ({tpl_name})")
+                except Exception as e:
+                    n_failed += 1
+                    self._mc_logln(
+                        f"  chpk[{e_idx:02d}] pal{v_idx:02d}: FAIL: {e}")
+
+        self._mc_logln("")
+        self._mc_logln(f"DONE: {n_done} converted, "
+                       f"{n_skipped} skipped, {n_failed} failed.")
+

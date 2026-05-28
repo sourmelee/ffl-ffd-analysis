@@ -30,6 +30,7 @@ Spec extensions consumed:
 from __future__ import annotations
 
 import os
+import sys
 import json
 import traceback
 
@@ -741,7 +742,7 @@ class SpriteConverterTab(TabBase):
         try:
             entry = self._field_anm_entries[self._field_anm_entry_idx]
             out = convert_mobile_sheet_to_android(
-                self._mobile_img, entry, self._spec, fill_missing=True)
+                self._mobile_img, entry, self._spec, fill_missing=False)
         except Exception as e:
             c.create_text(10, 10, anchor="nw",
                           text=f"Convert error: {e}", fill="red")
@@ -1063,7 +1064,7 @@ class SpriteConverterTab(TabBase):
         try:
             entry = self._field_anm_entries[self._field_anm_entry_idx]
             out = convert_mobile_sheet_to_android(self._mobile_img, entry,
-                                                  self._spec, fill_missing=True)
+                                                  self._spec, fill_missing=False)
             out.save(p)
             self._status.config(text=f"Exported {os.path.basename(p)}")
         except Exception as e:
@@ -1364,8 +1365,13 @@ class SpriteConverterTab(TabBase):
                     ms["palette"] = opt["palette"]
                 self._refresh_all()
                 self._status.config(text=f"Loaded Mobile: {opt['label']}")
+                # Auto-load the appropriate template spec based on sheet
+                # size + chpk_entry rules. Always-on per user spec; replaces
+                # current spec on every Mobile-pick.
+                self._auto_load_default_spec(
+                    (opt.get("width"), opt.get("height")),
+                    opt.get("chpk_entry"), opt.get("palette"))
                 # Auto-match Android target to this Mobile selection.
-                # Guard against the reverse callback loop with a flag.
                 if not getattr(self, "_suppress_auto_match", False):
                     self._auto_match_android(opt.get("chpk_entry"),
                                               opt.get("palette"))
@@ -1677,4 +1683,98 @@ class SpriteConverterTab(TabBase):
         tag = "exact" if exact else f"closest (id±{best[0]})"
         self._status.config(
             text=f"Auto-match Mobile → {chosen['label']} [{tag}]")
+
+    # ------------------------------------------------------------------
+    # Size-based default spec selector
+    # ------------------------------------------------------------------
+    #
+    # Rules (per user spec 2026-05-28):
+    #   Mobile 112x48                     -> character_battle.json
+    #   Mobile 80x144 / 80x72 /
+    #          64x72  / 48x72             -> character_main.json
+    #     except chpk_entry == 2          -> character_frog.json
+    #     except chpk_entry == 4          -> character_mini.json
+    #   Other sizes                       -> no change
+
+    MAIN_SHEET_SIZES = ((80, 144), (80, 72), (64, 72), (48, 72))
+    BATTLE_SHEET_SIZE = (112, 48)
+    ENTRY_OVERRIDES = {2: "character_frog.json", 4: "character_mini.json"}
+
+    def _default_spec_for_mobile(self, image_size, chpk_entry):
+        """Return the basename of the template JSON to load for a given
+        Mobile (image_size, chpk_entry), or None if no rule matches."""
+        if image_size == self.BATTLE_SHEET_SIZE:
+            return "character_battle.json"
+        if image_size in self.MAIN_SHEET_SIZES:
+            if chpk_entry in self.ENTRY_OVERRIDES:
+                return self.ENTRY_OVERRIDES[chpk_entry]
+            return "character_main.json"
+        return None
+
+    def _resolve_template_path(self, basename):
+        """Locate a template JSON in ffd/sprites/mappings/. Returns the
+        absolute path string or None if missing."""
+        if not basename:
+            return None
+        # mappings/ lives next to this module
+        here = os.path.dirname(os.path.abspath(
+            sys.modules[self.__module__].__file__))
+        candidate = os.path.join(here, "mappings", basename)
+        return candidate if os.path.exists(candidate) else None
+
+    def _auto_load_default_spec(self, image_size, chpk_entry, palette):
+        """Apply the size-based rule: pick a template and load it as the
+        current spec. Updates source-identity fields (chpk_entry, palette,
+        fldchr_id) to match the currently-picked sheet so the new spec
+        targets THIS character rather than the template's original one."""
+        tpl_name = self._default_spec_for_mobile(image_size, chpk_entry)
+        if not tpl_name:
+            return False
+        path = self._resolve_template_path(tpl_name)
+        if not path:
+            self._status.config(
+                text=f"Template {tpl_name} missing (no auto-load)")
+            return False
+        try:
+            spec = load_mapping_spec(path)
+        except Exception as e:
+            self._status.config(text=f"Template load failed: {e}")
+            return False
+        # Customize the template for this character
+        ms = spec.setdefault("mobile_source", {})
+        ms["chpk_entry"] = chpk_entry
+        if palette is not None:
+            ms["palette"] = palette
+        # Rename to char<entry>_<pal> for clarity
+        spec["name"] = f"char{chpk_entry}_{palette or 0}"
+        # If template specifies a target fldchr_id, override with our entry id
+        # (since auto-match keeps Android fldchr_id == Mobile chpk_entry).
+        at = spec.setdefault("android_target", {})
+        at["fldchr_id"] = chpk_entry
+        # Adopt the spec
+        self._spec = spec
+        self._spec_path = None  # treat as new-from-template (unsaved)
+        self._spec_label.config(
+            text=f"AUTO: {tpl_name} -> {spec['name']} (unsaved)")
+        # Restore mode + sync GUI vars from the freshly-loaded spec
+        spec_mode = at.get("mode", "field")
+        if spec_mode != self._mode.get():
+            self._mode.set(spec_mode)
+            self._on_mode_change()
+        # If template carries field_anm_entry / btl_entry+sub, set the combo
+        if spec_mode == "battle":
+            be = at.get("btl_entry"); bs = at.get("btl_sub")
+            if be is not None and bs is not None:
+                self._entry_var.set(f"{be}.{bs}")
+                self._on_entry_change()
+        else:
+            fae = at.get("field_anm_entry")
+            if fae is not None:
+                self._entry_var.set(str(fae))
+                self._on_entry_change()
+        self._sync_dims_from_spec()
+        self._sync_android_grid_from_spec()
+        self._status.config(
+            text=f"Auto-loaded {tpl_name} for chpk[{chpk_entry}] pal{palette or 0}")
+        return True
 

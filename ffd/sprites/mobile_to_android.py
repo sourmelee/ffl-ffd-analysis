@@ -289,7 +289,7 @@ def convert_mobile_sheet_to_android(
     mobile_img: Image.Image,
     field_anm_entry: dict,
     mapping_spec: dict,
-    fill_missing: bool = True,
+    fill_missing: bool = False,
 ) -> Image.Image:
     """Build an Android-layout PNG from a Mobile chpk sheet + mapping spec.
 
