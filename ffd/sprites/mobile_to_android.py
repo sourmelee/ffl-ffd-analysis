@@ -180,34 +180,52 @@ def save_mapping_spec(spec: dict, path: str) -> None:
 # Core converter
 # ---------------------------------------------------------------------------
 
-def _normalize_mobile_sheet(mobile_img: Image.Image) -> Image.Image:
-    """Return the Mobile sheet at native 80x144 size, regardless of input scale."""
+def _normalize_mobile_sheet(mobile_img: Image.Image,
+                            cell_w: int = MOBILE_CELL_W,
+                            cell_h: int = MOBILE_CELL_H,
+                            cols: int = MOBILE_COLS,
+                            rows: int = MOBILE_ROWS) -> Image.Image:
+    """Return the Mobile sheet at its native size based on the cell
+    grid dimensions. Default (16x24, 5x6) reproduces the legacy
+    80x144 field-sheet behavior, but battle / monster / other sprites
+    use different grids (e.g. 24x24 with 5x6 cols = 120x144).
+
+    If the input image matches an integer-multiple of the native size
+    (2x/3x/4x), it gets downscaled with nearest-neighbor (pixel-art
+    safe). Otherwise the image is clipped / padded into the expected
+    canvas.
+    """
     img = mobile_img.convert("RGBA")
+    native_w = cols * cell_w
+    native_h = rows * cell_h
     w, h = img.size
-    if (w, h) == (MOBILE_NATIVE_W, MOBILE_NATIVE_H):
+    if (w, h) == (native_w, native_h):
         return img
     for scale in (2, 3, 4):
-        if w == MOBILE_NATIVE_W * scale and h == MOBILE_NATIVE_H * scale:
-            return img.resize((MOBILE_NATIVE_W, MOBILE_NATIVE_H), Image.NEAREST)
-    out = Image.new("RGBA", (MOBILE_NATIVE_W, MOBILE_NATIVE_H), (0, 0, 0, 0))
-    out.paste(img.crop((0, 0, min(w, MOBILE_NATIVE_W),
-                              min(h, MOBILE_NATIVE_H))), (0, 0))
+        if w == native_w * scale and h == native_h * scale:
+            return img.resize((native_w, native_h), Image.NEAREST)
+    out = Image.new("RGBA", (native_w, native_h), (0, 0, 0, 0))
+    out.paste(img.crop((0, 0, min(w, native_w), min(h, native_h))), (0, 0))
     return out
 
 
 def _extract_mobile_cell(mobile_native: Image.Image,
                          col: int, row: int,
-                         cells_w: int = 1, cells_h: int = 1) -> Image.Image:
+                         cells_w: int = 1, cells_h: int = 1,
+                         cell_w: int = MOBILE_CELL_W,
+                         cell_h: int = MOBILE_CELL_H) -> Image.Image:
     """Extract a Mobile region spanning (cells_w x cells_h) cells from
-    the top-left corner at (col, row). Default 1x1 = single 16x24 cell.
+    the top-left corner at (col, row). Cell dimensions default to the
+    field convention (16x24); pass cell_w/cell_h overrides for battle
+    or other sprite shapes (e.g. 24x24).
 
     Multi-cell extracts are needed for wide poses like carry-overhead
     (Mobile (3,1)+(4,1)) and lying-down KO (Mobile (0,5)+(1,5)).
     """
-    x = col * MOBILE_CELL_W
-    y = row * MOBILE_CELL_H
-    w = cells_w * MOBILE_CELL_W
-    h = cells_h * MOBILE_CELL_H
+    x = col * cell_w
+    y = row * cell_h
+    w = cells_w * cell_w
+    h = cells_h * cell_h
     x2 = min(x + w, mobile_native.size[0])
     y2 = min(y + h, mobile_native.size[1])
     return mobile_native.crop((x, y, x2, y2))
@@ -280,7 +298,16 @@ def convert_mobile_sheet_to_android(
     25-frame template). Each entry may use a multi-cell Mobile source
     via ``mobile_cells_w/h``.
     """
-    mobile_native = _normalize_mobile_sheet(mobile_img)
+    # Read Mobile cell dimensions from the spec (default to legacy
+    # 16x24/5x6 if missing -- preserves back-compat with old specs).
+    ms = mapping_spec.get("mobile_source", {})
+    m_cell_w = int(ms.get("cell_w", MOBILE_CELL_W))
+    m_cell_h = int(ms.get("cell_h", MOBILE_CELL_H))
+    m_cols   = int(ms.get("cols",   MOBILE_COLS))
+    m_rows   = int(ms.get("rows",   MOBILE_ROWS))
+    mobile_native = _normalize_mobile_sheet(mobile_img,
+                                            cell_w=m_cell_w, cell_h=m_cell_h,
+                                            cols=m_cols, rows=m_rows)
     target = mapping_spec.get("android_target", {})
     ow, oh = target.get("output_size", [ANDROID_SHEET_W, ANDROID_SHEET_H])
     scale = target.get("scale", DEFAULT_SCALE)
@@ -309,14 +336,15 @@ def convert_mobile_sheet_to_android(
                 tile = _draw_missing_marker(aw, ah)
                 out.paste(tile, (ax, ay), tile)
             return
-        if not (0 <= m_col < MOBILE_COLS and 0 <= m_row < MOBILE_ROWS):
+        if not (0 <= m_col < m_cols and 0 <= m_row < m_rows):
             if fill_missing:
                 tile = _draw_missing_marker(aw, ah)
                 out.paste(tile, (ax, ay), tile)
             return
 
         cell = _extract_mobile_cell(mobile_native, m_col, m_row,
-                                    cells_w=m_cw, cells_h=m_ch)
+                                    cells_w=m_cw, cells_h=m_ch,
+                                    cell_w=m_cell_w, cell_h=m_cell_h)
         placed = _place_in_destination(cell, aw, ah, e_scale,
                                        e_halign, e_valign, flip_h,
                                        x_offset=x_off, y_offset=y_off)
@@ -352,18 +380,31 @@ def render_diagnostic_overlay(mobile_img: Image.Image,
 
     Field_anm rects drawn in RED with frame indices. If ``mapping_spec``
     is supplied, its ``extra_frames`` are also drawn in CYAN with their
-    ``name`` field as the label, so the user can see what's been added
-    beyond the standard 25-frame template.
+    ``name`` field as the label.
+
+    Mobile cell dimensions are read from ``mapping_spec.mobile_source``
+    (defaulting to 16x24/5x6 when no spec is supplied).
     """
-    mobile_native = _normalize_mobile_sheet(mobile_img)
-    mz = mobile_native.resize((MOBILE_NATIVE_W * zoom,
-                               MOBILE_NATIVE_H * zoom), Image.NEAREST)
+    if mapping_spec:
+        ms = mapping_spec.get("mobile_source", {})
+        cell_w = int(ms.get("cell_w", MOBILE_CELL_W))
+        cell_h = int(ms.get("cell_h", MOBILE_CELL_H))
+        cols   = int(ms.get("cols",   MOBILE_COLS))
+        rows   = int(ms.get("rows",   MOBILE_ROWS))
+    else:
+        cell_w, cell_h = MOBILE_CELL_W, MOBILE_CELL_H
+        cols, rows = MOBILE_COLS, MOBILE_ROWS
+    native_w, native_h = cols * cell_w, rows * cell_h
+    mobile_native = _normalize_mobile_sheet(mobile_img,
+                                            cell_w=cell_w, cell_h=cell_h,
+                                            cols=cols, rows=rows)
+    mz = mobile_native.resize((native_w * zoom, native_h * zoom), Image.NEAREST)
     md = ImageDraw.Draw(mz)
-    for c in range(MOBILE_COLS):
-        for r in range(MOBILE_ROWS):
-            x, y = c * MOBILE_CELL_W * zoom, r * MOBILE_CELL_H * zoom
-            md.rectangle([x, y, x + MOBILE_CELL_W * zoom - 1,
-                              y + MOBILE_CELL_H * zoom - 1],
+    for c in range(cols):
+        for r in range(rows):
+            x, y = c * cell_w * zoom, r * cell_h * zoom
+            md.rectangle([x, y, x + cell_w * zoom - 1,
+                              y + cell_h * zoom - 1],
                          outline=(255, 0, 0, 200))
             md.text((x + 2, y + 1), f"{c},{r}", fill=(255, 255, 0))
 

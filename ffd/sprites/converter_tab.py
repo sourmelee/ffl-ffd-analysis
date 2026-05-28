@@ -37,7 +37,7 @@ from PIL import Image
 
 from ..gui_stub import tk, ttk, filedialog, messagebox, ImageTk
 from ..gui_core.base import TabBase
-from ..animation.parser import parse_field_anm
+from ..animation.parser import parse_field_anm, parse_btl_anm
 from .mobile_to_android import (
     MOBILE_COLS, MOBILE_ROWS, MOBILE_CELL_W, MOBILE_CELL_H,
     MOBILE_NATIVE_W, MOBILE_NATIVE_H,
@@ -67,6 +67,9 @@ class SpriteConverterTab(TabBase):
         super().__init__(parent, data)
 
         # --- State ------------------------------------------------------
+        # Mode: "field" uses field_anm.dat (256x512 output);
+        # "battle" uses btlanm_sp.dat (512x512 output, sub-block addressing).
+        self._mode = tk.StringVar(value="field")
         self._mobile_path: str | None = None
         self._android_path: str | None = None
         self._field_anm_path: str | None = None
@@ -96,6 +99,28 @@ class SpriteConverterTab(TabBase):
         ]:
             v.trace_add("write", lambda *a, r=redraw: r())
 
+        # Android grid controls: a configurable "what if this sheet were a
+        # uniform grid" overlay. Cells not already covered by a field_anm
+        # rect (red) or an extra_frame (cyan) are drawn in YELLOW. Clicking
+        # a yellow cell auto-creates an extra_frame at that position.
+        # Defaults match field_anm party-member layout (6x5 at pitch 50).
+        self._a_cell_w = tk.StringVar(value="48")
+        self._a_cell_h = tk.StringVar(value="48")
+        self._a_pitch_x = tk.StringVar(value="50")
+        self._a_pitch_y = tk.StringVar(value="50")
+        self._a_cols   = tk.StringVar(value="6")
+        self._a_rows   = tk.StringVar(value="5")
+        self._a_origin_x = tk.StringVar(value="1")
+        self._a_origin_y = tk.StringVar(value="1")
+        self._a_grid_show = tk.BooleanVar(value=True)
+        for v in (self._a_cell_w, self._a_cell_h,
+                  self._a_pitch_x, self._a_pitch_y,
+                  self._a_cols, self._a_rows,
+                  self._a_origin_x, self._a_origin_y):
+            v.trace_add("write", lambda *a: self._on_android_grid_change())
+        self._a_grid_show.trace_add("write",
+                                    lambda *a: self._draw_android())
+
         self._build_top_bars()
         self._build_three_panes()
         self._build_action_bar()
@@ -106,32 +131,81 @@ class SpriteConverterTab(TabBase):
     # ------------------------------------------------------------------
 
     def _build_top_bars(self):
+        # --- Source type + loaded-entries pickers --------------------------
         bar = ttk.Frame(self); bar.pack(side="top", fill="x", padx=4, pady=2)
-        ttk.Button(bar, text="Pick Mobile chpk PNG",
-                   command=self._pick_mobile).pack(side="left")
-        self._mobile_label = ttk.Label(bar, text="(none)", width=30,
+
+        ttk.Label(bar, text="Source type:").pack(side="left", padx=(0,2))
+        self._source_type = tk.StringVar(value="Characters")
+        st_combo = ttk.Combobox(bar, textvariable=self._source_type,
+                                values=("Characters",), width=12,
+                                state="readonly")
+        st_combo.pack(side="left", padx=2)
+        st_combo.bind("<<ComboboxSelected>>",
+                      lambda e: self._refresh_source_pickers())
+
+        ttk.Label(bar, text=" Mode:").pack(side="left", padx=(8,2))
+        mode_combo = ttk.Combobox(bar, textvariable=self._mode,
+                                  values=("field", "battle"), width=7,
+                                  state="readonly")
+        mode_combo.pack(side="left", padx=2)
+        mode_combo.bind("<<ComboboxSelected>>",
+                        lambda e: self._on_mode_change())
+
+        ttk.Label(bar, text=" Mobile:").pack(side="left", padx=(8,2))
+        self._mobile_pick_var = tk.StringVar()
+        self._mobile_pick_combo = ttk.Combobox(
+            bar, textvariable=self._mobile_pick_var, values=(),
+            width=35, state="readonly")
+        self._mobile_pick_combo.pack(side="left", padx=2)
+        self._mobile_pick_combo.bind("<<ComboboxSelected>>",
+            lambda e: self._on_mobile_pick_selected())
+
+        ttk.Label(bar, text=" Android:").pack(side="left", padx=(8,2))
+        self._android_pick_var = tk.StringVar()
+        self._android_pick_combo = ttk.Combobox(
+            bar, textvariable=self._android_pick_var, values=(),
+            width=25, state="readonly")
+        self._android_pick_combo.pack(side="left", padx=2)
+        self._android_pick_combo.bind("<<ComboboxSelected>>",
+            lambda e: self._on_android_pick_selected())
+
+        ttk.Button(bar, text="Refresh from project",
+                   command=self._refresh_source_pickers).pack(side="left", padx=4)
+
+        # --- Disk fallback row (escape hatches for files not in project) ---
+        bar_disk = ttk.Frame(self); bar_disk.pack(side="top", fill="x",
+                                                  padx=4, pady=1)
+        ttk.Label(bar_disk, text=" Disk fallback:",
+                  foreground="#888").pack(side="left")
+        ttk.Button(bar_disk, text="Pick Mobile PNG",
+                   command=self._pick_mobile).pack(side="left", padx=2)
+        self._mobile_label = ttk.Label(bar_disk, text="(none)", width=24,
                                        relief="sunken", anchor="w")
-        self._mobile_label.pack(side="left", padx=4)
-
-        ttk.Button(bar, text="Pick Android sheet PNG",
-                   command=self._pick_android).pack(side="left")
-        self._android_label = ttk.Label(bar, text="(none)", width=24,
+        self._mobile_label.pack(side="left", padx=2)
+        ttk.Button(bar_disk, text="Pick Android PNG",
+                   command=self._pick_android).pack(side="left", padx=2)
+        self._android_label = ttk.Label(bar_disk, text="(none)", width=22,
                                         relief="sunken", anchor="w")
-        self._android_label.pack(side="left", padx=4)
-
-        ttk.Button(bar, text="Pick field_anm.dat",
-                   command=self._pick_field_anm).pack(side="left")
-        self._fanm_label = ttk.Label(bar, text="(none)", width=20,
+        self._android_label.pack(side="left", padx=2)
+        ttk.Button(bar_disk, text="Pick field_anm.dat",
+                   command=self._pick_field_anm).pack(side="left", padx=2)
+        self._fanm_label = ttk.Label(bar_disk, text="(none)", width=18,
                                      relief="sunken", anchor="w")
-        self._fanm_label.pack(side="left", padx=4)
-
-        ttk.Label(bar, text="Entry:").pack(side="left", padx=(8,0))
+        self._fanm_label.pack(side="left", padx=2)
+        ttk.Label(bar_disk, text=" Entry:").pack(side="left", padx=(8,0))
         self._entry_var = tk.StringVar(value="1")
-        self._entry_combo = ttk.Combobox(bar, textvariable=self._entry_var,
+        self._entry_combo = ttk.Combobox(bar_disk,
+                                         textvariable=self._entry_var,
                                          width=4, state="readonly")
         self._entry_combo.pack(side="left")
         self._entry_combo.bind("<<ComboboxSelected>>",
                                lambda e: self._on_entry_change())
+
+        # Try to populate the source pickers from currently-loaded data.
+        # (Called after_idle so listeners on FFData fire first if needed.)
+        self.after_idle(self._refresh_source_pickers)
+        # Try to auto-load field_anm.dat from the project's OBB on init.
+        self.after_idle(self._try_autoload_field_anm)
 
         bar2 = ttk.Frame(self); bar2.pack(side="top", fill="x", padx=4, pady=2)
         ttk.Button(bar2, text="New starter spec",
@@ -158,12 +232,17 @@ class SpriteConverterTab(TabBase):
 
         def make_scrollable_pane(parent, title, zoom_var,
                                  click_handler=None, shift_handler=None,
-                                 width=320, height=600):
+                                 width=320, height=600,
+                                 extra_title_widgets=None):
             """Build a LabelFrame containing: a zoom dropdown in the title
-            row + a Canvas with both H and V scrollbars."""
+            row + a Canvas with both H and V scrollbars.
+
+            ``extra_title_widgets``: optional callable that takes the title
+            row ttk.Frame and packs additional widgets into it (used by
+            the Mobile pane to expose cell dim entries).
+            """
             frame = ttk.LabelFrame(parent, text=title)
             frame.pack(side="left", fill="both", expand=True, padx=2)
-            # Title row with zoom selector
             tr = ttk.Frame(frame); tr.pack(side="top", fill="x")
             ttk.Label(tr, text="Zoom:").pack(side="left", padx=(4,0))
             cb = ttk.Combobox(tr, textvariable=zoom_var, values=ZOOM_CHOICES,
@@ -171,6 +250,8 @@ class SpriteConverterTab(TabBase):
             cb.pack(side="left", padx=2)
             ttk.Label(tr, text="x",
                       foreground="#888").pack(side="left")
+            if extra_title_widgets:
+                extra_title_widgets(tr)
             # Canvas + scrollbars
             inner = ttk.Frame(frame); inner.pack(side="top", fill="both",
                                                  expand=True)
@@ -194,18 +275,74 @@ class SpriteConverterTab(TabBase):
                 canvas.bind("<Shift-Button-1>", shift_handler)
             return canvas
 
+        # Mobile pane: title row gets cell_w/cell_h/cols/rows entries
+        # so the user can tune the grid for non-default sheets (battle,
+        # monster, etc.). Changes sync into spec.mobile_source and trigger
+        # an immediate redraw.
+        self._cell_w_var = tk.StringVar(value=str(MOBILE_CELL_W))
+        self._cell_h_var = tk.StringVar(value=str(MOBILE_CELL_H))
+        self._cols_var   = tk.StringVar(value=str(MOBILE_COLS))
+        self._rows_var   = tk.StringVar(value=str(MOBILE_ROWS))
+        for v in (self._cell_w_var, self._cell_h_var,
+                  self._cols_var, self._rows_var):
+            v.trace_add("write", lambda *a: self._on_cell_dims_change())
+
+        def _mobile_extras(tr):
+            ttk.Label(tr, text="  cell:",
+                      foreground="#888").pack(side="left", padx=(8,0))
+            ttk.Entry(tr, textvariable=self._cell_w_var, width=3
+                      ).pack(side="left")
+            ttk.Label(tr, text="x").pack(side="left")
+            ttk.Entry(tr, textvariable=self._cell_h_var, width=3
+                      ).pack(side="left")
+            ttk.Label(tr, text="  cols:",
+                      foreground="#888").pack(side="left", padx=(8,0))
+            ttk.Entry(tr, textvariable=self._cols_var, width=3
+                      ).pack(side="left")
+            ttk.Label(tr, text=" rows:",
+                      foreground="#888").pack(side="left", padx=(4,0))
+            ttk.Entry(tr, textvariable=self._rows_var, width=3
+                      ).pack(side="left")
+
         self._mobile_canvas = make_scrollable_pane(
             body, "Mobile (click cell; shift-click adjacent to extend)",
             self._zoom_mobile,
             click_handler=self._on_click_mobile,
             shift_handler=lambda e: self._on_click_mobile(e, shift=True),
-            width=340, height=600)
+            width=340, height=600,
+            extra_title_widgets=_mobile_extras)
+
+        def _android_extras(tr):
+            ttk.Label(tr, text="  cell:",
+                      foreground="#888").pack(side="left", padx=(8,0))
+            ttk.Entry(tr, textvariable=self._a_cell_w, width=3).pack(side="left")
+            ttk.Label(tr, text="x").pack(side="left")
+            ttk.Entry(tr, textvariable=self._a_cell_h, width=3).pack(side="left")
+            ttk.Label(tr, text=" pitch:",
+                      foreground="#888").pack(side="left", padx=(4,0))
+            ttk.Entry(tr, textvariable=self._a_pitch_x, width=3).pack(side="left")
+            ttk.Label(tr, text="x").pack(side="left")
+            ttk.Entry(tr, textvariable=self._a_pitch_y, width=3).pack(side="left")
+            ttk.Label(tr, text=" cols:",
+                      foreground="#888").pack(side="left", padx=(4,0))
+            ttk.Entry(tr, textvariable=self._a_cols, width=3).pack(side="left")
+            ttk.Label(tr, text=" rows:",
+                      foreground="#888").pack(side="left", padx=(4,0))
+            ttk.Entry(tr, textvariable=self._a_rows, width=3).pack(side="left")
+            ttk.Label(tr, text=" orig:",
+                      foreground="#888").pack(side="left", padx=(4,0))
+            ttk.Entry(tr, textvariable=self._a_origin_x, width=3).pack(side="left")
+            ttk.Label(tr, text=",").pack(side="left")
+            ttk.Entry(tr, textvariable=self._a_origin_y, width=3).pack(side="left")
+            ttk.Checkbutton(tr, text="grid",
+                            variable=self._a_grid_show).pack(side="left", padx=(8,0))
 
         self._android_canvas = make_scrollable_pane(
-            body, "Android (click frame to map / inspect)",
+            body, "Android (click cell to map / inspect; yellow = grid extras)",
             self._zoom_android,
             click_handler=self._on_click_android,
-            width=520, height=600)
+            width=520, height=600,
+            extra_title_widgets=_android_extras)
 
         self._preview_canvas = make_scrollable_pane(
             body, "Preview (live converted output)",
@@ -342,29 +479,70 @@ class SpriteConverterTab(TabBase):
             messagebox.showerror("Error", f"Failed to load Android sheet:\n{e}")
 
     def _pick_field_anm(self):
-        p = filedialog.askopenfilename(title="Pick field_anm.dat",
+        mode = self._mode.get()
+        title = ("Pick field_anm.dat" if mode == "field"
+                 else "Pick btlanm_sp.dat")
+        p = filedialog.askopenfilename(title=title,
                                        filetypes=[("DAT","*.dat"),("All","*.*")])
         if not p: return
         try:
             data = open(p, "rb").read()
-            self._field_anm_entries = parse_field_anm(data)
+            self._field_anm_entries = self._parse_anim_data(data)
             if not self._field_anm_entries:
                 raise RuntimeError("No entries parsed")
             self._field_anm_path = p
             self._fanm_label.config(
-                text=f"{os.path.basename(p)} ({len(self._field_anm_entries)} entries)")
-            self._entry_combo.config(
-                values=[str(i) for i,e in enumerate(self._field_anm_entries)
-                        if e['n_frames'] > 0])
+                text=f"{os.path.basename(p)} "
+                     f"({len(self._field_anm_entries)} entries)")
+            self._populate_entry_combo()
             self._on_entry_change()
         except Exception as e:
-            messagebox.showerror("Error", f"Failed to load field_anm.dat:\n{e}")
+            messagebox.showerror("Error", f"Failed to load anim file:\n{e}")
+
+    def _parse_anim_data(self, data: bytes):
+        """Mode-aware parsing: field_anm vs btl_anm. Both return a list
+        of entry dicts with 'frames' / 'sub_anims' / 'n_frames'. Battle
+        entries are flat sub-blocks (each with btl_entry/btl_sub keys)."""
+        if self._mode.get() == "battle":
+            return parse_btl_anm(data)
+        return parse_field_anm(data)
+
+    def _populate_entry_combo(self):
+        """Fill the entry combo. In field mode shows entry indices.
+        In battle mode shows 'btl_entry.btl_sub' labels for the flat
+        sub-block entries (more useful than the global index)."""
+        if not self._field_anm_entries:
+            self._entry_combo.config(values=())
+            return
+        labels = []
+        for e in self._field_anm_entries:
+            if e['n_frames'] <= 0:
+                continue
+            if "btl_entry" in e:
+                labels.append(f"{e['btl_entry']}.{e['btl_sub']}")
+            else:
+                labels.append(str(e['index']))
+        self._entry_combo.config(values=labels)
 
     def _on_entry_change(self):
-        try:
-            self._field_anm_entry_idx = int(self._entry_var.get())
-        except ValueError:
+        sel = self._entry_var.get().strip()
+        if not sel or not self._field_anm_entries:
             return
+        # Try resolving "N.M" battle label first, then plain "N" field index
+        idx = None
+        for i, e in enumerate(self._field_anm_entries):
+            if "btl_entry" in e:
+                if f"{e['btl_entry']}.{e['btl_sub']}" == sel:
+                    idx = i; break
+            else:
+                if str(e['index']) == sel or str(i) == sel:
+                    idx = i; break
+        if idx is None:
+            try:
+                idx = int(sel)
+            except ValueError:
+                return
+        self._field_anm_entry_idx = idx
         self._sel_android = None
         self._refresh_all()
 
@@ -382,6 +560,8 @@ class SpriteConverterTab(TabBase):
             field_anm_entry=self._field_anm_entry_idx)
         self._spec_path = None
         self._spec_label.config(text=f"NEW: {name} (unsaved)")
+        self._sync_dims_from_spec()
+        self._sync_android_grid_from_spec()
         self._refresh_all()
 
     def _load_spec(self):
@@ -392,10 +572,17 @@ class SpriteConverterTab(TabBase):
             self._spec = load_mapping_spec(p)
             self._spec_path = p
             self._spec_label.config(text=os.path.basename(p))
+            # Restore mode from spec (default field for back-compat)
+            spec_mode = self._spec.get("android_target",{}).get("mode", "field")
+            if spec_mode != self._mode.get():
+                self._mode.set(spec_mode)
+                self._on_mode_change()
             ent = self._spec.get("android_target",{}).get("field_anm_entry")
             if ent is not None:
                 self._entry_var.set(str(ent))
                 self._on_entry_change()
+            self._sync_dims_from_spec()
+            self._sync_android_grid_from_spec()
             self._refresh_all()
         except Exception as e:
             messagebox.showerror("Error", f"Failed to load spec:\n{e}")
@@ -457,28 +644,31 @@ class SpriteConverterTab(TabBase):
             return
         from .mobile_to_android import _normalize_mobile_sheet
         zoom = max(1, int(self._zoom_mobile.get() or 1))
-        native = _normalize_mobile_sheet(self._mobile_img)
-        zoomed = native.resize((MOBILE_NATIVE_W*zoom,
-                                MOBILE_NATIVE_H*zoom), Image.NEAREST)
+        cell_w, cell_h, cols, rows = self._current_mobile_dims()
+        native_w, native_h = cols * cell_w, rows * cell_h
+        native = _normalize_mobile_sheet(self._mobile_img,
+                                         cell_w=cell_w, cell_h=cell_h,
+                                         cols=cols, rows=rows)
+        zoomed = native.resize((native_w*zoom, native_h*zoom), Image.NEAREST)
         self._photo_mobile = ImageTk.PhotoImage(zoomed)
         c.create_image(0, 0, image=self._photo_mobile, anchor="nw")
         c.configure(scrollregion=(0, 0, zoomed.size[0], zoomed.size[1]))
-        for col in range(MOBILE_COLS):
-            for row in range(MOBILE_ROWS):
-                x = col * MOBILE_CELL_W * zoom
-                y = row * MOBILE_CELL_H * zoom
-                w = MOBILE_CELL_W * zoom
-                h = MOBILE_CELL_H * zoom
+        for col in range(cols):
+            for row in range(rows):
+                x = col * cell_w * zoom
+                y = row * cell_h * zoom
+                w = cell_w * zoom
+                h = cell_h * zoom
                 c.create_rectangle(x, y, x+w, y+h,
                                    outline="#c00", width=1)
                 c.create_text(x+2, y+2, anchor="nw",
                               text=f"{col},{row}", fill="#ffff80",
                               font=("TkDefaultFont", 7))
         for (col, row) in self._sel_mobile:
-            x = col * MOBILE_CELL_W * zoom
-            y = row * MOBILE_CELL_H * zoom
-            w = MOBILE_CELL_W * zoom
-            h = MOBILE_CELL_H * zoom
+            x = col * cell_w * zoom
+            y = row * cell_h * zoom
+            w = cell_w * zoom
+            h = cell_h * zoom
             c.create_rectangle(x, y, x+w, y+h, outline="#0f0", width=3)
 
     def _draw_android(self):
@@ -527,6 +717,21 @@ class SpriteConverterTab(TabBase):
                               text=ef.get("name","?")[:8],
                               fill="#0ff", font=("TkDefaultFont", 7))
 
+        # Yellow grid overlay for unmapped positions
+        if self._a_grid_show.get():
+            covered = self._covered_rects(entry)
+            for gx, gy, gw, gh in self._iter_android_grid():
+                if (gx, gy, gw, gh) in covered:
+                    continue  # already mapped (red or cyan)
+                # Skip cells that go off the sheet
+                if (gx + gw > self._android_img.size[0]
+                        or gy + gh > self._android_img.size[1]):
+                    continue
+                c.create_rectangle(gx*zoom, gy*zoom,
+                                   (gx+gw)*zoom, (gy+gh)*zoom,
+                                   outline="#ff0", width=1,
+                                   tags=("grid", f"{gx},{gy}"))
+
     def _draw_preview(self):
         c = self._preview_canvas
         c.delete("all")
@@ -574,11 +779,12 @@ class SpriteConverterTab(TabBase):
     def _on_click_mobile(self, ev, shift=False):
         if self._mobile_img is None: return
         zoom = max(1, int(self._zoom_mobile.get() or 1))
+        cell_w, cell_h, cols, rows = self._current_mobile_dims()
         cx = self._mobile_canvas.canvasx(ev.x)
         cy = self._mobile_canvas.canvasy(ev.y)
-        col = int(cx // (MOBILE_CELL_W * zoom))
-        row = int(cy // (MOBILE_CELL_H * zoom))
-        if not (0 <= col < MOBILE_COLS and 0 <= row < MOBILE_ROWS):
+        col = int(cx // (cell_w * zoom))
+        row = int(cy // (cell_h * zoom))
+        if not (0 <= col < cols and 0 <= row < rows):
             return
         if shift and self._sel_mobile:
             first_col, first_row = self._sel_mobile[0]
@@ -623,6 +829,31 @@ class SpriteConverterTab(TabBase):
                 ex, ey, ew, eh = rect
                 if ex <= ax <= ex+ew and ey <= ay <= ey+eh:
                     hit = ("extra", ei); break
+
+        # If no rect hit, try the Android grid overlay -- click on a yellow
+        # grid cell auto-creates an extra_frame there.
+        if hit is None and self._a_grid_show.get() and self._spec is not None:
+            for gx, gy, gw, gh in self._iter_android_grid():
+                if gx <= ax <= gx+gw and gy <= ay <= gy+gh:
+                    # Create a new extra_frame for this grid cell
+                    efs = self._spec.setdefault("extra_frames", [])
+                    name = f"grid_{gx}_{gy}"
+                    # Avoid duplicate names
+                    n = name
+                    suffix = 0
+                    while any(e.get("name") == n for e in efs):
+                        suffix += 1
+                        n = f"{name}_{suffix}"
+                    efs.append({"name": n,
+                                "android_rect": [gx, gy, gw, gh],
+                                "mobile_col": None, "mobile_row": None,
+                                "mobile_cells_w": 1, "mobile_cells_h": 1,
+                                "flip_h": False, "x_offset": 0, "y_offset": 0,
+                                "comment": "added via Android grid click"})
+                    hit = ("extra", len(efs) - 1)
+                    self._status.config(
+                        text=f"Created extra frame {n} at ({gx},{gy},{gw},{gh})")
+                    break
         if hit is None:
             return
         self._sel_android = hit
@@ -976,9 +1207,10 @@ class SpriteConverterTab(TabBase):
             self._spec = new_spec
             self._spec_path = p
             self._spec_label.config(text=os.path.basename(p))
-            # If the user changed field_anm_entry, switch combo too
             self._entry_var.set(str(new_spec["android_target"]["field_anm_entry"]))
             self._on_entry_change()
+            self._sync_dims_from_spec()
+            self._sync_android_grid_from_spec()
             self._refresh_all()
             self._status.config(text=f"Cloned to {os.path.basename(p)}")
             d.destroy()
@@ -989,4 +1221,338 @@ class SpriteConverterTab(TabBase):
                    command=commit).pack(side="left")
         ttk.Button(bb, text="Cancel",
                    command=d.destroy).pack(side="right")
+
+    # ------------------------------------------------------------------
+    # Cell-dim helpers (Mobile pane title-row entries <-> spec dims)
+    # ------------------------------------------------------------------
+
+    def _current_mobile_dims(self):
+        """Return current (cell_w, cell_h, cols, rows) from the GUI vars,
+        falling back to constants on parse error."""
+        def _safe_int(var, default):
+            try:
+                v = int(var.get())
+                return v if v > 0 else default
+            except (ValueError, AttributeError):
+                return default
+        return (_safe_int(self._cell_w_var, MOBILE_CELL_W),
+                _safe_int(self._cell_h_var, MOBILE_CELL_H),
+                _safe_int(self._cols_var,   MOBILE_COLS),
+                _safe_int(self._rows_var,   MOBILE_ROWS))
+
+    def _on_cell_dims_change(self):
+        """User edited cell_w/h/cols/rows: sync into spec.mobile_source
+        and redraw Mobile + Preview."""
+        if getattr(self, "_suppress_dim_cb", False):
+            return
+        cell_w, cell_h, cols, rows = self._current_mobile_dims()
+        if self._spec is not None:
+            ms = self._spec.setdefault("mobile_source", {})
+            ms["cell_w"] = cell_w
+            ms["cell_h"] = cell_h
+            ms["cols"]   = cols
+            ms["rows"]   = rows
+        self._draw_mobile()
+        self._draw_preview()
+
+    def _sync_dims_from_spec(self):
+        """When a spec is loaded, push its mobile_source dims into the
+        GUI vars without triggering the change callback."""
+        if self._spec is None:
+            return
+        ms = self._spec.get("mobile_source", {})
+        self._suppress_dim_cb = True
+        try:
+            self._cell_w_var.set(str(ms.get("cell_w", MOBILE_CELL_W)))
+            self._cell_h_var.set(str(ms.get("cell_h", MOBILE_CELL_H)))
+            self._cols_var.set(str(ms.get("cols", MOBILE_COLS)))
+            self._rows_var.set(str(ms.get("rows", MOBILE_ROWS)))
+        finally:
+            self._suppress_dim_cb = False
+
+    # ------------------------------------------------------------------
+    # Loaded-files pickers (Source type: Characters)
+    # ------------------------------------------------------------------
+
+    def _refresh_source_pickers(self):
+        """Re-enumerate Mobile and Android source options from the loaded
+        project data (FFData.sp_slots + obb_files). For Source type =
+        'Characters', shows Mobile chpk party-member-shape entries and
+        Android fldchr*.png files."""
+        kind = self._source_type.get()
+        mobile_opts = []
+        android_opts = []
+        if kind == "Characters":
+            mobile_opts = self._enumerate_mobile_chpk_characters()
+            android_opts = self._enumerate_android_fldchr()
+
+        self._mobile_pick_options = mobile_opts
+        self._android_pick_options = android_opts
+        # Combobox shows only the labels; selection is matched by index
+        self._mobile_pick_combo.config(values=[o["label"] for o in mobile_opts])
+        self._android_pick_combo.config(values=[o["label"] for o in android_opts])
+
+    def _enumerate_mobile_chpk_characters(self):
+        """Walk every loaded .sp slot, find chpk.dat, and emit one option
+        per (entry_idx, palette_idx) pair. Each option carries the
+        loaded ICImage so we can render it on demand."""
+        from .container import parse_sprite_container
+        from ..images.ic import render_ic
+        opts = []
+        for slot_label, files in (self.data.sp_slots or {}).items():
+            if not files:
+                continue
+            chpk = files.get("chpk.dat") if hasattr(files, "get") else None
+            if chpk is None:
+                continue
+            try:
+                for (e_idx, v_idx, ic, _raw) in parse_sprite_container(chpk):
+                    label = (f"{slot_label} chpk[{e_idx:02d}] pal{v_idx:02d}  "
+                             f"({ic.width}x{ic.height})")
+                    opts.append({
+                        "label": label, "kind": "mobile_chpk",
+                        "sp_slot": slot_label,
+                        "chpk_entry": e_idx, "palette": v_idx,
+                        "width": ic.width, "height": ic.height,
+                        "_ic": ic,
+                    })
+            except Exception:
+                continue
+        return opts
+
+    def _enumerate_android_fldchr(self):
+        """List every fldchr*.png in the loaded OBB. Each option carries
+        the filename + bytes so we can render on demand."""
+        opts = []
+        files = self.data.obb_files or {}
+        for name in sorted(files.keys()):
+            n = name.lower()
+            if not (n.startswith("fldchr") and n.endswith(".png")):
+                continue
+            blob = files[name]
+            opts.append({
+                "label": name, "kind": "android_fldchr",
+                "filename": name, "bytes": blob,
+            })
+        return opts
+
+    def _on_mobile_pick_selected(self):
+        """User picked a Mobile source from the combo: render the entry's
+        ic image, infer cell dims from the sheet shape (best-guess), and
+        update the Mobile canvas."""
+        from ..images.ic import render_ic
+        sel = self._mobile_pick_var.get()
+        opts = getattr(self, "_mobile_pick_options", [])
+        for opt in opts:
+            if opt["label"] == sel:
+                try:
+                    self._mobile_img = render_ic(opt["_ic"]).convert("RGBA")
+                except Exception as e:
+                    messagebox.showerror("Error",
+                        f"Failed to render Mobile entry: {e}")
+                    return
+                self._mobile_label.config(text=opt["label"][:32])
+                self._mobile_path = None
+                # Try to infer cell dimensions from sheet shape: pick the
+                # cell that gives integer cols+rows close to canonical
+                # party-member shape (5x6) when possible.
+                self._guess_mobile_dims_from_shape(opt["width"], opt["height"])
+                # Also write source identity into the spec if loaded
+                if self._spec is not None:
+                    ms = self._spec.setdefault("mobile_source", {})
+                    ms["chpk_entry"] = opt["chpk_entry"]
+                    ms["palette"] = opt["palette"]
+                self._refresh_all()
+                self._status.config(text=f"Loaded Mobile: {opt['label']}")
+                return
+
+    def _guess_mobile_dims_from_shape(self, w, h):
+        """Best-effort cell-dim inference from sheet pixel dimensions.
+
+        Known patterns:
+          80x144  -> cell 16x24, cols 5, rows 6   (field party-member)
+          112x48  -> cell 16x16, cols 7, rows 3   (NPC roster)
+          120x144 -> cell 24x24, cols 5, rows 6   (wider battle Sol?)
+
+        Falls back to dividing by the current cols/rows values if no
+        match is found (so user-edited dims are preserved when picking
+        a sheet of the same shape).
+        """
+        guesses = {
+            (80, 144):  (16, 24, 5, 6),
+            (120, 144): (24, 24, 5, 6),
+            (112, 48):  (16, 16, 7, 3),
+            (64, 72):   (16, 24, 4, 3),
+            (160, 288): (16, 24, 5, 6),  # 2x of 80x144
+            (240, 288): (24, 24, 5, 6),  # 2x of 120x144
+        }
+        if (w, h) in guesses:
+            cw, ch, c, r = guesses[(w, h)]
+            self._suppress_dim_cb = True
+            try:
+                self._cell_w_var.set(str(cw))
+                self._cell_h_var.set(str(ch))
+                self._cols_var.set(str(c))
+                self._rows_var.set(str(r))
+            finally:
+                self._suppress_dim_cb = False
+            if self._spec is not None:
+                ms = self._spec.setdefault("mobile_source", {})
+                ms["cell_w"] = cw; ms["cell_h"] = ch
+                ms["cols"]   = c;  ms["rows"]   = r
+
+    def _on_android_pick_selected(self):
+        sel = self._android_pick_var.get()
+        opts = getattr(self, "_android_pick_options", [])
+        from io import BytesIO
+        for opt in opts:
+            if opt["label"] == sel:
+                try:
+                    self._android_img = Image.open(BytesIO(opt["bytes"])
+                                                   ).convert("RGBA")
+                except Exception as e:
+                    messagebox.showerror("Error",
+                        f"Failed to load Android sheet: {e}")
+                    return
+                self._android_label.config(text=opt["filename"][:24])
+                self._android_path = None
+                # Update spec.android_target.fldchr_id from filename if
+                # it matches the standard fldchrNN_M.png pattern
+                if self._spec is not None:
+                    digits = "".join(c for c in opt["filename"][6:]
+                                     if c.isdigit())
+                    if digits:
+                        try:
+                            self._spec.setdefault("android_target", {})\
+                                ["fldchr_id"] = int(digits.split("_")[0]
+                                                    if "_" in digits else digits)
+                        except ValueError:
+                            pass
+                self._refresh_all()
+                self._status.config(text=f"Loaded Android: {opt['filename']}")
+                return
+
+    def _try_autoload_field_anm(self):
+        """Auto-load the anim file for the current mode from the loaded
+        OBB. field mode -> field_anm.dat, battle mode -> btlanm_sp.dat."""
+        files = self.data.obb_files or {}
+        mode = self._mode.get()
+        fname = "field_anm.dat" if mode == "field" else "btlanm_sp.dat"
+        blob = files.get(fname)
+        if not blob:
+            return
+        try:
+            self._field_anm_entries = self._parse_anim_data(blob)
+            self._field_anm_path = f"(loaded from OBB: {fname})"
+            self._fanm_label.config(
+                text=f"OBB {fname} ({len(self._field_anm_entries)} entries)")
+            self._populate_entry_combo()
+            self._on_entry_change()
+        except Exception:
+            pass
+
+    def _on_mode_change(self):
+        """Mode switched: reload the anim file, update output size, refresh."""
+        # Clear current anim entries -- they're mode-specific
+        self._field_anm_entries = []
+        self._field_anm_path = None
+        self._fanm_label.config(text="(none)")
+        # Try auto-loading the right file for the new mode
+        self._try_autoload_field_anm()
+        # Default output size for the mode (only if no spec or spec hasn't overridden)
+        if self._spec is not None:
+            at = self._spec.setdefault("android_target", {})
+            at["mode"] = self._mode.get()
+            # Adjust output_size if it still matches the OTHER mode's default
+            cur = tuple(at.get("output_size", [256, 512]))
+            if self._mode.get() == "battle" and cur == (256, 512):
+                at["output_size"] = [512, 512]
+            elif self._mode.get() == "field" and cur == (512, 512):
+                at["output_size"] = [256, 512]
+        self._sel_android = None
+        self._refresh_all()
+        self._status.config(text=f"Mode: {self._mode.get()}")
+
+    def on_data_change(self):
+        """FFData listener: refresh source pickers when project data changes."""
+        try:
+            self._refresh_source_pickers()
+            self._try_autoload_field_anm()
+        except Exception:
+            pass
+
+    # ------------------------------------------------------------------
+    # Android grid helpers
+    # ------------------------------------------------------------------
+
+    def _current_android_grid(self):
+        """Return (cell_w, cell_h, pitch_x, pitch_y, cols, rows,
+        origin_x, origin_y) parsed from the GUI vars (clamping to
+        sane fallbacks on parse error)."""
+        def _si(var, default):
+            try:
+                v = int(var.get())
+                return v if v >= 0 else default
+            except (ValueError, AttributeError):
+                return default
+        return (_si(self._a_cell_w, 48),  _si(self._a_cell_h, 48),
+                _si(self._a_pitch_x, 50), _si(self._a_pitch_y, 50),
+                _si(self._a_cols, 6),     _si(self._a_rows, 5),
+                _si(self._a_origin_x, 1), _si(self._a_origin_y, 1))
+
+    def _iter_android_grid(self):
+        """Yield (x, y, w, h) for every grid cell currently configured."""
+        cw, ch, px, py, cols, rows, ox, oy = self._current_android_grid()
+        if cw <= 0 or ch <= 0 or cols <= 0 or rows <= 0:
+            return
+        for r in range(rows):
+            for c in range(cols):
+                yield (ox + c * px, oy + r * py, cw, ch)
+
+    def _covered_rects(self, entry):
+        """Set of (x, y, w, h) covered by field_anm rects + extra_frames."""
+        covered = set()
+        for f in entry.get("frames", []):
+            covered.add((f["x"], f["y"], f["w"], f["h"]))
+        if self._spec:
+            for ef in self._spec.get("extra_frames", []) or []:
+                rect = ef.get("android_rect")
+                if rect and len(rect) == 4:
+                    covered.add(tuple(rect))
+        return covered
+
+    def _on_android_grid_change(self):
+        """User edited Android grid params: sync into spec and redraw."""
+        if getattr(self, "_suppress_a_grid_cb", False):
+            return
+        if self._spec is not None:
+            at = self._spec.setdefault("android_target", {})
+            cw, ch, px, py, cols, rows, ox, oy = self._current_android_grid()
+            at["grid"] = {
+                "cell_w": cw, "cell_h": ch,
+                "pitch_x": px, "pitch_y": py,
+                "cols": cols, "rows": rows,
+                "origin_x": ox, "origin_y": oy,
+            }
+        self._draw_android()
+
+    def _sync_android_grid_from_spec(self):
+        """Pull android_target.grid from spec into the GUI vars (no callbacks)."""
+        if self._spec is None:
+            return
+        g = self._spec.get("android_target", {}).get("grid", {})
+        if not g:
+            return
+        self._suppress_a_grid_cb = True
+        try:
+            self._a_cell_w.set(str(g.get("cell_w", 48)))
+            self._a_cell_h.set(str(g.get("cell_h", 48)))
+            self._a_pitch_x.set(str(g.get("pitch_x", 50)))
+            self._a_pitch_y.set(str(g.get("pitch_y", 50)))
+            self._a_cols.set(str(g.get("cols", 6)))
+            self._a_rows.set(str(g.get("rows", 5)))
+            self._a_origin_x.set(str(g.get("origin_x", 1)))
+            self._a_origin_y.set(str(g.get("origin_y", 1)))
+        finally:
+            self._suppress_a_grid_cb = False
 

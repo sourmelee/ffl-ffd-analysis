@@ -68,6 +68,7 @@ from ..tilesets.parser import (
 from ..monsters.parser import (
     parse_enemies_mobile, parse_monsters_android,
     parse_enemy_names_android, parse_bem,
+    decode_monster_body,
 )
 from ..items.parser import parse_items_mobile, parse_items_android
 from ..jobs.parser  import parse_jobs_mobile, parse_jobs_android
@@ -240,14 +241,25 @@ class TextTab(TabBase):
                             [f"{i:03d}  {s}" for i, s in enumerate(all_strs)]
         and_boot = self.data.boot_data_android()
         if and_boot:
-            # Bestiary (full records with HP + stats from libjniproxy.so)
+            # Bestiary (full records with HP + stats from libjniproxy.so).
+            # parse_monsters_android returns bare {id, name, body} records;
+            # decode_monster_body extracts max_hp + other stats from the
+            # 64-byte body. See monsters/parser.py for the body schema.
             and_monsters = parse_monsters_android(and_boot)
             if and_monsters:
-                self._sources["[android] monsters (name + HP)"] = [
-                    f"{i:03d}  {m['name']}   HP={m['max_hp']}"
-                    if m else f"{i:03d}  (deleted slot)"
-                    for i, m in enumerate(and_monsters)
-                ]
+                rows = []
+                for i, m in enumerate(and_monsters):
+                    if not m:
+                        rows.append(f"{i:03d}  (deleted slot)")
+                        continue
+                    body = m.get("body")
+                    if body:
+                        decoded = decode_monster_body(body)
+                        hp = decoded.get("max_hp", "?")
+                    else:
+                        hp = "?"
+                    rows.append(f"{i:03d}  {m['name']}   HP={hp}")
+                self._sources["[android] monsters (name + HP)"] = rows
 
             # Items / Magic / Abilities / Jobs — all use the same
             # (pascal name + pascal desc + body) format. Parsers from
