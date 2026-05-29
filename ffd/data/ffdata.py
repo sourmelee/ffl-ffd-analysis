@@ -17,10 +17,13 @@ from ..containers import parse_sp, load_zip_container, load_jam_manifest
 from ..maps.mc_overrides import (
     MC_OVERRIDES_FILENAME,
     CPK_TO_MC_FILENAME,
+    CPK_TO_MC_OVERRIDES_FILENAME,
     load_mc_overrides,
     save_mc_overrides,
     load_cpk_to_mc,
     invert_cpk_to_mc,
+    load_cpk_to_mc_overrides,
+    save_cpk_to_mc_overrides,
 )
 
 
@@ -284,3 +287,45 @@ class FFData:
         if not self.obb_files:
             return []
         return sorted(self.obb_files.items(), key=lambda kv: kv[0].lower())
+
+    # ---- cpk_to_mc_overrides (manual user overrides) ----------------------
+    def cpk_to_mc_overrides_path(self):
+        """Resolve where cpk_to_mc_overrides.json lives. Same logic as
+        cpk_to_mc_path -- look next to archives first, then project
+        root, then cwd."""
+        from pathlib import Path
+        candidates = []
+        for p in (self.obb_path, self.apk_path, self.jar_path, self.jam_path):
+            if not p:
+                continue
+            try:
+                parent = Path(p).resolve().parent
+            except Exception:
+                continue
+            candidates.append(parent / CPK_TO_MC_OVERRIDES_FILENAME)
+            candidates.append(parent.parent / CPK_TO_MC_OVERRIDES_FILENAME)
+        candidates.append(Path.cwd() / CPK_TO_MC_OVERRIDES_FILENAME)
+        for c in candidates:
+            if c.exists():
+                return c
+        return candidates[0] if candidates else (
+            Path.cwd() / CPK_TO_MC_OVERRIDES_FILENAME)
+
+    def cpk_to_mc_overrides(self, reload: bool = False):
+        """Lazy-loaded overrides dict. Returns the in-memory cached copy
+        unless reload=True forces a re-read from disk."""
+        path = self.cpk_to_mc_overrides_path()
+        cache = getattr(self, "_cpk_to_mc_overrides_cache", None)
+        cache_path = getattr(self, "_cpk_to_mc_overrides_path_cache", None)
+        if reload or cache is None or str(path) != cache_path:
+            self._cpk_to_mc_overrides_cache = load_cpk_to_mc_overrides(path)
+            self._cpk_to_mc_overrides_path_cache = str(path)
+        return self._cpk_to_mc_overrides_cache
+
+    def save_cpk_to_mc_overrides(self) -> bool:
+        """Persist the cached overrides to disk. Returns True on success."""
+        cache = getattr(self, "_cpk_to_mc_overrides_cache", None)
+        if cache is None:
+            return False
+        return save_cpk_to_mc_overrides(self.cpk_to_mc_overrides_path(),
+                                         cache)

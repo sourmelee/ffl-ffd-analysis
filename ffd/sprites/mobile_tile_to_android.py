@@ -163,30 +163,58 @@ def save_tileset_mapping_spec(spec: dict, path: str) -> None:
 # ---------------------------------------------------------------------------
 
 def lookup_mc_for_cpk(cpk_to_mc: dict, chapter: Optional[str],
-                      cpk_entry: int) -> Tuple[Optional[int], int, str]:
-    """Resolve (mc_id, variant) for a given (chapter, cpk_entry).
+                      cpk_entry: int,
+                      palette: Optional[int] = None,
+                      overrides: Optional[dict] = None
+                      ) -> Tuple[Optional[int], int, str]:
+    """Resolve (mc_id, variant) for a given (chapter, cpk_entry, palette).
 
     Order of preference:
+      0. ``overrides`` (cpk_to_mc_overrides.json) — manual user
+         overrides take precedence. Palette-specific entries beat
+         chapter-level ones.
+      0a. cpk_to_mc[chapter][cpk_entry].by_palette[palette] when the
+          v3 JSON has per-palette data and palette is supplied.
       1. cpk_to_mc[chapter][str(cpk_entry)] when both keys exist.
       2. Aggregate match across ALL chapters: pick the entry with the
          lowest best_sad value for str(cpk_entry).
       3. Numeric identity fallback: cpk{N} -> mc{N}_0.
 
-    Returns ``(mc_id, variant, source)`` where ``source`` is one of
-    ``"chapter" | "aggregate" | "numeric_fallback"``. ``mc_id`` may be
-    ``None`` only if cpk_to_mc is empty AND we somehow couldn't even
-    do numeric fallback (cpk_entry < 0). Callers can use the source
-    tag for UI hints ("matched via cpk_to_mc.json [Chapter1]" vs
-    "matched via numeric fallback").
+    Returns ``(mc_id, variant, source)``. Source tags: ``"override_*"``
+    (manual), ``"palette"`` (v3 per-palette), ``"chapter"``,
+    ``"aggregate"``, ``"numeric_fallback"``.
     """
     if cpk_entry is None or cpk_entry < 0:
         return (None, 0, "numeric_fallback")
 
+    # (0) Manual overrides take absolute precedence.
+    if overrides is not None:
+        try:
+            from ..maps.mc_overrides import lookup_cpk_to_mc_override
+            mc, var, src = lookup_cpk_to_mc_override(
+                overrides, chapter, cpk_entry, palette=palette)
+            if mc is not None:
+                return (mc, var, src)
+        except Exception:
+            pass
+
     eid_str = str(cpk_entry)
 
-    # (1) Exact chapter+entry hit.
+    # (1) Exact chapter+entry hit. Slot labels ("Chapter 5") have
+    # spaces; cpk_to_mc.json uses the dense form ("Chapter5"). Try
+    # both the literal and a strip-spaces variant so the GUI's
+    # SP_SLOTS labels map correctly onto the JSON's chapter keys.
     if chapter and isinstance(cpk_to_mc, dict):
-        chap_entries = cpk_to_mc.get(chapter) or {}
+        keys_to_try = [chapter]
+        dense = chapter.replace(" ", "")
+        if dense != chapter:
+            keys_to_try.append(dense)
+        chap_entries = None
+        for k in keys_to_try:
+            chap_entries = cpk_to_mc.get(k)
+            if chap_entries:
+                break
+        chap_entries = chap_entries or {}
         info = chap_entries.get(eid_str)
         if info and "mc_id" in info:
             try:

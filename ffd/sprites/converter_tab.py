@@ -2918,3 +2918,181 @@ class SpriteConverterTab(TabBase):
         self._refresh_all()
         self._status.config(
             text=f"Android cell ({col},{row}): {note}")
+
+    # ==================================================================
+    # Tileset mode v3 — manual overrides (cpk_to_mc_overrides.json)
+    # ==================================================================
+    #
+    # Per [[feedback-workflow]] (manual annotation > heuristics): when
+    # the SAD-matcher-generated cpk_to_mc.json is wrong for a particular
+    # (chapter, cpk_entry) pair, the user can save a manual override
+    # via the Save override button in the tileset action bar. The
+    # override persists in cpk_to_mc_overrides.json (project root) and
+    # takes absolute precedence over cpk_to_mc.json in lookup_mc_for_cpk.
+    #
+    # Two override granularities:
+    # * Overall (palette=None): applies to any Mobile palette of that cpk
+    # * Palette-specific (palette=N): only fires when the same Mobile
+    #   palette is selected. Useful when each Mobile palette in a cpk
+    #   visually matches a different mc variant.
+    # ==================================================================
+
+    def _build_tileset_action_bar(self):
+        """Override: same widgets as v2 plus a 'Save override' button.
+
+        Re-binding on subsequent calls keeps the canvas events fresh
+        whenever the user toggles back to Tileset mode."""
+        if getattr(self, "_tileset_bar", None) is not None:
+            self._bind_tileset_canvas_events()
+            return
+        self._tileset_bar = ttk.Frame(self)
+        self._tileset_bar.pack(side="bottom", fill="x", padx=4, pady=2)
+
+        ttk.Label(self._tileset_bar, text="Mobile palette:"
+                  ).pack(side="left")
+        self._tileset_mobile_palette_combo = ttk.Combobox(
+            self._tileset_bar,
+            textvariable=self._tileset_mobile_palette_var,
+            values=("0",), width=4, state="readonly")
+        self._tileset_mobile_palette_combo.pack(side="left", padx=2)
+
+        ttk.Label(self._tileset_bar, text="  Variant:"
+                  ).pack(side="left", padx=(8,0))
+        self._tileset_variant_combo = ttk.Combobox(
+            self._tileset_bar, textvariable=self._tileset_variant_var,
+            values=("0",), width=4, state="readonly")
+        self._tileset_variant_combo.pack(side="left", padx=2)
+
+        ttk.Checkbutton(self._tileset_bar,
+                        text="Fill missing tiles from Android",
+                        variable=self._t_fill_from_android
+                        ).pack(side="left", padx=8)
+
+        ttk.Label(self._tileset_bar, text="Variant strategy:"
+                  ).pack(side="left", padx=(8,2))
+        ttk.Combobox(self._tileset_bar,
+                     textvariable=self._t_palette_strategy,
+                     values=("verbatim", "swap"), width=10,
+                     state="readonly").pack(side="left", padx=2)
+
+        ttk.Button(self._tileset_bar, text="Convert tileset...",
+                   command=self._export_tileset_png
+                   ).pack(side="left", padx=8)
+
+        ttk.Button(self._tileset_bar, text="Save override",
+                   command=self._save_tileset_override
+                   ).pack(side="left", padx=4)
+
+        ttk.Label(self._tileset_bar,
+                  text=("Click Mobile, then Android to remap. "
+                        "Right-click Android cell for source override. "
+                        "Save override pins the current Mobile/Android pick."),
+                  foreground="#888").pack(side="left", padx=4)
+
+        self._bind_tileset_canvas_events()
+
+    def _get_overrides(self):
+        """Helper: load cpk_to_mc_overrides via FFData (lazy + cached)."""
+        try:
+            return self.data.cpk_to_mc_overrides()
+        except Exception:
+            return None
+
+    def _auto_match_android_tileset(self, chapter, cpk_entry):
+        """Override v3: looks up overrides first, then cpk_to_mc.json.
+        Passes the current Mobile palette so per-palette overrides fire."""
+        if cpk_entry is None:
+            return
+        cpk_to_mc = {}
+        try:
+            cpk_to_mc = self.data.cpk_to_mc() or {}
+        except Exception:
+            pass
+        overrides = self._get_overrides()
+        try:
+            palette = int(self._tileset_mobile_palette_var.get())
+        except (ValueError, AttributeError):
+            palette = None
+        mc_id, variant, source = lookup_mc_for_cpk(
+            cpk_to_mc, chapter, cpk_entry,
+            palette=palette, overrides=overrides)
+        self._tileset_match_source = source
+        if mc_id is None:
+            return
+        opts = getattr(self, "_android_pick_options", [])
+        chosen = None
+        for opt in opts:
+            if opt.get("mc_id") == mc_id:
+                chosen = opt
+                break
+        if chosen is None:
+            self._status.config(
+                text=f"Auto-match: mc{mc_id} not in OBB [{source}]")
+            return
+        if self._android_pick_var.get() == chosen["label"]:
+            if int(self._tileset_variant_var.get() or 0) != variant:
+                if variant in (chosen.get("variants") or [0]):
+                    self._tileset_variant_var.set(str(variant))
+            return
+        self._suppress_auto_match = True
+        try:
+            self._android_pick_var.set(chosen["label"])
+            self._on_android_pick_selected()
+            if variant in (chosen.get("variants") or [0]):
+                self._tileset_variant_var.set(str(variant))
+        finally:
+            self._suppress_auto_match = False
+        self._status.config(
+            text=f"Auto-match Android -> mc{mc_id}_{variant} "
+                 f"[{source}]")
+
+    def _save_tileset_override(self):
+        """Persist the current (Mobile cpk + palette) -> (Android mc +
+        variant) pick to cpk_to_mc_overrides.json. Asks the user whether
+        to save as palette-specific or overall."""
+        opt = self._get_current_mobile_pick()
+        if opt is None or self._tileset_mc_id is None:
+            messagebox.showinfo("Nothing to save",
+                "Pick a Mobile cpk + Android mc target first.")
+            return
+        chapter = opt.get("sp_slot")
+        cpk_entry = opt.get("cpk_entry")
+        mc_id = self._tileset_mc_id
+        variant = self._tileset_variant_idx
+        try:
+            palette = int(self._tileset_mobile_palette_var.get())
+        except (ValueError, AttributeError):
+            palette = 0
+
+        # Confirm with the user — palette-specific or overall?
+        msg = (f"Save override for:\n"
+               f"  Chapter: {chapter}\n"
+               f"  Mobile cpk{cpk_entry} palette {palette}\n"
+               f"  →  Android mc{mc_id}_{variant}\n\n"
+               f"Click YES to save as palette-{palette} specific "
+               f"(only applies when this palette is selected).\n"
+               f"Click NO to save as the overall match for cpk{cpk_entry}"
+               f" (applies to any palette).\n"
+               f"Click CANCEL to abort.")
+        choice = messagebox.askyesnocancel("Save override", msg)
+        if choice is None:
+            return
+        pal_arg = palette if choice else None
+
+        try:
+            from ..maps.mc_overrides import set_cpk_to_mc_override
+            overrides = self.data.cpk_to_mc_overrides()
+            set_cpk_to_mc_override(overrides, chapter, cpk_entry,
+                                    mc_id, variant, palette=pal_arg)
+            ok = self.data.save_cpk_to_mc_overrides()
+        except Exception as e:
+            messagebox.showerror("Save failed", str(e))
+            return
+        if not ok:
+            messagebox.showerror("Save failed",
+                "Could not write cpk_to_mc_overrides.json")
+            return
+        scope = (f"palette {palette}" if pal_arg is not None else "overall")
+        self._status.config(
+            text=f"Saved override: {chapter} cpk{cpk_entry} ({scope}) "
+                 f"-> mc{mc_id}_{variant}")

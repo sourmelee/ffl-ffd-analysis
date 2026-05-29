@@ -59,7 +59,8 @@ Python/
 │   └── gui_core/             # FFDApp window, TabBase, shared widgets
 └── tools/
     ├── boot_data_analyze.py
-    └── seed_mc_overrides_from_engine.py
+    ├── seed_mc_overrides_from_engine.py
+    └── regenerate_cpk_to_mc.py
 ```
 
 The legacy mega-module pattern is preserved: `from ffd_toolkit import parse_ic` (and every other name the old `ffd_toolkit.py` exported) still works, courtesy of explicit re-exports in `ffd_toolkit.py`.
@@ -68,7 +69,7 @@ The legacy mega-module pattern is preserved: `from ffd_toolkit import parse_ic` 
 
 ## GUI tabs
 
-The notebook displays 17 tabs in this order, every one defined by a `TabBase` subclass with a `LABEL` constant.
+The notebook displays 18 tabs in this order, every one defined by a `TabBase` subclass with a `LABEL` constant.
 
 **Files** — load `.sp` scratchpads into chapter slots and pick the Android container (`.obb` / `.apk` / `.jar` / `.jam`). Empty slots are flagged across every other viewer.
 
@@ -89,6 +90,12 @@ The notebook displays 17 tabs in this order, every one defined by a `TabBase` su
 - *Mobile*: `chpk.dat` is an ic-container of character atlases. The engine hardcodes cell layout (typically 16×16, with rows per facing × walk frames per row). Tab slices using a user-adjustable cell size and plays the chosen sequence (full sheet / single row / ping-pong / etc.).
 
 **Tilesets** — browser for the mobile `mpk*.dat`/`cpk*.dat` pack contents and the Android tileset lookup table.
+
+**Sprite Converter** — interactive Mobile → Android sprite/tileset converter with two source types selected via the top-bar *Source type* dropdown:
+- *Characters*: maps Mobile `chpk` cells onto Android `fldchr` sheets via a JSON spec (`frame_map` + `extra_frames`). Right-side inspector exposes per-frame `h_align`, `v_align`, `scale`, `x_offset`, `y_offset`, `flip_h`.
+- *Tilesets*: 2× nearest-neighbor upscale of Mobile `cpk` tile sheets into Android `mc{id}_{variant}.png` layout. Action bar exposes a *Mobile palette* dropdown (populated from `count_cpk_palettes`), the Android variant index, *Fill missing tiles from Android* checkbox, and a *Variant strategy* dropdown (`verbatim` / `swap`). Click a Mobile cell then an Android cell (or drag) to write a `cell_map` remap; right-click an Android cell for a source-override menu (Use Mobile / Use Android original / Clear remap). The **Save override** button persists the current (cpk, palette) → (mc_id, variant) pick to `cpk_to_mc_overrides.json`.
+
+The four panes (Mobile | Android | Preview | Inspector) sit inside a `ttk.PanedWindow` with draggable sashes. Auto-match between the Mobile and Android pickers uses `cpk_to_mc_overrides.json` first, then `cpk_to_mc.json`, falling back to closest-numeric-ID.
 
 **Backgrounds** — `bg.dat` viewer (mobile sprite-container subset).
 
@@ -251,6 +258,25 @@ python3 tools/seed_mc_overrides_from_engine.py --apply    # actually write
 python3 tools/seed_mc_overrides_from_engine.py --apply --proper-obb PATH
 ```
 
+### `tools/regenerate_cpk_to_mc.py`
+
+Palette-aware SAD matcher that regenerates `cpk_to_mc.json` from scratch. For every (chapter, cpk_entry, palette_idx) combination it computes alpha+luminance sum-of-absolute-differences against every Android (mc_id, variant) sheet, masked to pixels where Mobile alpha > 0. Output records the BEST overall match at the top level (back-compat with v2 callers) plus a `by_palette` sub-dict giving the best (mc_id, variant) per Mobile palette index.
+
+Loads `mc*.png` from `Android/proper_obb/` by default (~0.6s) instead of re-decrypting the OBB archive on every run (~41s). Pass `--obb` to fall back to OBB loading when the extracted folder isn't available.
+
+Supports `--resume` (skip chapters already in the output file) and `--only-chapters X,Y` for chunked runs that fit inside short CI budgets; per-chapter incremental saves mean a partial run survives a timeout.
+
+Requires NumPy in addition to Pillow.
+
+```bash
+python3 tools/regenerate_cpk_to_mc.py \
+    --sp-dir ../Mobile/Scratchpads \
+    --mc-dir ../Android/proper_obb \
+    --out ../cpk_to_mc.json
+# chunked run:
+python3 tools/regenerate_cpk_to_mc.py --resume --only-chapters Chapter1,Chapter3 ...
+```
+
 ---
 
 ## Key file format findings
@@ -274,6 +300,8 @@ A compressed cheat sheet of the formats this toolkit parses. The full per-byte d
 | `snd.dat` | Mobile | — | `music/parser.py` | gzip-wrapped MFi/MLD melodies |
 | `form.bin` | Mobile | BE | `formats/form_bin.py` | u16 offset table → per-formation enemy+drop records |
 | event scripts | Both | BE operands | `events/opcodes.py` | Per-command length-prefixed packets; 96 opcodes catalogued (range 0x00..0xAB with gaps) |
+| `cpk_to_mc.json` | Both (sidecar) | — | `maps/mc_overrides.py`, `sprites/mobile_tile_to_android.py` | SAD-matcher output: `{chapter: {cpk_entry: {mc_id, variant, best_sad, by_palette: {N: {…}}}}}`. Regenerate via `tools/regenerate_cpk_to_mc.py` |
+| `cpk_to_mc_overrides.json` | Both (sidecar) | — | `maps/mc_overrides.py` | Manual user overrides. `{entries: {ChapterDense: {cpk: {mc_id, variant, by_palette?: {N: {mc_id, variant}}}}}}`. Takes precedence over `cpk_to_mc.json`. Written by the Sprite Converter's *Save override* button |
 
 ---
 
@@ -307,7 +335,6 @@ To bulk-populate annotations from the engine parser, run `tools/seed_mc_override
 ### Tools used in the project
 
 - **[Colmines92's `FFDimensionsTool`](https://github.com/Colmines92)** — Windows GUI extractor for the Android `.obb`. Output of `FFDimensionsTool` in "proper" mode is the byte-for-byte reference target for `ffd.containers.obb`. The `proper_obb/` folder in the project tree was produced by this tool.
-- **APKTool** — used to decompile the Android `.apk` into smali for reverse engineering.
 - **YYCHR** — a free tile/graphics editor (originally built for NES ROM hacking). YYCHR was the stepping stone used to manually figure out the mobile sprite layout before it could be parsed programmatically: drop in a raw `.dat` blob, scrub through bit-depths and tile widths, and the structure becomes visible by eye. PowerPanda's sprite research (see Source material below) was carried out by hand in YYCHR before being formalised into the parsers in `ffd/sprites/` and `ffd/images/ic.py`.
 
 ### Source material

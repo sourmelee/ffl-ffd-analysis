@@ -17,6 +17,77 @@ commit as the changelog entry.
 
 ## [Unreleased]
 
+### Added
+
+- **Mobile palette picker in `SpriteConverterTab` (Tilesets mode)**:
+  the action bar exposes a *Mobile palette* combobox populated from
+  `count_cpk_palettes(sp_files, entry_id)` for the selected `cpk`
+  entry (Chapter 1 cpks have 2–4 palettes each). Switching palettes
+  re-renders the Mobile image via `MobileTilesetResolver.get(eid,
+  pal_idx)` and live-updates the preview.
+- **Per-cell tileset remap (click-click + drag-and-drop)**: click a
+  Mobile cell, then click an Android cell, to write
+  `cell_map["dst_col,dst_row"] = {mobile_col, mobile_row, flip_h}`.
+  Drag from Mobile pane to Android pane has the same effect. Cyan
+  outlines on remapped Android cells with the Mobile source label.
+- **Per-Android-cell source override**: right-click an Android cell
+  → context menu with "Use Mobile (default — clears overrides)",
+  "Use Android original (force_android)", and "Clear remap". New
+  `android_target.force_android_cells` list (`"col,row"` strings)
+  pastes the Android original tile after `cell_map` and before
+  `fill_from_android`. force-Android wins over cell_map. Magenta
+  outline + "A" label on force-Android cells.
+- **Resizable four-pane layout for `SpriteConverterTab`**: the body
+  is now a `ttk.PanedWindow(orient="horizontal")` so all four panes
+  (Mobile | Android | Preview | Inspector) have draggable sashes
+  with equal initial weight.
+- **`cpk_to_mc_overrides.json` manual override layer**: takes
+  absolute precedence over `cpk_to_mc.json`. Stored at project root.
+  Structure `{entries: {ChapterDense: {cpk: {mc_id, variant,
+  by_palette?: {N: {mc_id, variant}}}}}}` — supports overall and
+  palette-specific overrides. New helpers in
+  `ffd.maps.mc_overrides`: `empty_cpk_to_mc_overrides`,
+  `load_cpk_to_mc_overrides`, `save_cpk_to_mc_overrides`,
+  `set_cpk_to_mc_override`, `lookup_cpk_to_mc_override`. New
+  `FFData` accessors: `cpk_to_mc_overrides_path`,
+  `cpk_to_mc_overrides`, `save_cpk_to_mc_overrides`. Tileset action
+  bar gets a **Save override** button that prompts palette-specific
+  vs overall save scope via `askyesnocancel`.
+- **Palette-aware SAD matcher** (`Python/tools/regenerate_cpk_to_mc.py`):
+  for every (chapter, cpk_entry, palette_idx) computes alpha+luminance
+  SAD against every (mc_id, variant) in the OBB, masked to Mobile-
+  opaque pixels. Output adds `best_palette` (winning Mobile palette)
+  and `by_palette: {N: {mc_id, variant, best_sad, second_*, gap}}`
+  per cpk_entry. Loads `mc*.png` from `Android/proper_obb/` (~0.6s)
+  instead of re-decrypting the OBB (~41s). Supports `--resume`
+  (skips chapters already in the output file), `--only-chapters
+  X,Y` for chunked runs, and per-chapter incremental saves so a
+  partial run survives a timeout. Requires NumPy.
+
+### Changed
+
+- **`cpk_to_mc.json` regenerated with the v3 palette-aware matcher**.
+  40 of ~125 cpks now have a different `mc_id` vs v2. Backup of the
+  pre-regen file saved as `cpk_to_mc_v2_backup.json`. Each record
+  gains two new fields: `best_palette` and `by_palette`. Top-level
+  `mc_id`/`variant`/`best_sad`/`second_*`/`gap` fields stay for
+  back-compat with legacy callers.
+- **`lookup_mc_for_cpk` signature**: now accepts `palette=int` and
+  `overrides=dict` kwargs. New source-tag values:
+  `"override_palette"`, `"override_chapter"`. Chapter-step lookup
+  also tries the space-stripped form of the chapter label so the
+  GUI's `SP_SLOTS` labels (e.g. `"Chapter 5"`) match the JSON's
+  dense keys (`"Chapter5"`).
+
+### Fixed
+
+- **Slot-label normalisation bug in `lookup_mc_for_cpk`**: the
+  per-chapter step previously always missed for `SP_SLOTS` labels
+  (because they contain spaces but the JSON keys don't), causing
+  the auto-match status bar to show `[aggregate]` instead of
+  `[chapter]`. Verified end-to-end: `'Chapter 5'` now finds
+  `'Chapter5'` entries.
+
 ## [0.1.4] - 2026-05-29
 
 ### Added

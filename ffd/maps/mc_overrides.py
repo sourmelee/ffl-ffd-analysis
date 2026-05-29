@@ -29,6 +29,7 @@ import os
 
 MC_OVERRIDES_FILENAME = "mc_overrides.json"
 CPK_TO_MC_FILENAME = "cpk_to_mc.json"
+CPK_TO_MC_OVERRIDES_FILENAME = "cpk_to_mc_overrides.json"
 
 
 def empty_mc_overrides() -> dict:
@@ -140,3 +141,109 @@ def lookup_primary_mc(overrides: dict, group: int, pack: int, map_id: int,
         e = bg[gk]
         return int(e["mc_id"]), int(e.get("variant", 0)), "by_group"
     return default_mc_id, default_variant, "default"
+
+
+# ---------------------------------------------------------------------------
+# cpk_to_mc_overrides.json — manual user overrides that take precedence
+# over the SAD-matcher-generated cpk_to_mc.json.
+# ---------------------------------------------------------------------------
+
+def empty_cpk_to_mc_overrides() -> dict:
+    """Return a fresh empty overrides structure.
+
+    Format: ``{chapter_str: {cpk_entry_str: {mc_id, variant, palette?}}}``
+    where ``palette`` is optional and pins the override to a specific
+    Mobile palette. When absent, the override applies regardless of
+    palette."""
+    return {
+        "format_version": 1,
+        "comment": ("Manual user overrides for cpk -> mc auto-match. "
+                    "Takes precedence over cpk_to_mc.json. Edit via "
+                    "the GUI's Save override button or by hand."),
+        "entries": {},
+    }
+
+
+def load_cpk_to_mc_overrides(path) -> dict:
+    """Load cpk_to_mc_overrides.json from ``path``. Returns an empty
+    structure if the file does not exist or fails to parse."""
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = _json.load(f)
+        if not isinstance(data, dict):
+            return empty_cpk_to_mc_overrides()
+        data.setdefault("format_version", 1)
+        data.setdefault("entries", {})
+        return data
+    except FileNotFoundError:
+        return empty_cpk_to_mc_overrides()
+    except Exception:
+        return empty_cpk_to_mc_overrides()
+
+
+def save_cpk_to_mc_overrides(path, overrides: dict) -> bool:
+    """Atomically save the overrides file. Returns True on success."""
+    try:
+        tmp = str(path) + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            _json.dump(overrides, f, indent=2, ensure_ascii=False)
+        os.replace(tmp, str(path))
+        return True
+    except Exception:
+        return False
+
+
+def set_cpk_to_mc_override(overrides: dict, chapter: str, cpk_entry: int,
+                            mc_id: int, variant: int,
+                            palette: int = None) -> None:
+    """Mutate ``overrides`` to set the entry.
+
+    Chapter labels are normalised to dense form on store so 'Chapter 5'
+    and 'Chapter5' share the same entry. Palette-specific writes
+    (``palette`` is not None) only update ``by_palette[N]`` and do NOT
+    touch the overall ``mc_id/variant``."""
+    entries = overrides.setdefault("entries", {})
+    chap_key = str(chapter).replace(" ", "")
+    chap = entries.setdefault(chap_key, {})
+    key = str(cpk_entry)
+    rec = chap.get(key) or {}
+    if palette is None:
+        rec["mc_id"] = int(mc_id)
+        rec["variant"] = int(variant)
+    else:
+        by_pal = rec.setdefault("by_palette", {})
+        by_pal[str(palette)] = {"mc_id": int(mc_id), "variant": int(variant)}
+    chap[key] = rec
+
+
+def lookup_cpk_to_mc_override(overrides: dict, chapter: str,
+                               cpk_entry: int,
+                               palette: int = None):
+    """Return ``(mc_id, variant, source)`` if the overrides table has a
+    matching entry, else ``(None, None, None)``. Tries chapter literally
+    AND the dense (space-stripped) form so 'Chapter 5' finds 'Chapter5'.
+    ``source`` is one of ``"override_palette" | "override_chapter"``."""
+    if not isinstance(overrides, dict):
+        return (None, None, None)
+    entries = overrides.get("entries") or {}
+    if not chapter:
+        return (None, None, None)
+    keys = [chapter, str(chapter).replace(" ", "")]
+    eid_str = str(cpk_entry)
+    for k in keys:
+        chap_entries = entries.get(k) or {}
+        rec = chap_entries.get(eid_str)
+        if not rec:
+            continue
+        if palette is not None:
+            by_pal = rec.get("by_palette") or {}
+            pal_rec = by_pal.get(str(palette))
+            if pal_rec and "mc_id" in pal_rec:
+                return (int(pal_rec["mc_id"]),
+                        int(pal_rec.get("variant", 0)),
+                        "override_palette")
+        if "mc_id" in rec:
+            return (int(rec["mc_id"]),
+                    int(rec.get("variant", 0)),
+                    "override_chapter")
+    return (None, None, None)
