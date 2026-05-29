@@ -51,6 +51,7 @@ from .mobile_tile_to_android import (
     save_tileset_mapping_spec, lookup_mc_for_cpk, lookup_cpk_for_mc,
     convert_mobile_tileset_to_android, apply_variant_palette_swap,
     load_android_mc_png, list_android_mc_variants, list_android_mc_ids,
+    count_cpk_palettes,
 )
 
 
@@ -130,6 +131,12 @@ class SpriteConverterTab(TabBase):
                                     lambda *a: self._draw_android())
 
         # --- Tileset-mode state (used when source_type == "Tilesets") ----
+        # Currently-selected Mobile cpk palette index. Each cpk entry
+        # can carry 1..N palettes; the default-rendered image uses
+        # palette 0. User picks others via the Palette combo.
+        self._tileset_mobile_palette_var = tk.StringVar(value="0")
+        self._tileset_mobile_palette_var.trace_add("write",
+            lambda *a: self._on_tileset_mobile_palette_change())
         # Currently-selected Android mc variant index for display.
         self._tileset_variant_var = tk.StringVar(value="0")
         self._tileset_variant_var.trace_add("write",
@@ -2367,4 +2374,547 @@ class SpriteConverterTab(TabBase):
         except Exception as e:
             messagebox.showerror("Error",
                 f"Tileset export failed:\n{e}\n\n{traceback.format_exc()}")
-           
+
+    # ==================================================================
+    # Tileset mode v2 — palette picker + per-cell remap UI
+    # ==================================================================
+    #
+    # The methods below override earlier definitions in the class
+    # (Python uses the last definition wins). They add:
+    # * Mobile palette dropdown in the tileset action bar
+    # * Selection / cell_map / force_android overlays on the canvases
+    # * Click-click cell remap workflow (Mobile cell → Android cell)
+    # * Right-click context menu on Android cell (Use Mobile / Use Android / Clear)
+    # * Drag-and-drop Mobile→Android (same effect as click-click)
+    #
+    # State variables initialised here (so the helpers work even if a
+    # user pre-existing flow never set them):
+    # * self._sel_mobile_tileset_cell : tuple[int,int] | None
+    # * self._drag_origin_mobile_cell : tuple[int,int] | None
+    # * self._tileset_mobile_palette_combo : Combobox (lazy)
+    # ==================================================================
+
+    def _build_tileset_action_bar(self):
+        """Override: also includes a Mobile palette combo and binds the
+        per-cell remap interactions on Mobile/Android canvases."""
+        if getattr(self, "_tileset_bar", None) is not None:
+            # Re-bind canvas events on every entry into Tileset mode in
+            # case the user toggled back to Characters and we lost them.
+            self._bind_tileset_canvas_events()
+            return
+        self._tileset_bar = ttk.Frame(self)
+        self._tileset_bar.pack(side="bottom", fill="x", padx=4, pady=2)
+
+        ttk.Label(self._tileset_bar, text="Mobile palette:"
+                  ).pack(side="left")
+        self._tileset_mobile_palette_combo = ttk.Combobox(
+            self._tileset_bar,
+            textvariable=self._tileset_mobile_palette_var,
+            values=("0",), width=4, state="readonly")
+        self._tileset_mobile_palette_combo.pack(side="left", padx=2)
+
+        ttk.Label(self._tileset_bar, text="  Variant:"
+                  ).pack(side="left", padx=(8,0))
+        self._tileset_variant_combo = ttk.Combobox(
+            self._tileset_bar, textvariable=self._tileset_variant_var,
+            values=("0",), width=4, state="readonly")
+        self._tileset_variant_combo.pack(side="left", padx=2)
+
+        ttk.Checkbutton(self._tileset_bar,
+                        text="Fill missing tiles from Android",
+                        variable=self._t_fill_from_android
+                        ).pack(side="left", padx=8)
+
+        ttk.Label(self._tileset_bar, text="Variant strategy:"
+                  ).pack(side="left", padx=(8,2))
+        ttk.Combobox(self._tileset_bar,
+                     textvariable=self._t_palette_strategy,
+                     values=("verbatim", "swap"), width=10,
+                     state="readonly").pack(side="left", padx=2)
+
+        ttk.Button(self._tileset_bar, text="Convert tileset...",
+                   command=self._export_tileset_png
+                   ).pack(side="left", padx=8)
+        ttk.Label(self._tileset_bar,
+                  text=("Click Mobile cell, then Android cell to remap. "
+                        "Right-click Android cell for source override. "
+                        "Drag Mobile→Android also remaps."),
+                  foreground="#888").pack(side="left", padx=4)
+
+        self._bind_tileset_canvas_events()
+
+    def _bind_tileset_canvas_events(self):
+        """Wire Button-1/3 + B1-Motion/Release events on Mobile and
+        Android canvases for tileset-mode interactions. Overrides
+        the character-mode bindings; reversed by
+        ``_bind_character_canvas_events`` when source type changes."""
+        m = self._mobile_canvas
+        a = self._android_canvas
+        m.bind("<Button-1>",
+               lambda e: self._on_click_mobile_tileset(e))
+        m.bind("<B1-Motion>",
+               lambda e: self._on_drag_mobile_tileset(e))
+        m.bind("<ButtonRelease-1>",
+               lambda e: self._on_release_mobile_tileset(e))
+        a.bind("<Button-1>",
+               lambda e: self._on_click_android_tileset(e))
+        a.bind("<Button-3>",
+               lambda e: self._on_right_click_android_tileset(e))
+        a.bind("<ButtonRelease-1>",
+               lambda e: self._on_release_android_tileset(e))
+
+    def _bind_character_canvas_events(self):
+        """Restore Button-1 bindings to the character-mode handlers
+        when leaving Tileset mode."""
+        m = self._mobile_canvas
+        a = self._android_canvas
+        m.bind("<Button-1>", self._on_click_mobile)
+        m.bind("<Shift-Button-1>",
+               lambda e: self._on_click_mobile(e, shift=True))
+        m.unbind("<B1-Motion>")
+        m.unbind("<ButtonRelease-1>")
+        a.bind("<Button-1>", self._on_click_android)
+        a.unbind("<Button-3>")
+        a.unbind("<ButtonRelease-1>")
+
+    def _on_source_type_change(self):
+        """Override: also re-bind canvas events to match the new mode."""
+        self._mobile_img = None
+        self._android_img = None
+        self._tileset_android_orig_img = None
+        self._tileset_mc_id = None
+        self._tileset_variant_idx = 0
+        self._tileset_match_source = ""
+        self._sel_mobile_tileset_cell = None
+        self._drag_origin_mobile_cell = None
+        if self._source_type.get() == "Tilesets":
+            self._field_anm_entries = []
+            self._field_anm_path = None
+            if hasattr(self, "_fanm_label"):
+                self._fanm_label.config(text="(none - tileset mode)")
+            if hasattr(self, "_entry_combo"):
+                self._entry_combo.config(values=())
+            self._load_tileset_default_template()
+            self._build_tileset_action_bar()
+        else:
+            # Restore character-mode click bindings if leaving Tilesets
+            self._bind_character_canvas_events()
+        self._refresh_source_pickers()
+        self._refresh_all()
+        self._status.config(text=f"Source type: {self._source_type.get()}")
+
+    # ------------------------------------------------------------------
+    # Mobile palette dropdown wiring
+    # ------------------------------------------------------------------
+
+    def _get_current_mobile_pick(self):
+        """Return the currently-selected Mobile picker option dict (the
+        last opt with matching label), or None."""
+        sel = self._mobile_pick_var.get()
+        for opt in getattr(self, "_mobile_pick_options", []):
+            if opt.get("label") == sel:
+                return opt
+        return None
+
+    def _on_mobile_pick_selected_tileset(self):
+        """Override: populates the Mobile palette combo with all available
+        palette indices for the picked cpk entry."""
+        sel = self._mobile_pick_var.get()
+        opts = getattr(self, "_mobile_pick_options", [])
+        for opt in opts:
+            if opt["label"] != sel:
+                continue
+            # Determine how many palettes the cpk entry exposes
+            try:
+                sp_files = (self.data.sp_slots or {}).get(opt.get("sp_slot"))
+                n_pal = count_cpk_palettes(sp_files,
+                                            opt.get("cpk_entry"))
+            except Exception:
+                n_pal = 1
+            opt["n_palettes"] = n_pal
+            # Populate the Mobile palette combo (if action bar exists)
+            combo = getattr(self, "_tileset_mobile_palette_combo", None)
+            cur_pal = 0
+            try:
+                cur_pal = int(self._tileset_mobile_palette_var.get())
+            except Exception:
+                cur_pal = 0
+            new_pal = cur_pal if cur_pal < n_pal else 0
+            if combo is not None:
+                combo.config(values=[str(i) for i in range(n_pal)])
+            self._suppress_variant_cb = True
+            try:
+                self._tileset_mobile_palette_var.set(str(new_pal))
+            finally:
+                self._suppress_variant_cb = False
+            # Render the Mobile image at the chosen palette
+            try:
+                self._mobile_img = self._load_mobile_tileset_img(
+                    opt.get("sp_slot"), opt.get("cpk_entry"), new_pal)
+            except Exception as e:
+                messagebox.showerror("Error",
+                    f"Failed to render Mobile cpk: {e}")
+                return
+            self._mobile_label.config(text=opt["label"][:32])
+            self._mobile_path = None
+            if self._spec is not None:
+                ms = self._spec.setdefault("mobile_source", {})
+                ms["chapter"] = opt.get("sp_slot")
+                ms["cpk_entry"] = opt.get("cpk_entry")
+                ms["palette"] = new_pal
+            self._sel_mobile_tileset_cell = None
+            self._refresh_all()
+            self._status.config(
+                text=f"Loaded Mobile cpk: {opt['label']} "
+                     f"(palettes: {n_pal})")
+            if not getattr(self, "_suppress_auto_match", False):
+                self._auto_match_android_tileset(
+                    opt.get("sp_slot"), opt.get("cpk_entry"))
+            return
+
+    def _load_mobile_tileset_img(self, sp_slot, cpk_entry, pal_idx):
+        """Render a Mobile cpk image at the given palette index via the
+        MobileTilesetResolver, returning an RGBA PIL Image."""
+        from ..tilesets.parser import MobileTilesetResolver
+        sp_files = (self.data.sp_slots or {}).get(sp_slot)
+        if not sp_files:
+            return None
+        resolver = MobileTilesetResolver(sp_files)
+        img = resolver.get(cpk_entry, pal_idx)
+        return img.convert("RGBA") if img is not None else None
+
+    def _on_tileset_mobile_palette_change(self):
+        """User changed the Mobile palette combo. Re-render the Mobile
+        image and refresh the preview."""
+        if getattr(self, "_suppress_variant_cb", False):
+            return
+        opt = self._get_current_mobile_pick()
+        if opt is None:
+            return
+        try:
+            pal = int(self._tileset_mobile_palette_var.get())
+        except ValueError:
+            return
+        try:
+            self._mobile_img = self._load_mobile_tileset_img(
+                opt.get("sp_slot"), opt.get("cpk_entry"), pal)
+        except Exception as e:
+            self._status.config(text=f"Palette render failed: {e}")
+            return
+        if self._spec is not None:
+            ms = self._spec.setdefault("mobile_source", {})
+            ms["palette"] = pal
+        self._refresh_all()
+        self._status.config(
+            text=f"Mobile palette: {pal}")
+
+    # ------------------------------------------------------------------
+    # Cell-selection / cell_map / force_android overlays
+    # ------------------------------------------------------------------
+
+    def _draw_mobile_tileset(self):
+        """Override: adds green selection outline for the picked Mobile
+        cell (used by the click-Mobile-then-click-Android remap flow)."""
+        c = self._mobile_canvas
+        if self._mobile_img is None:
+            return
+        zoom = max(1, int(self._zoom_mobile.get() or 1))
+        cell_w = MOBILE_TILE_CELL
+        cell_h = MOBILE_TILE_CELL
+        img = self._mobile_img
+        w, h = img.size
+        zoomed = img.resize((w * zoom, h * zoom), Image.NEAREST)
+        self._photo_mobile = ImageTk.PhotoImage(zoomed)
+        c.create_image(0, 0, image=self._photo_mobile, anchor="nw")
+        c.configure(scrollregion=(0, 0, zoomed.size[0], zoomed.size[1]))
+        cols = w // cell_w
+        rows = h // cell_h
+        for col in range(cols):
+            for row in range(rows):
+                x = col * cell_w * zoom
+                y = row * cell_h * zoom
+                cw = cell_w * zoom
+                ch = cell_h * zoom
+                c.create_rectangle(x, y, x + cw, y + ch,
+                                   outline="#666", width=1)
+        sel = getattr(self, "_sel_mobile_tileset_cell", None)
+        if sel is not None:
+            col, row = sel
+            x = col * cell_w * zoom
+            y = row * cell_h * zoom
+            cw = cell_w * zoom
+            ch = cell_h * zoom
+            c.create_rectangle(x, y, x + cw, y + ch,
+                               outline="#0f0", width=3)
+
+    def _draw_android_tileset(self):
+        """Override: adds cyan outlines for cell_map remaps and magenta
+        outlines for force_android overrides, plus a green selection
+        indicator for the most recently-clicked Android cell."""
+        c = self._android_canvas
+        if self._android_img is None:
+            return
+        zoom = max(1, int(self._zoom_android.get() or 1))
+        cell_w = ANDROID_TILE_CELL
+        cell_h = ANDROID_TILE_CELL
+        img = self._android_img.convert("RGBA")
+        w, h = img.size
+        zoomed = img.resize((w * zoom, h * zoom), Image.NEAREST)
+        self._photo_android = ImageTk.PhotoImage(zoomed)
+        c.create_image(0, 0, image=self._photo_android, anchor="nw")
+        c.configure(scrollregion=(0, 0, zoomed.size[0], zoomed.size[1]))
+        # Base grid overlay
+        if self._a_grid_show.get():
+            cols = w // cell_w
+            rows = h // cell_h
+            for col in range(cols):
+                for row in range(rows):
+                    x = col * cell_w * zoom
+                    y = row * cell_h * zoom
+                    cw = cell_w * zoom
+                    ch = cell_h * zoom
+                    c.create_rectangle(x, y, x + cw, y + ch,
+                                       outline="#666", width=1)
+        # cell_map overlays (cyan, with mobile source label)
+        cmap = (self._spec or {}).get("cell_map", {}) or {}
+        for key, val in cmap.items():
+            try:
+                col_s, row_s = key.split(",", 1)
+                col = int(col_s); row = int(row_s)
+                mc = val.get("mobile_col")
+                mr = val.get("mobile_row")
+            except (ValueError, AttributeError):
+                continue
+            x = col * cell_w * zoom
+            y = row * cell_h * zoom
+            cw = cell_w * zoom
+            ch = cell_h * zoom
+            c.create_rectangle(x, y, x + cw, y + ch,
+                               outline="#0ff", width=2)
+            if mc is not None and mr is not None:
+                c.create_text(x + 2, y + 1, anchor="nw",
+                              text=f"{mc},{mr}",
+                              fill="#0ff",
+                              font=("TkDefaultFont", 7))
+        # force_android overlays (magenta)
+        forced = (self._spec or {}).get("android_target", {}) \
+                                    .get("force_android_cells", []) or []
+        for key in forced:
+            try:
+                col_s, row_s = key.split(",", 1)
+                col = int(col_s); row = int(row_s)
+            except (ValueError, AttributeError):
+                continue
+            x = col * cell_w * zoom
+            y = row * cell_h * zoom
+            cw = cell_w * zoom
+            ch = cell_h * zoom
+            c.create_rectangle(x, y, x + cw, y + ch,
+                               outline="#f0f", width=2)
+            c.create_text(x + 2, y + 1, anchor="nw", text="A",
+                          fill="#f0f",
+                          font=("TkDefaultFont", 7, "bold"))
+
+    # ------------------------------------------------------------------
+    # Click / drag handlers for tileset mode
+    # ------------------------------------------------------------------
+
+    def _cell_from_event_mobile(self, ev):
+        """Return (col, row) Mobile cell coords from a canvas event, or
+        None if click is outside the sheet bounds."""
+        if self._mobile_img is None:
+            return None
+        zoom = max(1, int(self._zoom_mobile.get() or 1))
+        cx = self._mobile_canvas.canvasx(ev.x)
+        cy = self._mobile_canvas.canvasy(ev.y)
+        col = int(cx // (MOBILE_TILE_CELL * zoom))
+        row = int(cy // (MOBILE_TILE_CELL * zoom))
+        w, h = self._mobile_img.size
+        cols = w // MOBILE_TILE_CELL
+        rows = h // MOBILE_TILE_CELL
+        if not (0 <= col < cols and 0 <= row < rows):
+            return None
+        return (col, row)
+
+    def _cell_from_event_android(self, ev):
+        """Return (col, row) Android cell coords from a canvas event, or
+        None if click is outside the sheet bounds."""
+        if self._android_img is None:
+            return None
+        zoom = max(1, int(self._zoom_android.get() or 1))
+        cx = self._android_canvas.canvasx(ev.x)
+        cy = self._android_canvas.canvasy(ev.y)
+        col = int(cx // (ANDROID_TILE_CELL * zoom))
+        row = int(cy // (ANDROID_TILE_CELL * zoom))
+        w, h = self._android_img.size
+        cols = w // ANDROID_TILE_CELL
+        rows = h // ANDROID_TILE_CELL
+        if not (0 <= col < cols and 0 <= row < rows):
+            return None
+        return (col, row)
+
+    def _on_click_mobile_tileset(self, ev):
+        """Pick a Mobile cell as the remap source."""
+        cell = self._cell_from_event_mobile(ev)
+        if cell is None:
+            return
+        self._sel_mobile_tileset_cell = cell
+        self._drag_origin_mobile_cell = cell  # for drag-and-drop
+        self._draw_mobile_tileset()
+        self._status.config(
+            text=f"Mobile cell selected: {cell[0]},{cell[1]} "
+                 f"— click Android cell to remap (or drag onto Android)")
+
+    def _on_drag_mobile_tileset(self, ev):
+        """While dragging from Mobile pane, just update the status
+        hint; the actual remap happens on release over Android pane."""
+        if self._drag_origin_mobile_cell is None:
+            return
+        self._status.config(
+            text=f"Dragging Mobile cell "
+                 f"{self._drag_origin_mobile_cell[0]},"
+                 f"{self._drag_origin_mobile_cell[1]} — release on "
+                 f"Android cell to remap")
+
+    def _on_release_mobile_tileset(self, ev):
+        """Mouse released inside the Mobile pane — same cell as origin,
+        treat as a regular click (already done in _on_click_mobile).
+        No-op."""
+        pass
+
+    def _on_click_android_tileset(self, ev):
+        """Either commit the current Mobile selection into cell_map at
+        this Android cell, or just inspect/highlight the cell."""
+        cell = self._cell_from_event_android(ev)
+        if cell is None:
+            return
+        sel = getattr(self, "_sel_mobile_tileset_cell", None)
+        if sel is None:
+            self._status.config(
+                text=f"Android cell: {cell[0]},{cell[1]} "
+                     f"(no Mobile selection — click Mobile first to remap)")
+            return
+        self._commit_cell_remap(sel, cell)
+
+    def _on_release_android_tileset(self, ev):
+        """Drag ended over Android pane: commit the drag origin as the
+        Mobile source for this Android cell."""
+        origin = getattr(self, "_drag_origin_mobile_cell", None)
+        if origin is None:
+            return
+        cell = self._cell_from_event_android(ev)
+        if cell is None:
+            self._drag_origin_mobile_cell = None
+            return
+        # Only commit if this was actually a drag (origin != target tile
+        # in spec terms, and current Mobile selection still points at
+        # origin). _on_click_android_tileset already handles the click-
+        # click flow; here we only fire if the user STARTED on Mobile
+        # AND released on Android (cross-pane gesture).
+        # Tk doesn't easily distinguish single-pane click-release from
+        # cross-pane drag-release, so we deduplicate: if click handler
+        # already committed (i.e. _drag_origin was cleared), skip.
+        sel = getattr(self, "_sel_mobile_tileset_cell", None)
+        if sel == origin:
+            self._commit_cell_remap(origin, cell)
+        self._drag_origin_mobile_cell = None
+
+    def _commit_cell_remap(self, mobile_cell, android_cell):
+        """Write a cell_map entry mapping the Android destination cell
+        to the Mobile source cell. Also clears any force_android entry
+        for the same Android cell (Mobile remap supersedes)."""
+        if self._spec is None:
+            self._status.config(text="No spec loaded")
+            return
+        mc, mr = mobile_cell
+        dc, dr = android_cell
+        cmap = self._spec.setdefault("cell_map", {})
+        key = f"{dc},{dr}"
+        cmap[key] = {
+            "mobile_col": mc,
+            "mobile_row": mr,
+            "flip_h": False,
+        }
+        # If this cell was previously in force_android_cells, remove it
+        at = self._spec.setdefault("android_target", {})
+        fa = at.get("force_android_cells", []) or []
+        if key in fa:
+            fa.remove(key)
+            at["force_android_cells"] = fa
+        self._sel_mobile_tileset_cell = None
+        self._drag_origin_mobile_cell = None
+        self._refresh_all()
+        self._status.config(
+            text=f"Remapped Android ({dc},{dr}) <- Mobile ({mc},{mr})")
+
+    def _on_right_click_android_tileset(self, ev):
+        """Show a context menu on the clicked Android cell with three
+        choices: Use Mobile (default — clears overrides), Use Android
+        (sets force_android), Clear remap (removes from cell_map)."""
+        cell = self._cell_from_event_android(ev)
+        if cell is None:
+            return
+        col, row = cell
+        key = f"{col},{row}"
+        if self._spec is None:
+            return
+        cmap = self._spec.get("cell_map", {}) or {}
+        at = self._spec.get("android_target", {}) or {}
+        forced = set(at.get("force_android_cells", []) or [])
+        has_remap = key in cmap
+        is_forced = key in forced
+
+        menu = tk.Menu(self._android_canvas, tearoff=0)
+        menu.add_command(
+            label=f"Android cell ({col},{row})  —  source override",
+            state="disabled")
+        menu.add_separator()
+        menu.add_command(
+            label="Use Mobile (default, clears overrides)",
+            command=lambda: self._set_cell_source(col, row, "mobile"))
+        menu.add_command(
+            label="Use Android original (force_android)"
+                  + ("   [current]" if is_forced else ""),
+            command=lambda: self._set_cell_source(col, row, "android"))
+        if has_remap:
+            menu.add_command(
+                label=f"Clear remap (currently from Mobile "
+                      f"{cmap[key].get('mobile_col')},"
+                      f"{cmap[key].get('mobile_row')})",
+                command=lambda: self._set_cell_source(col, row, "clear_remap"))
+        try:
+            menu.tk_popup(ev.x_root, ev.y_root)
+        finally:
+            menu.grab_release()
+
+    def _set_cell_source(self, col, row, source):
+        """Apply a context-menu choice. ``source`` is one of:
+        'mobile' (clear overrides), 'android' (force Android orig),
+        'clear_remap' (just remove the cell_map entry)."""
+        if self._spec is None:
+            return
+        key = f"{col},{row}"
+        cmap = self._spec.setdefault("cell_map", {})
+        at = self._spec.setdefault("android_target", {})
+        fa = list(at.get("force_android_cells", []) or [])
+        if source == "mobile":
+            cmap.pop(key, None)
+            if key in fa:
+                fa.remove(key)
+            at["force_android_cells"] = fa
+            note = "default Mobile"
+        elif source == "android":
+            cmap.pop(key, None)
+            if key not in fa:
+                fa.append(key)
+            at["force_android_cells"] = fa
+            note = "force Android original"
+        elif source == "clear_remap":
+            cmap.pop(key, None)
+            note = "remap cleared"
+        else:
+            return
+        self._refresh_all()
+        self._refresh_all()
+        self._status.config(
+            text=f"Android cell ({col},{row}): {note}")

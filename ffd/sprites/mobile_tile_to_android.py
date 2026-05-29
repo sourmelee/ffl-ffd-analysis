@@ -416,6 +416,18 @@ def convert_mobile_tileset_to_android(
                               src_cell_w, src_cell_h,
                               dst_cell_w, dst_cell_h, scale)
 
+    # Step 3.5 (optional): force-Android cells. For each "col,row" in
+    # ``android_target.force_android_cells``, paste the Android original
+    # tile at that position. Runs AFTER cell_map (so a force-Android
+    # entry overrides a Mobile remap for the same cell) and BEFORE the
+    # transparent-tile backfill (so explicit force takes priority over
+    # the heuristic fill).
+    force_cells = at.get("force_android_cells") or []
+    if force_cells and android_orig_img is not None:
+        out = _apply_force_android_cells(
+            out, android_orig_img, force_cells,
+            cell_w=dst_cell_w, cell_h=dst_cell_h)
+
     # Step 4 (optional): backfill transparent tiles from the Android
     # original sheet.
     if fill_from_android and android_orig_img is not None:
@@ -423,6 +435,37 @@ def convert_mobile_tileset_to_android(
                                                cell_w=dst_cell_w,
                                                cell_h=dst_cell_h)
 
+    return out
+
+
+def _apply_force_android_cells(base: Image.Image,
+                                android_orig: Image.Image,
+                                force_cells,
+                                cell_w: int = ANDROID_TILE_CELL,
+                                cell_h: int = ANDROID_TILE_CELL
+                                ) -> Image.Image:
+    """For every ``"col,row"`` string in ``force_cells``, paste the
+    corresponding ``(cell_w x cell_h)`` tile from ``android_orig`` into
+    ``base``. Out-of-range coords are silently skipped (so a stale
+    override from a different-sized sheet doesn't crash).
+    """
+    out = base.convert("RGBA").copy()
+    src = android_orig.convert("RGBA")
+    w, h = out.size
+    sw, sh = src.size
+    for key in force_cells:
+        try:
+            c_s, r_s = key.split(",", 1)
+            c = int(c_s); r = int(r_s)
+        except (ValueError, AttributeError):
+            continue
+        x = c * cell_w
+        y = r * cell_h
+        if (x < 0 or y < 0 or x + cell_w > w or y + cell_h > h
+                or x + cell_w > sw or y + cell_h > sh):
+            continue
+        tile = src.crop((x, y, x + cell_w, y + cell_h))
+        out.paste(tile, (x, y))
     return out
 
 
@@ -502,6 +545,7 @@ def apply_variant_palette_swap(
 # Android mc PNG helpers
 # ---------------------------------------------------------------------------
 
+
 def load_android_mc_png(obb_files: dict, mc_id: int,
                         variant: int = 0,
                         preserve_palette: bool = False
@@ -573,3 +617,48 @@ def list_android_mc_ids(obb_files: dict) -> list:
             except ValueError:
                 continue
     return sorted(ids)
+
+
+# ---------------------------------------------------------------------------
+# Mobile cpk palette enumeration
+# ---------------------------------------------------------------------------
+
+def count_cpk_palettes(sp_files: dict, entry_id: int) -> int:
+    """Return how many palette variants the Mobile cpk entry has.
+
+    The cpk chunk format stores N sub-records starting with N 4-byte
+    offsets at byte 0; the first sub-record is the ic image (containing
+    the default palette), and entries 1..N-1 are alternate palettes.
+    So the count equals ``first4 // 4``.
+
+    Returns 1 if anything fails to parse (the default palette is
+    always available since it's embedded in the ic record).
+    """
+    if not sp_files or entry_id is None:
+        return 1
+    try:
+        from ..tilesets.parser import (
+            parse_cpk_index_mobile, flat_pack_index,
+        )
+        boot = sp_files.get("boot_data.dat")
+        if not boot:
+            return 1
+        idx = flat_pack_index(parse_cpk_index_mobile(boot))
+        if entry_id not in idx:
+            return 1
+        pack_n, off, sz = idx[entry_id]
+        cpk_name = f"cpk{pack_n}.dat"
+        chunk_blob = sp_files.get(cpk_name)
+        if not chunk_blob:
+            return 1
+        chunk = chunk_blob[off:off + sz]
+        if len(chunk) < 4:
+            return 1
+        import struct
+        first4 = struct.unpack(">I", chunk[:4])[0]
+        if first4 == 0 or first4 % 4 != 0 or first4 > len(chunk):
+            return 1
+        n = first4 // 4
+        return max(1, int(n))
+    except Exception:
+        return 1
