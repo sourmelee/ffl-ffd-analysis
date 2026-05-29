@@ -257,22 +257,28 @@ class SpriteConverterTab(TabBase):
     # ------------------------------------------------------------------
 
     def _build_three_panes(self):
-        body = ttk.Frame(self); body.pack(fill="both", expand=True,
-                                          padx=4, pady=4)
+        # ``ttk.PanedWindow`` so the user can drag the sashes to resize the
+        # four panes (Mobile | Android | Preview | Inspector). Each child
+        # gets equal initial weight; the inspector form fields still
+        # render correctly when the user shrinks that pane (Tk widgets
+        # clip rather than overflow).
+        body = ttk.PanedWindow(self, orient="horizontal")
+        body.pack(fill="both", expand=True, padx=4, pady=4)
 
         def make_scrollable_pane(parent, title, zoom_var,
                                  click_handler=None, shift_handler=None,
                                  width=320, height=600,
                                  extra_title_widgets=None):
             """Build a LabelFrame containing: a zoom dropdown in the title
-            row + a Canvas with both H and V scrollbars.
+            row + a Canvas with both H and V scrollbars. Does NOT pack the
+            outer frame -- the caller is responsible for adding it to the
+            PanedWindow (or other parent). Returns (frame, canvas).
 
             ``extra_title_widgets``: optional callable that takes the title
             row ttk.Frame and packs additional widgets into it (used by
             the Mobile pane to expose cell dim entries).
             """
             frame = ttk.LabelFrame(parent, text=title)
-            frame.pack(side="left", fill="both", expand=True, padx=2)
             tr = ttk.Frame(frame); tr.pack(side="top", fill="x")
             ttk.Label(tr, text="Zoom:").pack(side="left", padx=(4,0))
             cb = ttk.Combobox(tr, textvariable=zoom_var, values=ZOOM_CHOICES,
@@ -303,7 +309,7 @@ class SpriteConverterTab(TabBase):
                 canvas.bind("<Button-1>", click_handler)
             if shift_handler:
                 canvas.bind("<Shift-Button-1>", shift_handler)
-            return canvas
+            return frame, canvas
 
         # Mobile pane: title row gets cell_w/cell_h/cols/rows entries
         # so the user can tune the grid for non-default sheets (battle,
@@ -334,13 +340,14 @@ class SpriteConverterTab(TabBase):
             ttk.Entry(tr, textvariable=self._rows_var, width=3
                       ).pack(side="left")
 
-        self._mobile_canvas = make_scrollable_pane(
+        mobile_frame, self._mobile_canvas = make_scrollable_pane(
             body, "Mobile (click cell; shift-click adjacent to extend)",
             self._zoom_mobile,
             click_handler=self._on_click_mobile,
             shift_handler=lambda e: self._on_click_mobile(e, shift=True),
             width=340, height=600,
             extra_title_widgets=_mobile_extras)
+        body.add(mobile_frame, weight=1)
 
         def _android_extras(tr):
             ttk.Label(tr, text="  cell:",
@@ -367,21 +374,24 @@ class SpriteConverterTab(TabBase):
             ttk.Checkbutton(tr, text="grid",
                             variable=self._a_grid_show).pack(side="left", padx=(8,0))
 
-        self._android_canvas = make_scrollable_pane(
+        android_frame, self._android_canvas = make_scrollable_pane(
             body, "Android (click cell to map / inspect; yellow = grid extras)",
             self._zoom_android,
             click_handler=self._on_click_android,
             width=520, height=600,
             extra_title_widgets=_android_extras)
+        body.add(android_frame, weight=1)
 
-        self._preview_canvas = make_scrollable_pane(
+        preview_frame, self._preview_canvas = make_scrollable_pane(
             body, "Preview (live converted output)",
             self._zoom_preview,
             width=520, height=600)
+        body.add(preview_frame, weight=1)
 
-        # Inspector sidebar (unchanged)
+        # Inspector sidebar -- also in the PanedWindow with weight=1 per
+        # Jack's preference (resizable along with the canvases).
         ins = ttk.LabelFrame(body, text="Inspector (selected mapping)")
-        ins.pack(side="left", fill="y", padx=2)
+        body.add(ins, weight=1)
         self._build_inspector(ins)
 
     def _build_inspector(self, parent):
@@ -2357,7 +2367,4 @@ class SpriteConverterTab(TabBase):
         except Exception as e:
             messagebox.showerror("Error",
                 f"Tileset export failed:\n{e}\n\n{traceback.format_exc()}")
-            self._status.config(text=f"Exported {os.path.basename(p)}")
-        except Exception as e:
-            messagebox.showerror("Error",
-                f"Tileset export failed:\n{e}\n\n{traceback.format_exc()}")
+           
