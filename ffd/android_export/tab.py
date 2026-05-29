@@ -45,6 +45,11 @@ class AndroidExportTab(TabBase):
         notebook.add(mc_frame, text="Mass convert characters")
         self._build_mass_convert_tab(mc_frame)
 
+        # Sub-tab 4: Mass convert tileset sheets ---------------------------
+        mt_frame = ttk.Frame(notebook)
+        notebook.add(mt_frame, text="Mass convert tilesets")
+        self._build_mass_convert_tilesets_tab(mt_frame)
+
     def _build_extract_tab(self, parent):
         intro = ttk.Label(parent, text=(
             "Extract assets from every loaded .sp scratchpad in the "
@@ -503,3 +508,283 @@ class AndroidExportTab(TabBase):
         self._mc_logln(f"DONE: {n_done} converted, "
                        f"{n_skipped} skipped, {n_failed} failed.")
 
+    # ------------------------------------------------------------------ #
+    # Sub-tab 4: Mass convert tilesets
+    # ------------------------------------------------------------------ #
+    def _build_mass_convert_tilesets_tab(self, parent):
+        intro = ttk.Label(parent, text=(
+            "Run the Mobile -> Android tileset converter over every "
+            "Mobile cpk entry across the loaded .sp slots. Each entry "
+            "is auto-matched to its Android mc_id via cpk_to_mc.json "
+            "(with numeric fallback when missing) and written as "
+            "mc<id>_0.png (variant 0). Non-zero color variants of each "
+            "tileset are handled per the 'Variant strategy' option "
+            "(verbatim copy from Android, or palette swap from the "
+            "Mobile-sourced base). Existing files in the output folder "
+            "are overwritten."),
+            wraplength=820)
+        intro.pack(anchor="w", padx=4, pady=4)
+
+        outf = ttk.Frame(parent)
+        outf.pack(fill="x", padx=4, pady=4)
+        ttk.Label(outf, text="Output folder:").pack(side="left")
+        self._mt_out_var = tk.StringVar(
+            value=str(Path.home() / "ffd_converted_tilesets"))
+        ttk.Entry(outf, textvariable=self._mt_out_var).pack(
+            side="left", fill="x", expand=True, padx=4)
+        ttk.Button(outf, text="Choose...",
+                   command=lambda: self._pick_dir(self._mt_out_var)
+                   ).pack(side="left")
+
+        # Filter / strategy options
+        optf = ttk.LabelFrame(parent, text="Options")
+        optf.pack(fill="x", padx=4, pady=4)
+        self._mt_fill_from_android = tk.BooleanVar(value=True)
+        ttk.Checkbutton(optf,
+            text="Fill missing tiles from Android original",
+            variable=self._mt_fill_from_android
+            ).grid(row=0, column=0, sticky="w", padx=6, pady=2)
+        self._mt_skip_existing = tk.BooleanVar(value=False)
+        ttk.Checkbutton(optf,
+            text="Skip if output file already exists",
+            variable=self._mt_skip_existing
+            ).grid(row=0, column=1, sticky="w", padx=6, pady=2)
+        self._mt_include_variants = tk.BooleanVar(value=True)
+        ttk.Checkbutton(optf,
+            text="Also emit non-zero variants (mc_<id>_1, _2, ...)",
+            variable=self._mt_include_variants
+            ).grid(row=1, column=0, sticky="w", padx=6, pady=2)
+        ttk.Label(optf, text="Variant strategy:"
+                  ).grid(row=2, column=0, sticky="w", padx=6, pady=2)
+        self._mt_palette_strategy = tk.StringVar(value="verbatim")
+        ttk.Combobox(optf, textvariable=self._mt_palette_strategy,
+                     values=("verbatim", "swap"), width=10,
+                     state="readonly"
+                     ).grid(row=2, column=1, sticky="w", padx=6, pady=2)
+        ttk.Label(optf,
+            text=("verbatim = copy Android variant byte-for-byte (lossless, "
+                  "doesn't reflect Mobile edits); swap = re-color Mobile "
+                  "base via palette LUT extracted from Android variants"),
+            wraplength=820, foreground="#666"
+            ).grid(row=3, column=0, columnspan=2,
+                   sticky="w", padx=6, pady=2)
+
+        runf = ttk.Frame(parent); runf.pack(fill="x", padx=4, pady=4)
+        self._mt_run_btn = ttk.Button(runf, text="Mass convert tilesets",
+                                       command=self._run_mass_convert_tilesets)
+        self._mt_run_btn.pack(side="left")
+        self._mt_prog = ttk.Progressbar(runf, mode="indeterminate")
+        self._mt_prog.pack(side="left", fill="x", expand=True, padx=8)
+
+        logf = ttk.LabelFrame(parent, text="Log")
+        logf.pack(fill="both", expand=True, padx=4, pady=4)
+        self._mt_log = ScrolledText(logf, height=20, wrap="word",
+                                    font=("TkFixedFont", 9))
+        self._mt_log.pack(fill="both", expand=True, padx=4, pady=4)
+
+    def _mt_logln(self, msg):
+        self._mt_log.insert("end", msg + "\n")
+        self._mt_log.see("end")
+        self._mt_log.update_idletasks()
+
+    def _run_mass_convert_tilesets(self):
+        out_path = self._mt_out_var.get().strip()
+        if not out_path:
+            messagebox.showinfo("Output folder",
+                "Choose an output folder first.")
+            return
+        try:
+            Path(out_path).mkdir(parents=True, exist_ok=True)
+        except Exception as e:
+            messagebox.showerror("Error", f"Cannot create output folder:\n{e}")
+            return
+        self._mt_log.delete("1.0", "end")
+        self._mt_run_btn.config(state="disabled")
+        self._mt_prog.start(10)
+        import threading
+        t = threading.Thread(target=self._mt_worker,
+                             args=(out_path,), daemon=True)
+        t.start()
+
+    def _mt_worker(self, out_path):
+        try:
+            self._mt_impl(out_path)
+        except Exception as e:
+            self._mt_logln(f"FATAL: {e}")
+            self._mt_logln(traceback.format_exc())
+        finally:
+            self.after(0, self._mt_done)
+
+    def _mt_done(self):
+        self._mt_prog.stop()
+        self._mt_run_btn.config(state="normal")
+
+    def _mt_impl(self, out_path):
+        """Iterate every Mobile cpk entry across loaded .sp slots, run
+        the tileset converter, write mc{id}_0.png. Optionally also
+        write non-zero variants via verbatim copy or palette swap.
+        """
+        import os
+        from ..tilesets.parser import MobileTilesetResolver
+        from ..sprites.mobile_tile_to_android import (
+            convert_mobile_tileset_to_android,
+            apply_variant_palette_swap,
+            lookup_mc_for_cpk,
+            load_android_mc_png,
+            list_android_mc_variants,
+            make_tileset_starter_spec,
+        )
+
+        obb = self.data.obb_files or {}
+        cpk_to_mc = self.data.cpk_to_mc() or {}
+
+        # Cache loaded cpk_to_mc for telemetry
+        self._mt_logln(f"Output:         {out_path}")
+        self._mt_logln(f"Fill missing:   {bool(self._mt_fill_from_android.get())}")
+        self._mt_logln(f"Include var>0:  {bool(self._mt_include_variants.get())}")
+        self._mt_logln(f"Strategy:       {self._mt_palette_strategy.get()}")
+        self._mt_logln(f"cpk_to_mc.json: "
+                       f"{len(cpk_to_mc)} chapter entries loaded" if cpk_to_mc
+                       else "cpk_to_mc.json: MISSING (numeric fallback only)")
+        self._mt_logln("")
+
+        n_done = 0
+        n_skipped = 0
+        n_failed = 0
+        n_variants = 0
+
+        # Track which mc_ids we've already emitted to avoid re-writing variants
+        # multiple times when several cpk entries map to the same mc_id.
+        emitted = set()  # (mc_id, variant)
+
+        for slot_label, files in (self.data.sp_slots or {}).items():
+            if not files:
+                continue
+            try:
+                resolver = MobileTilesetResolver(files)
+            except Exception as e:
+                self._mt_logln(f"[{slot_label}] resolver failed: {e}")
+                continue
+            cpks = sorted(resolver.cpk_index.keys())
+            if not cpks:
+                continue
+            self._mt_logln(f"[{slot_label}] {len(cpks)} cpk entries")
+
+            for cpk_entry in cpks:
+                try:
+                    mobile_img = resolver.get(cpk_entry, 0)
+                except Exception as e:
+                    self._mt_logln(f"  cpk[{cpk_entry:02d}]: render failed: {e}")
+                    n_failed += 1
+                    continue
+                if mobile_img is None:
+                    n_skipped += 1
+                    continue
+
+                # Look up Android mc_id
+                mc_id, variant, source = lookup_mc_for_cpk(
+                    cpk_to_mc, slot_label, cpk_entry)
+                if mc_id is None:
+                    self._mt_logln(
+                        f"  cpk[{cpk_entry:02d}]: no mc_id "
+                        f"(source: {source})")
+                    n_skipped += 1
+                    continue
+
+                # Load Android original for fill_missing + size
+                android_orig = load_android_mc_png(obb, mc_id, 0)
+                # Build a base spec
+                spec = make_tileset_starter_spec(
+                    f"cpk{cpk_entry}", cpk_entry=cpk_entry,
+                    mc_id=mc_id, variant=0,
+                    chapter=slot_label,
+                    fill_from_android=bool(self._mt_fill_from_android.get()),
+                    palette_strategy=self._mt_palette_strategy.get(),
+                )
+
+                # Emit variant 0 (always Mobile-sourced)
+                key0 = (mc_id, 0)
+                out_file = os.path.join(out_path, f"mc{mc_id}_0.png")
+                if (self._mt_skip_existing.get()
+                        and os.path.exists(out_file)) or key0 in emitted:
+                    pass
+                else:
+                    try:
+                        out_img = convert_mobile_tileset_to_android(
+                            mobile_img, spec, android_orig)
+                        out_img.save(out_file)
+                        emitted.add(key0)
+                        n_done += 1
+                        self._mt_logln(
+                            f"  cpk[{cpk_entry:02d}] -> "
+                            f"mc{mc_id}_0.png  [{source}]")
+                    except Exception as e:
+                        self._mt_logln(
+                            f"  cpk[{cpk_entry:02d}] -> mc{mc_id}_0: "
+                            f"FAIL: {e}")
+                        n_failed += 1
+
+                # Emit non-zero variants if requested
+                if self._mt_include_variants.get():
+                    variants = list_android_mc_variants(obb, mc_id)
+                    strategy = self._mt_palette_strategy.get()
+                    for var in variants:
+                        if var == 0:
+                            continue
+                        keyN = (mc_id, var)
+                        if keyN in emitted:
+                            continue
+                        out_var = os.path.join(out_path,
+                                                f"mc{mc_id}_{var}.png")
+                        if (self._mt_skip_existing.get()
+                                and os.path.exists(out_var)):
+                            emitted.add(keyN)
+                            continue
+
+                        try:
+                            if strategy == "verbatim":
+                                # Copy the Android variant straight through
+                                src_blob = obb.get(f"mc{mc_id}_{var}.png")
+                                if not src_blob:
+                                    continue
+                                with open(out_var, "wb") as f:
+                                    f.write(src_blob)
+                            else:  # swap
+                                base_pal = load_android_mc_png(
+                                    obb, mc_id, 0, preserve_palette=True)
+                                tgt_pal = load_android_mc_png(
+                                    obb, mc_id, var, preserve_palette=True)
+                                if base_pal is None or tgt_pal is None:
+                                    self._mt_logln(
+                                        f"    mc{mc_id}_{var}: paletted "
+                                        f"variant missing, falling back to "
+                                        f"verbatim")
+                                    src_blob = obb.get(f"mc{mc_id}_{var}.png")
+                                    if src_blob:
+                                        with open(out_var, "wb") as f:
+                                            f.write(src_blob)
+                                else:
+                                    # Re-run convert for variant 0 base, then swap
+                                    base_spec = make_tileset_starter_spec(
+                                        f"cpk{cpk_entry}",
+                                        cpk_entry=cpk_entry, mc_id=mc_id,
+                                        variant=0, chapter=slot_label,
+                                        fill_from_android=bool(
+                                            self._mt_fill_from_android.get()),
+                                    )
+                                    base_out = convert_mobile_tileset_to_android(
+                                        mobile_img, base_spec, android_orig)
+                                    swapped = apply_variant_palette_swap(
+                                        base_out, base_pal, tgt_pal)
+                                    swapped.save(out_var)
+                            emitted.add(keyN)
+                            n_variants += 1
+                        except Exception as e:
+                            self._mt_logln(
+                                f"    mc{mc_id}_{var}: FAIL: {e}")
+                            n_failed += 1
+
+        self._mt_logln("")
+        self._mt_logln(f"DONE: {n_done} mc_0 converted, "
+                       f"{n_variants} variants, "
+                       f"{n_skipped} skipped, {n_failed} failed.")

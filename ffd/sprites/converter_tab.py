@@ -45,6 +45,13 @@ from .mobile_to_android import (
     make_starter_spec, load_mapping_spec, save_mapping_spec,
     convert_mobile_sheet_to_android,
 )
+from .mobile_tile_to_android import (
+    MOBILE_TILE_CELL, ANDROID_TILE_CELL, DEFAULT_OUTPUT_SIZE as TILE_DEFAULT_OUTPUT_SIZE,
+    make_tileset_starter_spec, load_tileset_mapping_spec,
+    save_tileset_mapping_spec, lookup_mc_for_cpk, lookup_cpk_for_mc,
+    convert_mobile_tileset_to_android, apply_variant_palette_swap,
+    load_android_mc_png, list_android_mc_variants, list_android_mc_ids,
+)
 
 
 # Default integer-only zoom levels (per-canvas, user-adjustable via the
@@ -122,6 +129,28 @@ class SpriteConverterTab(TabBase):
         self._a_grid_show.trace_add("write",
                                     lambda *a: self._draw_android())
 
+        # --- Tileset-mode state (used when source_type == "Tilesets") ----
+        # Currently-selected Android mc variant index for display.
+        self._tileset_variant_var = tk.StringVar(value="0")
+        self._tileset_variant_var.trace_add("write",
+            lambda *a: self._on_tileset_variant_change())
+        # Tileset-spec checkboxes.
+        self._t_fill_from_android = tk.BooleanVar(value=True)
+        self._t_fill_from_android.trace_add("write",
+            lambda *a: self._on_tileset_option_change("fill_from_android"))
+        self._t_palette_strategy = tk.StringVar(value="verbatim")
+        self._t_palette_strategy.trace_add("write",
+            lambda *a: self._on_tileset_option_change("palette_strategy"))
+        # The user can pick any (mc_id, variant) the OBB exposes; we
+        # cache the currently-loaded Android mc image (RGBA) and its
+        # palette-mode variant pair for the swap path.
+        self._tileset_mc_id: int | None = None
+        self._tileset_variant_idx: int = 0
+        self._tileset_android_orig_img: Image.Image | None = None
+        # Status hint for the auto-match source ("chapter" / "aggregate"
+        # / "numeric_fallback") — shown in the action bar.
+        self._tileset_match_source: str = ""
+
         self._build_top_bars()
         self._build_three_panes()
         self._build_action_bar()
@@ -138,11 +167,11 @@ class SpriteConverterTab(TabBase):
         ttk.Label(bar, text="Source type:").pack(side="left", padx=(0,2))
         self._source_type = tk.StringVar(value="Characters")
         st_combo = ttk.Combobox(bar, textvariable=self._source_type,
-                                values=("Characters",), width=12,
+                                values=("Characters", "Tilesets"), width=12,
                                 state="readonly")
         st_combo.pack(side="left", padx=2)
         st_combo.bind("<<ComboboxSelected>>",
-                      lambda e: self._refresh_source_pickers())
+                      lambda e: self._on_source_type_change())
 
         ttk.Label(bar, text=" Mode:").pack(side="left", padx=(8,2))
         mode_combo = ttk.Combobox(bar, textvariable=self._mode,
@@ -641,6 +670,9 @@ class SpriteConverterTab(TabBase):
     def _draw_mobile(self):
         c = self._mobile_canvas
         c.delete("all")
+        if self._source_type.get() == "Tilesets":
+            self._draw_mobile_tileset()
+            return
         if self._mobile_img is None:
             return
         from .mobile_to_android import _normalize_mobile_sheet
@@ -675,6 +707,9 @@ class SpriteConverterTab(TabBase):
     def _draw_android(self):
         c = self._android_canvas
         c.delete("all")
+        if self._source_type.get() == "Tilesets":
+            self._draw_android_tileset()
+            return
         if self._android_img is None or not self._field_anm_entries:
             return
         try:
@@ -736,6 +771,9 @@ class SpriteConverterTab(TabBase):
     def _draw_preview(self):
         c = self._preview_canvas
         c.delete("all")
+        if self._source_type.get() == "Tilesets":
+            self._draw_preview_tileset()
+            return
         if (self._mobile_img is None or not self._field_anm_entries
                 or self._spec is None):
             return
@@ -1277,15 +1315,21 @@ class SpriteConverterTab(TabBase):
 
     def _refresh_source_pickers(self):
         """Re-enumerate Mobile and Android source options from the loaded
-        project data (FFData.sp_slots + obb_files). For Source type =
-        'Characters', shows Mobile chpk party-member-shape entries and
-        Android fldchr*.png files."""
+        project data (FFData.sp_slots + obb_files). Dispatches by
+        Source type:
+          * 'Characters' -> Mobile chpk entries + Android fldchr*.png
+          * 'Tilesets'   -> Mobile cpk entries (via MobileTilesetResolver)
+                            + Android mc*.png (with variant selector)
+        """
         kind = self._source_type.get()
         mobile_opts = []
         android_opts = []
         if kind == "Characters":
             mobile_opts = self._enumerate_mobile_chpk_characters()
             android_opts = self._enumerate_android_fldchr()
+        elif kind == "Tilesets":
+            mobile_opts = self._enumerate_mobile_cpk_tilesets()
+            android_opts = self._enumerate_android_mc_pngs()
 
         self._mobile_pick_options = mobile_opts
         self._android_pick_options = android_opts
@@ -1341,6 +1385,9 @@ class SpriteConverterTab(TabBase):
         """User picked a Mobile source from the combo: render the entry's
         ic image, infer cell dims from the sheet shape (best-guess), and
         update the Mobile canvas."""
+        if self._source_type.get() == "Tilesets":
+            self._on_mobile_pick_selected_tileset()
+            return
         from ..images.ic import render_ic
         sel = self._mobile_pick_var.get()
         opts = getattr(self, "_mobile_pick_options", [])
@@ -1413,6 +1460,9 @@ class SpriteConverterTab(TabBase):
                 ms["cols"]   = c;  ms["rows"]   = r
 
     def _on_android_pick_selected(self):
+        if self._source_type.get() == "Tilesets":
+            self._on_android_pick_selected_tileset()
+            return
         sel = self._android_pick_var.get()
         opts = getattr(self, "_android_pick_options", [])
         from io import BytesIO
@@ -1448,7 +1498,10 @@ class SpriteConverterTab(TabBase):
 
     def _try_autoload_field_anm(self):
         """Auto-load the anim file for the current mode from the loaded
-        OBB. field mode -> field_anm.dat, battle mode -> btlanm_sp.dat."""
+        OBB. field mode -> field_anm.dat, battle mode -> btlanm_sp.dat.
+        No-op in Tileset source type (tiles have no anim file)."""
+        if self._source_type.get() == "Tilesets":
+            return
         files = self.data.obb_files or {}
         mode = self._mode.get()
         fname = "field_anm.dat" if mode == "field" else "btlanm_sp.dat"
@@ -1610,6 +1663,8 @@ class SpriteConverterTab(TabBase):
         """Mobile->Android: pick the Android fldchr option whose
         (fldchr_id, palette) best matches (chpk_entry, palette).
         Falls back to closest fldchr_id."""
+        if self._source_type.get() == "Tilesets":
+            return  # tileset flow uses _auto_match_android_tileset
         if chpk_entry is None:
             return
         opts = getattr(self, "_android_pick_options", [])
@@ -1651,6 +1706,8 @@ class SpriteConverterTab(TabBase):
         Falls back to closest chpk_entry; among equally close
         candidates the first occurrence in the combo wins (per Jack's
         scoping choice -- no chapter preference)."""
+        if self._source_type.get() == "Tilesets":
+            return  # tileset flow uses _auto_match_mobile_tileset
         if fldchr_id is None:
             return
         opts = getattr(self, "_mobile_pick_options", [])
@@ -1778,3 +1835,529 @@ class SpriteConverterTab(TabBase):
             text=f"Auto-loaded {tpl_name} for chpk[{chpk_entry}] pal{palette or 0}")
         return True
 
+    # ==================================================================
+    # Tileset mode (Source type = "Tilesets")
+    # ==================================================================
+    #
+    # Tileset mode REUSES the 3-pane SpriteConverterTab UI but swaps in
+    # a fundamentally simpler conversion model:
+    #
+    # * Mobile pane shows a Mobile cpk tileset (16x16 grid of 16x16
+    #   cells by default), one of many enumerated from the loaded
+    #   .sp slots via MobileTilesetResolver.
+    # * Android pane shows an Android mc{id}_{variant}.png at native
+    #   dims (typically 512x512 = 16x16 grid of 32x32 cells). A
+    #   variant selector lets the user flip between mc{id}_0,
+    #   mc{id}_1, mc{id}_2... while keeping the same mc_id.
+    # * Preview pane shows the live convert output (2x NN upscale,
+    #   optional fill-from-Android backfill, optional palette swap
+    #   for non-zero variants).
+    #
+    # The auto-match (Mobile <-> Android) uses cpk_to_mc.json with
+    # numeric fallback, per Jack's choice. Manual override is the GUI
+    # combo selection itself.
+    # ==================================================================
+
+    def _on_source_type_change(self):
+        """User flipped the Source type dropdown. Reset selections,
+        re-enumerate pickers, redraw."""
+        self._mobile_img = None
+        self._android_img = None
+        self._tileset_android_orig_img = None
+        self._tileset_mc_id = None
+        self._tileset_variant_idx = 0
+        self._tileset_match_source = ""
+        # Tileset mode has no anim file or field_anm dependency; clear them.
+        if self._source_type.get() == "Tilesets":
+            self._field_anm_entries = []
+            self._field_anm_path = None
+            if hasattr(self, "_fanm_label"):
+                self._fanm_label.config(text="(none - tileset mode)")
+            if hasattr(self, "_entry_combo"):
+                self._entry_combo.config(values=())
+            # Auto-load the tileset_default template as the working spec
+            self._load_tileset_default_template()
+            # Build the tileset action bar (idempotent)
+            self._build_tileset_action_bar()
+        self._refresh_source_pickers()
+        self._refresh_all()
+        self._status.config(text=f"Source type: {self._source_type.get()}")
+
+    # ------------------------------------------------------------------
+    # Tileset spec helpers
+    # ------------------------------------------------------------------
+
+    def _load_tileset_default_template(self):
+        """Replace the current spec with a fresh copy of tileset_default.json
+        so the converter has a baseline configuration to work from."""
+        path = self._resolve_template_path("tileset_default.json")
+        if not path:
+            self._spec = make_tileset_starter_spec(
+                "tileset_default", cpk_entry=0, mc_id=0, variant=0)
+            self._spec_path = None
+            self._spec_label.config(text="DEFAULT: tileset_default (unsaved)")
+            return
+        try:
+            self._spec = load_tileset_mapping_spec(path)
+            self._spec_path = None  # treat as unsaved
+            self._spec_label.config(
+                text=f"AUTO: tileset_default.json (unsaved)")
+        except Exception as e:
+            self._spec = make_tileset_starter_spec(
+                "tileset_default", cpk_entry=0, mc_id=0, variant=0)
+            self._spec_path = None
+            self._spec_label.config(text=f"DEFAULT (load failed: {e})")
+        # Sync GUI checkboxes from the loaded spec
+        at = (self._spec or {}).get("android_target", {}) or {}
+        self._t_fill_from_android.set(bool(at.get("fill_from_android", True)))
+        ps = at.get("palette_strategy", "verbatim")
+        if ps in ("verbatim", "swap"):
+            self._t_palette_strategy.set(ps)
+
+    # ------------------------------------------------------------------
+    # Tileset enumerators
+    # ------------------------------------------------------------------
+
+    def _enumerate_mobile_cpk_tilesets(self):
+        """Walk every loaded .sp slot, parse its cpk_index from
+        boot_data.dat, and emit one option per available cpk entry id
+        across (palette 0 only -- tile-color variants are an Android-side
+        concept). Each option carries the resolver-loaded image."""
+        from ..tilesets.parser import MobileTilesetResolver
+        opts = []
+        for slot_label, files in (self.data.sp_slots or {}).items():
+            if not files:
+                continue
+            try:
+                resolver = MobileTilesetResolver(files)
+            except Exception:
+                continue
+            for eid in sorted(resolver.cpk_index.keys()):
+                try:
+                    img = resolver.get(eid, 0)
+                except Exception:
+                    img = None
+                if img is None:
+                    continue
+                w, h = img.size
+                label = (f"{slot_label} cpk[{eid:02d}] "
+                         f"({w}x{h})")
+                opts.append({
+                    "label": label, "kind": "mobile_cpk",
+                    "sp_slot": slot_label,
+                    "cpk_entry": eid,
+                    "palette": 0,
+                    "width": w, "height": h,
+                    "_img": img,
+                })
+        return opts
+
+    def _enumerate_android_mc_pngs(self):
+        """List every mc{id}_{variant}.png in the loaded OBB. Variant
+        selection is handled by a separate dropdown in the action bar
+        (so the Android picker shows one row per mc_id, not per
+        variant), but each option carries the full list of variants
+        for the variant selector to populate."""
+        opts = []
+        files = self.data.obb_files or {}
+        if not files:
+            return opts
+        mc_ids = list_android_mc_ids(files)
+        for mc_id in mc_ids:
+            variants = list_android_mc_variants(files, mc_id)
+            if not variants:
+                continue
+            label = (f"mc{mc_id}  ({len(variants)} variant"
+                     f"{'s' if len(variants) > 1 else ''}: {variants})")
+            opts.append({
+                "label": label, "kind": "android_mc",
+                "mc_id": mc_id,
+                "variants": variants,
+                "default_variant": variants[0],
+            })
+        return opts
+
+    # ------------------------------------------------------------------
+    # Tileset pick handlers
+    # ------------------------------------------------------------------
+
+    def _on_mobile_pick_selected_tileset(self):
+        """User picked a Mobile cpk entry. Load image, update spec,
+        auto-match Android side."""
+        sel = self._mobile_pick_var.get()
+        opts = getattr(self, "_mobile_pick_options", [])
+        for opt in opts:
+            if opt["label"] != sel:
+                continue
+            self._mobile_img = opt["_img"].convert("RGBA")
+            self._mobile_label.config(text=opt["label"][:32])
+            self._mobile_path = None
+            if self._spec is not None:
+                ms = self._spec.setdefault("mobile_source", {})
+                ms["chapter"] = opt.get("sp_slot")
+                ms["cpk_entry"] = opt.get("cpk_entry")
+                ms["palette"] = opt.get("palette", 0)
+            self._refresh_all()
+            self._status.config(text=f"Loaded Mobile cpk: {opt['label']}")
+            # Auto-match Android mc via cpk_to_mc.json + numeric fallback
+            if not getattr(self, "_suppress_auto_match", False):
+                self._auto_match_android_tileset(
+                    opt.get("sp_slot"), opt.get("cpk_entry"))
+            return
+
+    def _on_android_pick_selected_tileset(self):
+        """User picked an Android mc tileset. Populate the variant
+        dropdown, load the chosen variant image."""
+        sel = self._android_pick_var.get()
+        opts = getattr(self, "_android_pick_options", [])
+        for opt in opts:
+            if opt["label"] != sel:
+                continue
+            mc_id = opt.get("mc_id")
+            variants = opt.get("variants") or [0]
+            self._tileset_mc_id = mc_id
+            # Reset variant to first available unless current selection
+            # is also in the new list
+            cur = self._tileset_variant_var.get()
+            try:
+                cur_i = int(cur)
+            except ValueError:
+                cur_i = variants[0]
+            new_i = cur_i if cur_i in variants else variants[0]
+            # Update variant combo (may not exist if action bar not built yet)
+            combo = getattr(self, "_tileset_variant_combo", None)
+            if combo is not None:
+                combo.config(values=[str(v) for v in variants])
+            # Suppress trace while we set to avoid double-fire
+            self._suppress_variant_cb = True
+            try:
+                self._tileset_variant_var.set(str(new_i))
+            finally:
+                self._suppress_variant_cb = False
+            self._tileset_variant_idx = new_i
+            # Load the actual mc PNG
+            self._reload_android_mc_image()
+            if self._spec is not None:
+                at = self._spec.setdefault("android_target", {})
+                at["mc_id"] = mc_id
+                at["variant"] = new_i
+            self._android_label.config(
+                text=f"mc{mc_id}_{new_i}.png")
+            self._status.config(
+                text=f"Loaded Android: mc{mc_id}_{new_i}.png "
+                     f"(variants: {variants})")
+            self._refresh_all()
+            # Auto-match Mobile side
+            if not getattr(self, "_suppress_auto_match", False):
+                self._auto_match_mobile_tileset(mc_id, new_i)
+            return
+
+    def _reload_android_mc_image(self):
+        """Re-load self._android_img + self._tileset_android_orig_img
+        for the current (mc_id, variant) selection from the OBB."""
+        if self._tileset_mc_id is None:
+            self._android_img = None
+            self._tileset_android_orig_img = None
+            return
+        obb = self.data.obb_files or {}
+        img = load_android_mc_png(obb, self._tileset_mc_id,
+                                  self._tileset_variant_idx)
+        self._android_img = img
+        self._tileset_android_orig_img = img
+
+    def _on_tileset_variant_change(self):
+        """User changed the variant dropdown."""
+        if getattr(self, "_suppress_variant_cb", False):
+            return
+        try:
+            v = int(self._tileset_variant_var.get())
+        except ValueError:
+            return
+        self._tileset_variant_idx = v
+        if self._spec is not None:
+            at = self._spec.setdefault("android_target", {})
+            at["variant"] = v
+        self._reload_android_mc_image()
+        if self._tileset_mc_id is not None:
+            self._android_label.config(
+                text=f"mc{self._tileset_mc_id}_{v}.png")
+        self._refresh_all()
+
+    def _on_tileset_option_change(self, field):
+        """User toggled fill_from_android or changed palette_strategy."""
+        if self._spec is None:
+            return
+        at = self._spec.setdefault("android_target", {})
+        if field == "fill_from_android":
+            at["fill_from_android"] = bool(self._t_fill_from_android.get())
+        elif field == "palette_strategy":
+            at["palette_strategy"] = self._t_palette_strategy.get()
+        self._draw_preview()
+
+    # ------------------------------------------------------------------
+    # Tileset auto-match (cpk_to_mc.json with numeric fallback)
+    # ------------------------------------------------------------------
+
+    def _auto_match_android_tileset(self, chapter, cpk_entry):
+        """Mobile->Android: look up (chapter, cpk_entry) in cpk_to_mc.json
+        and pick the matching mc_id; fall back to numeric cpk_entry."""
+        if cpk_entry is None:
+            return
+        cpk_to_mc = {}
+        try:
+            cpk_to_mc = self.data.cpk_to_mc() or {}
+        except Exception:
+            pass
+        mc_id, variant, source = lookup_mc_for_cpk(cpk_to_mc, chapter,
+                                                    cpk_entry)
+        self._tileset_match_source = source
+        if mc_id is None:
+            return
+        # Find the matching Android option for mc_id (variants are
+        # selected via the variant dropdown, not the picker label).
+        opts = getattr(self, "_android_pick_options", [])
+        chosen = None
+        for opt in opts:
+            if opt.get("mc_id") == mc_id:
+                chosen = opt
+                break
+        if chosen is None:
+            self._status.config(
+                text=f"Auto-match: mc{mc_id} not in OBB (source: {source})")
+            return
+        if self._android_pick_var.get() == chosen["label"]:
+            # Already on this mc_id; just ensure the variant matches
+            if int(self._tileset_variant_var.get() or 0) != variant:
+                if variant in (chosen.get("variants") or [0]):
+                    self._tileset_variant_var.set(str(variant))
+            return
+        self._suppress_auto_match = True
+        try:
+            self._android_pick_var.set(chosen["label"])
+            self._on_android_pick_selected()
+            # If the lookup pinned a specific variant, set it
+            if variant in (chosen.get("variants") or [0]):
+                self._tileset_variant_var.set(str(variant))
+        finally:
+            self._suppress_auto_match = False
+        self._status.config(
+            text=f"Auto-match Android -> mc{mc_id}_{variant} "
+                 f"[{source}]")
+
+    def _auto_match_mobile_tileset(self, mc_id, variant=0):
+        """Android->Mobile: pick the cpk option whose cpk_to_mc entry
+        best matches (mc_id, variant); fall back to numeric cpk_entry."""
+        if mc_id is None:
+            return
+        cpk_to_mc = {}
+        try:
+            cpk_to_mc = self.data.cpk_to_mc() or {}
+        except Exception:
+            pass
+        chapter, cpk_entry, source = lookup_cpk_for_mc(cpk_to_mc, mc_id,
+                                                       variant)
+        self._tileset_match_source = source
+        if cpk_entry is None:
+            return
+        # Find the Mobile cpk option (prefer matching chapter, then any)
+        opts = getattr(self, "_mobile_pick_options", [])
+        chosen = None
+        for opt in opts:
+            if (opt.get("cpk_entry") == cpk_entry
+                    and (chapter is None or opt.get("sp_slot") == chapter)):
+                chosen = opt
+                break
+        if chosen is None:
+            for opt in opts:
+                if opt.get("cpk_entry") == cpk_entry:
+                    chosen = opt
+                    break
+        if chosen is None:
+            self._status.config(
+                text=f"Auto-match Mobile: cpk{cpk_entry} not loaded "
+                     f"[{source}]")
+            return
+        if self._mobile_pick_var.get() == chosen["label"]:
+            return
+        self._suppress_auto_match = True
+        try:
+            self._mobile_pick_var.set(chosen["label"])
+            self._on_mobile_pick_selected()
+        finally:
+            self._suppress_auto_match = False
+        self._status.config(
+            text=f"Auto-match Mobile -> {chosen['label']} [{source}]")
+
+    # ------------------------------------------------------------------
+    # Tileset drawing
+    # ------------------------------------------------------------------
+
+    def _draw_mobile_tileset(self):
+        c = self._mobile_canvas
+        if self._mobile_img is None:
+            return
+        zoom = max(1, int(self._zoom_mobile.get() or 1))
+        cell_w = MOBILE_TILE_CELL
+        cell_h = MOBILE_TILE_CELL
+        img = self._mobile_img
+        w, h = img.size
+        zoomed = img.resize((w * zoom, h * zoom), Image.NEAREST)
+        self._photo_mobile = ImageTk.PhotoImage(zoomed)
+        c.create_image(0, 0, image=self._photo_mobile, anchor="nw")
+        c.configure(scrollregion=(0, 0, zoomed.size[0], zoomed.size[1]))
+        # Grid overlay at Mobile cell pitch
+        cols = w // cell_w
+        rows = h // cell_h
+        for col in range(cols):
+            for row in range(rows):
+                x = col * cell_w * zoom
+                y = row * cell_h * zoom
+                cw = cell_w * zoom
+                ch = cell_h * zoom
+                c.create_rectangle(x, y, x + cw, y + ch,
+                                   outline="#666", width=1)
+
+    def _draw_android_tileset(self):
+        c = self._android_canvas
+        if self._android_img is None:
+            return
+        zoom = max(1, int(self._zoom_android.get() or 1))
+        cell_w = ANDROID_TILE_CELL
+        cell_h = ANDROID_TILE_CELL
+        img = self._android_img.convert("RGBA")
+        w, h = img.size
+        zoomed = img.resize((w * zoom, h * zoom), Image.NEAREST)
+        self._photo_android = ImageTk.PhotoImage(zoomed)
+        c.create_image(0, 0, image=self._photo_android, anchor="nw")
+        c.configure(scrollregion=(0, 0, zoomed.size[0], zoomed.size[1]))
+        # Grid overlay at Android cell pitch
+        if self._a_grid_show.get():
+            cols = w // cell_w
+            rows = h // cell_h
+            for col in range(cols):
+                for row in range(rows):
+                    x = col * cell_w * zoom
+                    y = row * cell_h * zoom
+                    cw = cell_w * zoom
+                    ch = cell_h * zoom
+                    c.create_rectangle(x, y, x + cw, y + ch,
+                                       outline="#666", width=1)
+
+    def _draw_preview_tileset(self):
+        c = self._preview_canvas
+        if self._mobile_img is None:
+            return
+        try:
+            out = self._render_tileset_preview()
+        except Exception as e:
+            c.create_text(10, 10, anchor="nw",
+                          text=f"Tileset convert error: {e}",
+                          fill="red")
+            return
+        if out is None:
+            return
+        zoom = max(1, int(self._zoom_preview.get() or 1))
+        zoomed = out.resize((out.size[0] * zoom,
+                             out.size[1] * zoom), Image.NEAREST)
+        self._photo_preview = ImageTk.PhotoImage(zoomed)
+        c.create_image(0, 0, image=self._photo_preview, anchor="nw")
+        c.configure(scrollregion=(0, 0, zoomed.size[0], zoomed.size[1]))
+
+    def _render_tileset_preview(self):
+        """Build the converted preview image based on the current
+        spec + checkbox state. Handles the variant > 0 + palette-swap
+        opt-in path."""
+        if self._mobile_img is None:
+            return None
+        spec = self._spec or make_tileset_starter_spec(
+            "preview", cpk_entry=0, mc_id=0, variant=0)
+        # Always reflect the current variant in the spec
+        at = spec.setdefault("android_target", {})
+        at["variant"] = int(self._tileset_variant_idx or 0)
+        at["fill_from_android"] = bool(self._t_fill_from_android.get())
+        at["palette_strategy"] = self._t_palette_strategy.get()
+        # Match the original Android sheet's dims
+        if self._android_img is not None:
+            at["output_size"] = list(self._android_img.size)
+        # Variant 0: always convert from Mobile. Variant > 0 with
+        # 'verbatim' strategy: pass-through Android verbatim. Variant > 0
+        # with 'swap' strategy: convert from Mobile base + palette swap.
+        variant = int(self._tileset_variant_idx or 0)
+        strategy = self._t_palette_strategy.get()
+        if variant > 0 and strategy == "verbatim":
+            # Show the original Android variant unchanged (preview only;
+            # mass-convert writes it byte-for-byte from the OBB).
+            return self._android_img.convert("RGBA") if self._android_img else None
+        # Otherwise: run the Mobile-based converter
+        base_out = convert_mobile_tileset_to_android(
+            self._mobile_img, spec, self._tileset_android_orig_img)
+        if variant > 0 and strategy == "swap":
+            obb = self.data.obb_files or {}
+            base_pal_img = load_android_mc_png(obb, self._tileset_mc_id, 0,
+                                               preserve_palette=True)
+            target_pal_img = load_android_mc_png(
+                obb, self._tileset_mc_id, variant, preserve_palette=True)
+            if base_pal_img is not None and target_pal_img is not None:
+                return apply_variant_palette_swap(
+                    base_out, base_pal_img, target_pal_img)
+        return base_out
+
+    # ------------------------------------------------------------------
+    # Tileset action bar (built lazily on first source-type switch)
+    # ------------------------------------------------------------------
+
+    def _build_tileset_action_bar(self):
+        """Append a row of tileset-specific controls to the existing
+        action bar. Idempotent -- only builds the row once."""
+        if getattr(self, "_tileset_bar", None) is not None:
+            return
+        self._tileset_bar = ttk.Frame(self)
+        self._tileset_bar.pack(side="bottom", fill="x", padx=4, pady=2)
+        ttk.Label(self._tileset_bar, text="Variant:").pack(side="left")
+        self._tileset_variant_combo = ttk.Combobox(
+            self._tileset_bar, textvariable=self._tileset_variant_var,
+            values=("0",), width=4, state="readonly")
+        self._tileset_variant_combo.pack(side="left", padx=2)
+        ttk.Checkbutton(self._tileset_bar,
+                        text="Fill missing tiles from Android",
+                        variable=self._t_fill_from_android).pack(side="left", padx=8)
+        ttk.Label(self._tileset_bar, text="Variant strategy:"
+                  ).pack(side="left", padx=(8,2))
+        ttk.Combobox(self._tileset_bar,
+                     textvariable=self._t_palette_strategy,
+                     values=("verbatim", "swap"), width=10,
+                     state="readonly").pack(side="left", padx=2)
+        ttk.Button(self._tileset_bar, text="Convert tileset...",
+                   command=self._export_tileset_png).pack(side="left", padx=8)
+        ttk.Label(self._tileset_bar,
+                  text=("verbatim = copy Android variant byte-for-byte; "
+                        "swap = re-color from Mobile via palette LUT"),
+                  foreground="#888").pack(side="left", padx=4)
+
+    def _export_tileset_png(self):
+        """Save the current preview as mc{id}_{variant}.png."""
+        if self._mobile_img is None or self._tileset_mc_id is None:
+            messagebox.showinfo("Missing inputs",
+                "Load a Mobile cpk + an Android mc target first.")
+            return
+        suggested = f"mc{self._tileset_mc_id}_{self._tileset_variant_idx}.png"
+        p = filedialog.asksaveasfilename(
+            title="Export converted tileset PNG",
+            defaultextension=".png", filetypes=[("PNG","*.png")],
+            initialfile=suggested)
+        if not p:
+            return
+        try:
+            out = self._render_tileset_preview()
+            if out is None:
+                messagebox.showerror("Error", "No preview to export")
+                return
+            out.save(p)
+            self._status.config(text=f"Exported {os.path.basename(p)}")
+        except Exception as e:
+            messagebox.showerror("Error",
+                f"Tileset export failed:\n{e}\n\n{traceback.format_exc()}")
+            self._status.config(text=f"Exported {os.path.basename(p)}")
+        except Exception as e:
+            messagebox.showerror("Error",
+                f"Tileset export failed:\n{e}\n\n{traceback.format_exc()}")

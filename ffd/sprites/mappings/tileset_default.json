@@ -1,0 +1,22 @@
+{
+  "name": "tileset_default",
+  "mobile_source": {
+    "chapter": null,
+    "cpk_entry": 0,
+    "palette": 0,
+    "cell_w": 16,
+    "cell_h": 16
+  },
+  "android_target": {
+    "mode": "tileset",
+    "mc_id": 0,
+    "variant": 0,
+    "output_size": [512, 512],
+    "scale": 2,
+    "cell_w": 32,
+    "cell_h": 32,
+    "fill_from_android": true,
+    "palette_strategy": "verbatim"
+  },
+  "cell_map": {}
+}
