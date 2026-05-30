@@ -44,6 +44,7 @@ import json
 import os
 import sys
 import time
+from pathlib import Path
 from typing import Optional
 
 import numpy as np
@@ -150,8 +151,10 @@ def main():
                     help="Folder containing extracted mc*.png files "
                          "(MUCH faster than loading the OBB archive). "
                          "Falls back to --obb if not found.")
-    ap.add_argument("--out", default="cpk_to_mc.json",
-                    help="Output JSON path")
+    ap.add_argument("--out",
+                    default=str(Path(__file__).resolve().parent.parent
+                                / "data" / "cpk_to_mc.json"),
+                    help="Output JSON path (default: Python/data/cpk_to_mc.json)")
     ap.add_argument("--max-cpk-per-chapter", type=int, default=0,
                     help="If >0, only process the first N cpks per chapter"
                          " (for quick smoke runs)")

@@ -127,6 +127,16 @@ commit as the changelog entry.
   also tries the space-stripped form of the chapter label so the
   GUI's `SP_SLOTS` labels (e.g. `"Chapter 5"`) match the JSON's
   dense keys (`"Chapter5"`).
+- **Sidecar JSONs moved to `Python/data/`**: `cpk_to_mc.json`,
+  `cpk_to_mc_overrides.json`, and `mc_overrides.json` now live
+  inside the toolkit folder so they ship with the code in git.
+  `FFData` resolves their paths via `_data_dir()` (computed from
+  `__file__`) instead of searching project-root / next-to-archive /
+  cwd. Old fallback locations are no longer checked. The folder is
+  auto-created so first-time saves on a fresh checkout succeed.
+  `tools/seed_mc_overrides_from_engine.py` and
+  `tools/regenerate_cpk_to_mc.py` default outputs likewise point at
+  `Python/data/`.
 
 ### Fixed
 
@@ -296,12 +306,4 @@ project went up on GitHub.
 
 - `python ffd_toolkit.py` — launch GUI.
 - `python ffd_toolkit.py --version` / `-V` — print version and exit.
-- `python ffd_toolkit.py --compare ...` — headless asset comparison.
-
-[Unreleased]: https://github.com/sourmelee/ffl-ffd-analysis/compare/v0.2.0...HEAD
-[0.2.0]: https://github.com/sourmelee/ffl-ffd-analysis/compare/v0.1.4...v0.2.0
-[0.1.4]: https://github.com/sourmelee/ffl-ffd-analysis/compare/v0.1.3...v0.1.4
-[0.1.3]: https://github.com/sourmelee/ffl-ffd-analysis/compare/v0.1.2...v0.1.3
-[0.1.2]: https://github.com/sourmelee/ffl-ffd-analysis/compare/v0.1.1...v0.1.2
-[0.1.1]: https://github.com/sourmelee/ffl-ffd-analysis/compare/v0.1.0...v0.1.1
-[0.1.0]: https://github.com/sourmelee/ffl-ffd-analysis/releases/tag/v0.1.0
+- `python ffd_toolkit.py --compare ...

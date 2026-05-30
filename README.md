@@ -57,10 +57,12 @@ Python/
 │   ├── cross_ref/            # Cross-reference tab (enemy ↔ sprite ↔ formation)
 │   ├── files_io/             # Files + Extract tabs
 │   └── gui_core/             # FFDApp window, TabBase, shared widgets
-└── tools/
-    ├── boot_data_analyze.py
-    ├── seed_mc_overrides_from_engine.py
-    └── regenerate_cpk_to_mc.py
+├── tools/
+│   ├── boot_data_analyze.py
+│   ├── seed_mc_overrides_from_engine.py
+│   └── regenerate_cpk_to_mc.py
+└── data/                     # Sidecar JSONs (cpk_to_mc, mc_overrides,
+                              # cpk_to_mc_overrides). Tracked in git.
 ```
 
 The legacy mega-module pattern is preserved: `from ffd_toolkit import parse_ic` (and every other name the old `ffd_toolkit.py` exported) still works, courtesy of explicit re-exports in `ffd_toolkit.py`.
@@ -77,7 +79,7 @@ The notebook displays 18 tabs in this order, every one defined by a `TabBase` su
 
 **Maps** — three sources: pure mobile (`.sp` `mpk*.dat`), pure Android (`.obb` `mpkh+mpk`), or Android-tile-IDs-against-mobile-tilesets (a useful diff view). Renderer is shared with ExtractTab; lazy on selection. Includes an "Obb inventory…" dialog and a "Chunk hex…" inspector.
 
-**Map Annotations** — walks every Android map and lets you manually assign its primary `mc_id` + variant. Persisted to `mc_overrides.json` next to the `.obb`. The tree is keyed by `(chunk[18], chunk[5])` buckets so similar maps cluster together. See **The `mc_overrides` annotation workflow** below.
+**Map Annotations** — walks every Android map and lets you manually assign its primary `mc_id` + variant. Persisted to `Python/data/mc_overrides.json` (ships with the toolkit so annotations track in git). The tree is keyed by `(chunk[18], chunk[5])` buckets so similar maps cluster together. See **The `mc_overrides` annotation workflow** below.
 
 **Event Scripts** — disassembles per-map event scripts on both platforms using the opcode table in `ffd/events/opcodes.py`. Each opcode has a mnemonic, an operand-format string, and a description; platform-specific opcodes are tagged `[Mobile]` or `[Android]` in the description.
 
@@ -132,7 +134,7 @@ Endian-aware integer readers (`be_u8`, `be_s8`, `be_u16`, `be_u32`, `le_u16`, `l
 Imports `tkinter` and `PIL.ImageTk` defensively, exposing `HAS_GUI` / `HAS_TK` / `HAS_IMAGETK` booleans and re-exporting Tk modules. Means `import ffd` works on a headless box; only `FFDApp().mainloop()` actually requires Tk.
 
 ### `data/ffdata.py`
-The central `FFData` model. Holds raw bytes from every loaded source (`.sp` slots, `.obb`, `.apk`, `.jar`, `.jam`), exposes lookup helpers used by every viewer tab, owns the `mc_overrides` cache + resolved path, and notifies registered change-listeners so tabs refresh automatically on load/clear. `mc_overrides_path()` resolves to (1) next to the loaded archive, (2) project root, (3) cwd — first match wins.
+The central `FFData` model. Holds raw bytes from every loaded source (`.sp` slots, `.obb`, `.apk`, `.jar`, `.jam`), exposes lookup helpers used by every viewer tab, owns the sidecar JSON caches, and notifies registered change-listeners so tabs refresh automatically on load/clear. Sidecar paths (`mc_overrides_path()`, `cpk_to_mc_path()`, `cpk_to_mc_overrides_path()`) all resolve to fixed locations in `Python/data/` — see `_data_dir()`. The folder is auto-created so first-time saves on a fresh checkout succeed.
 
 ### `containers/`
 - **`sp.py`** — `parse_sp(path)` decodes a DoCoMo `.sp` scratchpad: skip the 64-byte header, read the directory at `DIR_POS = 0x41A4` (length-prefixed, optionally zipped), and yield each contained `.dat`. Returns `OrderedDict[filename, bytes]`.
@@ -345,7 +347,5 @@ To bulk-populate annotations from the engine parser, run `tools/seed_mc_override
 - **`libjniproxy.so` decompilation** — the Android engine port. Most map / animation / event findings cite line numbers in `Decomp/Functions/libjniproxy_c.c`.
 
 ### Acknowledgements
-
-Many thanks to the **Final Fantasy Legemensions team** — GuyPerfect and PowerPanda — and to the **KeitaiWorld community**, whose incredible help and accumulated knowledge of DoCoMo FOMA-era games made this toolkit possible. Without their groundwork there would be no parsers to write.
 
 The toolkit itself was developed by Jack (`sourmelee`) with Claude as a research collaborator. Engine references in docstrings cite the decompiled sources directly so future debuggers can chase any claim back to its primary source.

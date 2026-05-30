@@ -45,7 +45,9 @@ import ffd_toolkit as tk  # type: ignore  # noqa: E402
 
 PROJECT_ROOT = PYTHON_DIR.parent          # the actual project root
 DEFAULT_OBB = PROJECT_ROOT / "Android" / "proper_obb"
-OVERRIDES_PATH = PROJECT_ROOT / "mc_overrides.json"
+# Sidecar JSONs now live in Python/data/ so they ship inside the toolkit
+# folder for git tracking. See Python/ffd/data/ffdata.py:_data_dir().
+OVERRIDES_PATH = PYTHON_DIR / "data" / "mc_overrides.json"
 
 
 def collect_engine_answers(obb_folder: Path):
@@ -214,11 +216,10 @@ def main() -> int:
     backup = args.overrides.with_suffix(f".json.bak-{timestamp}")
     shutil.copy2(args.overrides, backup)
     args.overrides.write_text(
-        json.dumps(overrides, indent=2, ensure_ascii=False) + "\n",
         encoding="utf-8",
     )
-    print(f"\nWrote: {args.overrides}")
-    print(f"Backup: {backup}")
+    print(f"Wrote {args.overrides}")
+    print(f"Backup at {backup}")
     return 0
 
 

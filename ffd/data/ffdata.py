@@ -59,30 +59,22 @@ class FFData:
         self._listeners = []
 
     # ---- mc_overrides -----------------------------------------------------
+    @staticmethod
+    def _data_dir() -> Path:
+        """Return the absolute path of ``Python/data/`` (the toolkit's
+        bundled JSON sidecar folder). All sidecars live here so they
+        can be checked into version control alongside the code."""
+        # __file__ -> Python/ffd/data/ffdata.py -> .parent.parent.parent
+        # = Python/, then + data/.
+        return Path(__file__).resolve().parent.parent.parent / "data"
+
     def mc_overrides_path(self):
-        """Resolve where mc_overrides.json lives. Preference order:
-          1. Next to any loaded archive (where the user originally created it)
-          2. The PROJECT ROOT (one level up — this is where the toolkit's
-             seed_mc_overrides_from_engine script writes it, and where
-             cross-chapter project-scoped JSONs typically belong)
-          3. The current working directory
-        Returns the first existing path, or candidate-0 as default."""
-        candidates = []
-        for p in (self.obb_path, self.apk_path, self.jar_path, self.jam_path):
-            if not p:
-                continue
-            try:
-                parent = Path(p).resolve().parent
-            except Exception:
-                continue
-            candidates.append(parent / MC_OVERRIDES_FILENAME)
-            candidates.append(parent.parent / MC_OVERRIDES_FILENAME)
-        candidates.append(Path.cwd() / MC_OVERRIDES_FILENAME)
-        for c in candidates:
-            if c.exists():
-                return c
-        return candidates[0] if candidates else (
-            Path.cwd() / MC_OVERRIDES_FILENAME)
+        """Resolve where mc_overrides.json lives — fixed at
+        ``Python/data/mc_overrides.json``. The folder is auto-created
+        if missing so first-time saves succeed."""
+        d = self._data_dir()
+        d.mkdir(parents=True, exist_ok=True)
+        return d / MC_OVERRIDES_FILENAME
 
     def mc_overrides(self, reload: bool = False):
         """Return the cached mc_overrides dict, loading lazily from disk."""
@@ -102,34 +94,12 @@ class FFData:
 
     # ---- cpk_to_mc translation table --------------------------------------
     def cpk_to_mc_path(self):
-        """Where cpk_to_mc.json lives.
-
-        Searches multiple candidate locations:
-          1. Next to the loaded .obb / .apk / .jar / .jam
-          2. The PROJECT ROOT (one level above any of those archives) — this
-             is where the JSON typically lives because the table covers
-             cross-chapter matches and conceptually belongs at the project
-             scope, not nested under Android/.
-          3. The current working directory.
-        Returns the first candidate that actually exists, or the cwd path
-        as a last-resort default (so write paths still work for a fresh
-        save).
-        """
-        candidates = []
-        for p in (self.obb_path, self.apk_path, self.jar_path, self.jam_path):
-            if not p:
-                continue
-            try:
-                parent = Path(p).resolve().parent
-            except Exception:
-                continue
-            candidates.append(parent / CPK_TO_MC_FILENAME)
-            candidates.append(parent.parent / CPK_TO_MC_FILENAME)
-        candidates.append(Path.cwd() / CPK_TO_MC_FILENAME)
-        for c in candidates:
-            if c.exists():
-                return c
-        return candidates[0] if candidates else Path.cwd() / CPK_TO_MC_FILENAME
+        """Where cpk_to_mc.json lives — fixed at
+        ``Python/data/cpk_to_mc.json``. The folder is auto-created
+        so write paths work even on a fresh checkout."""
+        d = self._data_dir()
+        d.mkdir(parents=True, exist_ok=True)
+        return d / CPK_TO_MC_FILENAME
 
     def cpk_to_mc(self):
         """Lazy-loaded cpk_to_mc dict (chapter -> {cpk_entry_id: info})."""
@@ -290,26 +260,12 @@ class FFData:
 
     # ---- cpk_to_mc_overrides (manual user overrides) ----------------------
     def cpk_to_mc_overrides_path(self):
-        """Resolve where cpk_to_mc_overrides.json lives. Same logic as
-        cpk_to_mc_path -- look next to archives first, then project
-        root, then cwd."""
-        from pathlib import Path
-        candidates = []
-        for p in (self.obb_path, self.apk_path, self.jar_path, self.jam_path):
-            if not p:
-                continue
-            try:
-                parent = Path(p).resolve().parent
-            except Exception:
-                continue
-            candidates.append(parent / CPK_TO_MC_OVERRIDES_FILENAME)
-            candidates.append(parent.parent / CPK_TO_MC_OVERRIDES_FILENAME)
-        candidates.append(Path.cwd() / CPK_TO_MC_OVERRIDES_FILENAME)
-        for c in candidates:
-            if c.exists():
-                return c
-        return candidates[0] if candidates else (
-            Path.cwd() / CPK_TO_MC_OVERRIDES_FILENAME)
+        """Where cpk_to_mc_overrides.json lives — fixed at
+        ``Python/data/cpk_to_mc_overrides.json`` so manual overrides
+        ship with the toolkit (and get checked into git)."""
+        d = self._data_dir()
+        d.mkdir(parents=True, exist_ok=True)
+        return d / CPK_TO_MC_OVERRIDES_FILENAME
 
     def cpk_to_mc_overrides(self, reload: bool = False):
         """Lazy-loaded overrides dict. Returns the in-memory cached copy

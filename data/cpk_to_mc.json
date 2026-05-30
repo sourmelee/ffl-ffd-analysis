@@ -1,0 +1,4385 @@
+{
+ "Chapter1": {
+  "0": {
+   "mc_id": 0,
+   "variant": 0,
+   "best_sad": 6624335,
+   "second_mc_id": 0,
+   "second_variant": 1,
+   "second_sad": 8046949,
+   "gap": 1422614,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 0,
+     "variant": 0,
+     "best_sad": 6624335,
+     "second_mc_id": 0,
+     "second_variant": 1,
+     "second_sad": 8046949,
+     "gap": 1422614
+    },
+    "1": {
+     "mc_id": 0,
+     "variant": 1,
+     "best_sad": 8143391,
+     "second_mc_id": 0,
+     "second_variant": 2,
+     "second_sad": 8536685,
+     "gap": 393294
+    },
+    "2": {
+     "mc_id": 0,
+     "variant": 3,
+     "best_sad": 8532339,
+     "second_mc_id": 0,
+     "second_variant": 2,
+     "second_sad": 10633287,
+     "gap": 2100948
+    },
+    "3": {
+     "mc_id": 0,
+     "variant": 0,
+     "best_sad": 6624335,
+     "second_mc_id": 0,
+     "second_variant": 1,
+     "second_sad": 8046949,
+     "gap": 1422614
+    }
+   }
+  },
+  "1": {
+   "mc_id": 0,
+   "variant": 1,
+   "best_sad": 12711574,
+   "second_mc_id": 0,
+   "second_variant": 2,
+   "second_sad": 13462511,
+   "gap": 750937,
+   "best_palette": 2,
+   "by_palette": {
+    "0": {
+     "mc_id": 0,
+     "variant": 3,
+     "best_sad": 16516023,
+     "second_mc_id": 46,
+     "second_variant": 0,
+     "second_sad": 17893251,
+     "gap": 1377228
+    },
+    "1": {
+     "mc_id": 46,
+     "variant": 0,
+     "best_sad": 16639593,
+     "second_mc_id": 0,
+     "second_variant": 3,
+     "second_sad": 16741395,
+     "gap": 101802
+    },
+    "2": {
+     "mc_id": 0,
+     "variant": 1,
+     "best_sad": 12711574,
+     "second_mc_id": 0,
+     "second_variant": 2,
+     "second_sad": 13462511,
+     "gap": 750937
+    },
+    "3": {
+     "mc_id": 0,
+     "variant": 3,
+     "best_sad": 16516023,
+     "second_mc_id": 46,
+     "second_variant": 0,
+     "second_sad": 17893251,
+     "gap": 1377228
+    }
+   }
+  },
+  "2": {
+   "mc_id": 2,
+   "variant": 0,
+   "best_sad": 8351293,
+   "second_mc_id": 2,
+   "second_variant": 1,
+   "second_sad": 8559270,
+   "gap": 207977,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 2,
+     "variant": 0,
+     "best_sad": 8351293,
+     "second_mc_id": 2,
+     "second_variant": 1,
+     "second_sad": 8559270,
+     "gap": 207977
+    },
+    "1": {
+     "mc_id": 2,
+     "variant": 0,
+     "best_sad": 8351293,
+     "second_mc_id": 2,
+     "second_variant": 1,
+     "second_sad": 8559270,
+     "gap": 207977
+    }
+   }
+  },
+  "3": {
+   "mc_id": 3,
+   "variant": 0,
+   "best_sad": 5669688,
+   "second_mc_id": 19,
+   "second_variant": 1,
+   "second_sad": 7269300,
+   "gap": 1599612,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 3,
+     "variant": 0,
+     "best_sad": 5669688,
+     "second_mc_id": 19,
+     "second_variant": 1,
+     "second_sad": 7269300,
+     "gap": 1599612
+    },
+    "1": {
+     "mc_id": 3,
+     "variant": 0,
+     "best_sad": 5669688,
+     "second_mc_id": 19,
+     "second_variant": 1,
+     "second_sad": 7269300,
+     "gap": 1599612
+    }
+   }
+  },
+  "4": {
+   "mc_id": 4,
+   "variant": 0,
+   "best_sad": 176886,
+   "second_mc_id": 20,
+   "second_variant": 0,
+   "second_sad": 335606,
+   "gap": 158720,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 4,
+     "variant": 0,
+     "best_sad": 176886,
+     "second_mc_id": 20,
+     "second_variant": 0,
+     "second_sad": 335606,
+     "gap": 158720
+    },
+    "1": {
+     "mc_id": 4,
+     "variant": 0,
+     "best_sad": 176886,
+     "second_mc_id": 20,
+     "second_variant": 0,
+     "second_sad": 335606,
+     "gap": 158720
+    }
+   }
+  },
+  "5": {
+   "mc_id": 5,
+   "variant": 1,
+   "best_sad": 7026806,
+   "second_mc_id": 30,
+   "second_variant": 0,
+   "second_sad": 7689728,
+   "gap": 662922,
+   "best_palette": 1,
+   "by_palette": {
+    "0": {
+     "mc_id": 5,
+     "variant": 0,
+     "best_sad": 7632979,
+     "second_mc_id": 5,
+     "second_variant": 2,
+     "second_sad": 7823458,
+     "gap": 190479
+    },
+    "1": {
+     "mc_id": 5,
+     "variant": 1,
+     "best_sad": 7026806,
+     "second_mc_id": 30,
+     "second_variant": 0,
+     "second_sad": 7689728,
+     "gap": 662922
+    },
+    "2": {
+     "mc_id": 5,
+     "variant": 0,
+     "best_sad": 7632979,
+     "second_mc_id": 5,
+     "second_variant": 2,
+     "second_sad": 7823458,
+     "gap": 190479
+    }
+   }
+  },
+  "6": {
+   "mc_id": 6,
+   "variant": 0,
+   "best_sad": 12486410,
+   "second_mc_id": 0,
+   "second_variant": 1,
+   "second_sad": 19109384,
+   "gap": 6622974,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 6,
+     "variant": 0,
+     "best_sad": 12486410,
+     "second_mc_id": 0,
+     "second_variant": 1,
+     "second_sad": 19109384,
+     "gap": 6622974
+    },
+    "1": {
+     "mc_id": 6,
+     "variant": 0,
+     "best_sad": 12486410,
+     "second_mc_id": 0,
+     "second_variant": 1,
+     "second_sad": 19109384,
+     "gap": 6622974
+    }
+   }
+  },
+  "7": {
+   "mc_id": 7,
+   "variant": 0,
+   "best_sad": 3795691,
+   "second_mc_id": 32,
+   "second_variant": 0,
+   "second_sad": 3795691,
+   "gap": 0,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 7,
+     "variant": 0,
+     "best_sad": 3795691,
+     "second_mc_id": 32,
+     "second_variant": 0,
+     "second_sad": 3795691,
+     "gap": 0
+    },
+    "1": {
+     "mc_id": 7,
+     "variant": 0,
+     "best_sad": 3795691,
+     "second_mc_id": 32,
+     "second_variant": 0,
+     "second_sad": 3795691,
+     "gap": 0
+    }
+   }
+  },
+  "8": {
+   "mc_id": 43,
+   "variant": 0,
+   "best_sad": 691992,
+   "second_mc_id": 8,
+   "second_variant": 0,
+   "second_sad": 1136811,
+   "gap": 444819,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 43,
+     "variant": 0,
+     "best_sad": 691992,
+     "second_mc_id": 8,
+     "second_variant": 0,
+     "second_sad": 1136811,
+     "gap": 444819
+    },
+    "1": {
+     "mc_id": 43,
+     "variant": 0,
+     "best_sad": 691992,
+     "second_mc_id": 8,
+     "second_variant": 0,
+     "second_sad": 1136811,
+     "gap": 444819
+    }
+   }
+  },
+  "9": {
+   "mc_id": 9,
+   "variant": 0,
+   "best_sad": 6822954,
+   "second_mc_id": 9,
+   "second_variant": 1,
+   "second_sad": 7926929,
+   "gap": 1103975,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 9,
+     "variant": 0,
+     "best_sad": 6822954,
+     "second_mc_id": 9,
+     "second_variant": 1,
+     "second_sad": 7926929,
+     "gap": 1103975
+    },
+    "1": {
+     "mc_id": 9,
+     "variant": 1,
+     "best_sad": 7971443,
+     "second_mc_id": 40,
+     "second_variant": 0,
+     "second_sad": 7971443,
+     "gap": 0
+    },
+    "2": {
+     "mc_id": 9,
+     "variant": 0,
+     "best_sad": 6822954,
+     "second_mc_id": 9,
+     "second_variant": 1,
+     "second_sad": 7926929,
+     "gap": 1103975
+    }
+   }
+  },
+  "10": {
+   "mc_id": 10,
+   "variant": 0,
+   "best_sad": 6060356,
+   "second_mc_id": 64,
+   "second_variant": 0,
+   "second_sad": 11681172,
+   "gap": 5620816,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 10,
+     "variant": 0,
+     "best_sad": 6060356,
+     "second_mc_id": 64,
+     "second_variant": 0,
+     "second_sad": 11681172,
+     "gap": 5620816
+    },
+    "1": {
+     "mc_id": 10,
+     "variant": 0,
+     "best_sad": 6060356,
+     "second_mc_id": 64,
+     "second_variant": 0,
+     "second_sad": 11681172,
+     "gap": 5620816
+    }
+   }
+  },
+  "11": {
+   "mc_id": 0,
+   "variant": 1,
+   "best_sad": 11592470,
+   "second_mc_id": 0,
+   "second_variant": 0,
+   "second_sad": 11730544,
+   "gap": 138074,
+   "best_palette": 1,
+   "by_palette": {
+    "0": {
+     "mc_id": 0,
+     "variant": 1,
+     "best_sad": 12013304,
+     "second_mc_id": 0,
+     "second_variant": 2,
+     "second_sad": 12480188,
+     "gap": 466884
+    },
+    "1": {
+     "mc_id": 0,
+     "variant": 1,
+     "best_sad": 11592470,
+     "second_mc_id": 0,
+     "second_variant": 0,
+     "second_sad": 11730544,
+     "gap": 138074
+    },
+    "2": {
+     "mc_id": 0,
+     "variant": 1,
+     "best_sad": 12013304,
+     "second_mc_id": 0,
+     "second_variant": 2,
+     "second_sad": 12480188,
+     "gap": 466884
+    }
+   }
+  },
+  "12": {
+   "mc_id": 12,
+   "variant": 0,
+   "best_sad": 3705776,
+   "second_mc_id": 12,
+   "second_variant": 2,
+   "second_sad": 5570596,
+   "gap": 1864820,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 12,
+     "variant": 0,
+     "best_sad": 3705776,
+     "second_mc_id": 12,
+     "second_variant": 2,
+     "second_sad": 5570596,
+     "gap": 1864820
+    },
+    "1": {
+     "mc_id": 12,
+     "variant": 0,
+     "best_sad": 3705776,
+     "second_mc_id": 12,
+     "second_variant": 2,
+     "second_sad": 5570596,
+     "gap": 1864820
+    }
+   }
+  },
+  "13": {
+   "mc_id": 13,
+   "variant": 0,
+   "best_sad": 7913295,
+   "second_mc_id": 37,
+   "second_variant": 0,
+   "second_sad": 7966548,
+   "gap": 53253,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 13,
+     "variant": 0,
+     "best_sad": 7913295,
+     "second_mc_id": 37,
+     "second_variant": 0,
+     "second_sad": 7966548,
+     "gap": 53253
+    },
+    "1": {
+     "mc_id": 13,
+     "variant": 0,
+     "best_sad": 7913295,
+     "second_mc_id": 37,
+     "second_variant": 0,
+     "second_sad": 7966548,
+     "gap": 53253
+    }
+   }
+  },
+  "14": {
+   "mc_id": 38,
+   "variant": 0,
+   "best_sad": 2221320,
+   "second_mc_id": 14,
+   "second_variant": 0,
+   "second_sad": 2226149,
+   "gap": 4829,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 38,
+     "variant": 0,
+     "best_sad": 2221320,
+     "second_mc_id": 14,
+     "second_variant": 0,
+     "second_sad": 2226149,
+     "gap": 4829
+    },
+    "1": {
+     "mc_id": 38,
+     "variant": 0,
+     "best_sad": 2221320,
+     "second_mc_id": 14,
+     "second_variant": 0,
+     "second_sad": 2226149,
+     "gap": 4829
+    }
+   }
+  },
+  "15": {
+   "mc_id": 15,
+   "variant": 0,
+   "best_sad": 11226114,
+   "second_mc_id": 15,
+   "second_variant": 1,
+   "second_sad": 11655810,
+   "gap": 429696,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 15,
+     "variant": 0,
+     "best_sad": 11226114,
+     "second_mc_id": 15,
+     "second_variant": 1,
+     "second_sad": 11655810,
+     "gap": 429696
+    },
+    "1": {
+     "mc_id": 15,
+     "variant": 0,
+     "best_sad": 11226114,
+     "second_mc_id": 15,
+     "second_variant": 1,
+     "second_sad": 11655810,
+     "gap": 429696
+    }
+   }
+  },
+  "16": {
+   "mc_id": 16,
+   "variant": 0,
+   "best_sad": 4350537,
+   "second_mc_id": 16,
+   "second_variant": 1,
+   "second_sad": 4483989,
+   "gap": 133452,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 16,
+     "variant": 0,
+     "best_sad": 4350537,
+     "second_mc_id": 16,
+     "second_variant": 1,
+     "second_sad": 4483989,
+     "gap": 133452
+    },
+    "1": {
+     "mc_id": 16,
+     "variant": 0,
+     "best_sad": 4350537,
+     "second_mc_id": 16,
+     "second_variant": 1,
+     "second_sad": 4483989,
+     "gap": 133452
+    }
+   }
+  },
+  "17": {
+   "mc_id": 17,
+   "variant": 0,
+   "best_sad": 8940812,
+   "second_mc_id": 17,
+   "second_variant": 1,
+   "second_sad": 13657619,
+   "gap": 4716807,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 17,
+     "variant": 0,
+     "best_sad": 8940812,
+     "second_mc_id": 17,
+     "second_variant": 1,
+     "second_sad": 13657619,
+     "gap": 4716807
+    },
+    "1": {
+     "mc_id": 17,
+     "variant": 0,
+     "best_sad": 8940812,
+     "second_mc_id": 17,
+     "second_variant": 1,
+     "second_sad": 13657619,
+     "gap": 4716807
+    }
+   }
+  },
+  "18": {
+   "mc_id": 27,
+   "variant": 0,
+   "best_sad": 8274720,
+   "second_mc_id": 27,
+   "second_variant": 1,
+   "second_sad": 8278487,
+   "gap": 3767,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 27,
+     "variant": 0,
+     "best_sad": 8274720,
+     "second_mc_id": 27,
+     "second_variant": 1,
+     "second_sad": 8278487,
+     "gap": 3767
+    },
+    "1": {
+     "mc_id": 27,
+     "variant": 0,
+     "best_sad": 8274720,
+     "second_mc_id": 27,
+     "second_variant": 1,
+     "second_sad": 8278487,
+     "gap": 3767
+    }
+   }
+  },
+  "19": {
+   "mc_id": 19,
+   "variant": 1,
+   "best_sad": 6034640,
+   "second_mc_id": 19,
+   "second_variant": 0,
+   "second_sad": 6123949,
+   "gap": 89309,
+   "best_palette": 1,
+   "by_palette": {
+    "0": {
+     "mc_id": 19,
+     "variant": 1,
+     "best_sad": 6044754,
+     "second_mc_id": 19,
+     "second_variant": 0,
+     "second_sad": 6156789,
+     "gap": 112035
+    },
+    "1": {
+     "mc_id": 19,
+     "variant": 1,
+     "best_sad": 6034640,
+     "second_mc_id": 19,
+     "second_variant": 0,
+     "second_sad": 6123949,
+     "gap": 89309
+    },
+    "2": {
+     "mc_id": 19,
+     "variant": 1,
+     "best_sad": 6044754,
+     "second_mc_id": 19,
+     "second_variant": 0,
+     "second_sad": 6156789,
+     "gap": 112035
+    }
+   }
+  },
+  "20": {
+   "mc_id": 20,
+   "variant": 0,
+   "best_sad": 291842,
+   "second_mc_id": 45,
+   "second_variant": 0,
+   "second_sad": 293498,
+   "gap": 1656,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 20,
+     "variant": 0,
+     "best_sad": 291842,
+     "second_mc_id": 45,
+     "second_variant": 0,
+     "second_sad": 293498,
+     "gap": 1656
+    },
+    "1": {
+     "mc_id": 20,
+     "variant": 0,
+     "best_sad": 291842,
+     "second_mc_id": 45,
+     "second_variant": 0,
+     "second_sad": 293498,
+     "gap": 1656
+    }
+   }
+  },
+  "21": {
+   "mc_id": 21,
+   "variant": 0,
+   "best_sad": 7787250,
+   "second_mc_id": 0,
+   "second_variant": 3,
+   "second_sad": 13618152,
+   "gap": 5830902,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 21,
+     "variant": 0,
+     "best_sad": 7787250,
+     "second_mc_id": 0,
+     "second_variant": 3,
+     "second_sad": 13618152,
+     "gap": 5830902
+    },
+    "1": {
+     "mc_id": 21,
+     "variant": 0,
+     "best_sad": 7787250,
+     "second_mc_id": 0,
+     "second_variant": 3,
+     "second_sad": 13618152,
+     "gap": 5830902
+    }
+   }
+  },
+  "22": {
+   "mc_id": 22,
+   "variant": 0,
+   "best_sad": 229170,
+   "second_mc_id": 29,
+   "second_variant": 1,
+   "second_sad": 350699,
+   "gap": 121529,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 22,
+     "variant": 0,
+     "best_sad": 229170,
+     "second_mc_id": 29,
+     "second_variant": 1,
+     "second_sad": 350699,
+     "gap": 121529
+    },
+    "1": {
+     "mc_id": 22,
+     "variant": 0,
+     "best_sad": 229170,
+     "second_mc_id": 29,
+     "second_variant": 1,
+     "second_sad": 350699,
+     "gap": 121529
+    }
+   }
+  },
+  "23": {
+   "mc_id": 23,
+   "variant": 1,
+   "best_sad": 6643747,
+   "second_mc_id": 23,
+   "second_variant": 0,
+   "second_sad": 9527785,
+   "gap": 2884038,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 23,
+     "variant": 1,
+     "best_sad": 6643747,
+     "second_mc_id": 23,
+     "second_variant": 0,
+     "second_sad": 9527785,
+     "gap": 2884038
+    },
+    "1": {
+     "mc_id": 23,
+     "variant": 1,
+     "best_sad": 6643747,
+     "second_mc_id": 23,
+     "second_variant": 0,
+     "second_sad": 9527785,
+     "gap": 2884038
+    }
+   }
+  },
+  "44": {
+   "mc_id": 44,
+   "variant": 0,
+   "best_sad": 466691,
+   "second_mc_id": 44,
+   "second_variant": 2,
+   "second_sad": 1257535,
+   "gap": 790844,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 44,
+     "variant": 0,
+     "best_sad": 466691,
+     "second_mc_id": 44,
+     "second_variant": 2,
+     "second_sad": 1257535,
+     "gap": 790844
+    },
+    "1": {
+     "mc_id": 44,
+     "variant": 0,
+     "best_sad": 466691,
+     "second_mc_id": 44,
+     "second_variant": 2,
+     "second_sad": 1257535,
+     "gap": 790844
+    }
+   }
+  }
+ },
+ "Chapter3": {
+  "0": {
+   "mc_id": 0,
+   "variant": 0,
+   "best_sad": 6647548,
+   "second_mc_id": 0,
+   "second_variant": 1,
+   "second_sad": 8074829,
+   "gap": 1427281,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 0,
+     "variant": 0,
+     "best_sad": 6647548,
+     "second_mc_id": 0,
+     "second_variant": 1,
+     "second_sad": 8074829,
+     "gap": 1427281
+    },
+    "1": {
+     "mc_id": 0,
+     "variant": 1,
+     "best_sad": 7845167,
+     "second_mc_id": 0,
+     "second_variant": 2,
+     "second_sad": 8354602,
+     "gap": 509435
+    },
+    "2": {
+     "mc_id": 0,
+     "variant": 3,
+     "best_sad": 7877706,
+     "second_mc_id": 0,
+     "second_variant": 2,
+     "second_sad": 9997370,
+     "gap": 2119664
+    },
+    "3": {
+     "mc_id": 0,
+     "variant": 3,
+     "best_sad": 6717778,
+     "second_mc_id": 0,
+     "second_variant": 0,
+     "second_sad": 13035256,
+     "gap": 6317478
+    },
+    "4": {
+     "mc_id": 0,
+     "variant": 0,
+     "best_sad": 6647548,
+     "second_mc_id": 0,
+     "second_variant": 1,
+     "second_sad": 8074829,
+     "gap": 1427281
+    }
+   }
+  },
+  "1": {
+   "mc_id": 46,
+   "variant": 0,
+   "best_sad": 16291793,
+   "second_mc_id": 0,
+   "second_variant": 3,
+   "second_sad": 16341464,
+   "gap": 49671,
+   "best_palette": 3,
+   "by_palette": {
+    "0": {
+     "mc_id": 0,
+     "variant": 3,
+     "best_sad": 17063930,
+     "second_mc_id": 46,
+     "second_variant": 0,
+     "second_sad": 19239169,
+     "gap": 2175239
+    },
+    "1": {
+     "mc_id": 0,
+     "variant": 3,
+     "best_sad": 17255808,
+     "second_mc_id": 46,
+     "second_variant": 0,
+     "second_sad": 17947057,
+     "gap": 691249
+    },
+    "2": {
+     "mc_id": 0,
+     "variant": 1,
+     "best_sad": 17394708,
+     "second_mc_id": 0,
+     "second_variant": 2,
+     "second_sad": 17685012,
+     "gap": 290304
+    },
+    "3": {
+     "mc_id": 46,
+     "variant": 0,
+     "best_sad": 16291793,
+     "second_mc_id": 0,
+     "second_variant": 3,
+     "second_sad": 16341464,
+     "gap": 49671
+    },
+    "4": {
+     "mc_id": 0,
+     "variant": 3,
+     "best_sad": 17063930,
+     "second_mc_id": 46,
+     "second_variant": 0,
+     "second_sad": 19239169,
+     "gap": 2175239
+    }
+   }
+  },
+  "6": {
+   "mc_id": 6,
+   "variant": 0,
+   "best_sad": 12486410,
+   "second_mc_id": 0,
+   "second_variant": 1,
+   "second_sad": 19109384,
+   "gap": 6622974,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 6,
+     "variant": 0,
+     "best_sad": 12486410,
+     "second_mc_id": 0,
+     "second_variant": 1,
+     "second_sad": 19109384,
+     "gap": 6622974
+    },
+    "1": {
+     "mc_id": 6,
+     "variant": 0,
+     "best_sad": 12486410,
+     "second_mc_id": 0,
+     "second_variant": 1,
+     "second_sad": 19109384,
+     "gap": 6622974
+    }
+   }
+  },
+  "7": {
+   "mc_id": 7,
+   "variant": 0,
+   "best_sad": 3958687,
+   "second_mc_id": 32,
+   "second_variant": 0,
+   "second_sad": 3958687,
+   "gap": 0,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 7,
+     "variant": 0,
+     "best_sad": 3958687,
+     "second_mc_id": 32,
+     "second_variant": 0,
+     "second_sad": 3958687,
+     "gap": 0
+    },
+    "1": {
+     "mc_id": 7,
+     "variant": 0,
+     "best_sad": 3958687,
+     "second_mc_id": 32,
+     "second_variant": 0,
+     "second_sad": 3958687,
+     "gap": 0
+    }
+   }
+  },
+  "8": {
+   "mc_id": 8,
+   "variant": 0,
+   "best_sad": 3707104,
+   "second_mc_id": 33,
+   "second_variant": 0,
+   "second_sad": 3707104,
+   "gap": 0,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 8,
+     "variant": 0,
+     "best_sad": 3707104,
+     "second_mc_id": 33,
+     "second_variant": 0,
+     "second_sad": 3707104,
+     "gap": 0
+    },
+    "1": {
+     "mc_id": 8,
+     "variant": 0,
+     "best_sad": 3707104,
+     "second_mc_id": 33,
+     "second_variant": 0,
+     "second_sad": 3707104,
+     "gap": 0
+    }
+   }
+  },
+  "9": {
+   "mc_id": 9,
+   "variant": 0,
+   "best_sad": 7617522,
+   "second_mc_id": 79,
+   "second_variant": 0,
+   "second_sad": 9653606,
+   "gap": 2036084,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 9,
+     "variant": 0,
+     "best_sad": 7617522,
+     "second_mc_id": 79,
+     "second_variant": 0,
+     "second_sad": 9653606,
+     "gap": 2036084
+    },
+    "1": {
+     "mc_id": 9,
+     "variant": 1,
+     "best_sad": 7646448,
+     "second_mc_id": 40,
+     "second_variant": 0,
+     "second_sad": 7646448,
+     "gap": 0
+    },
+    "2": {
+     "mc_id": 9,
+     "variant": 0,
+     "best_sad": 7617522,
+     "second_mc_id": 79,
+     "second_variant": 0,
+     "second_sad": 9653606,
+     "gap": 2036084
+    }
+   }
+  },
+  "10": {
+   "mc_id": 10,
+   "variant": 0,
+   "best_sad": 6060356,
+   "second_mc_id": 64,
+   "second_variant": 0,
+   "second_sad": 11681172,
+   "gap": 5620816,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 10,
+     "variant": 0,
+     "best_sad": 6060356,
+     "second_mc_id": 64,
+     "second_variant": 0,
+     "second_sad": 11681172,
+     "gap": 5620816
+    },
+    "1": {
+     "mc_id": 10,
+     "variant": 0,
+     "best_sad": 6060356,
+     "second_mc_id": 64,
+     "second_variant": 0,
+     "second_sad": 11681172,
+     "gap": 5620816
+    }
+   }
+  },
+  "13": {
+   "mc_id": 13,
+   "variant": 0,
+   "best_sad": 8069456,
+   "second_mc_id": 13,
+   "second_variant": 2,
+   "second_sad": 8129184,
+   "gap": 59728,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 13,
+     "variant": 0,
+     "best_sad": 8069456,
+     "second_mc_id": 13,
+     "second_variant": 2,
+     "second_sad": 8129184,
+     "gap": 59728
+    },
+    "1": {
+     "mc_id": 13,
+     "variant": 1,
+     "best_sad": 8131011,
+     "second_mc_id": 37,
+     "second_variant": 2,
+     "second_sad": 8335633,
+     "gap": 204622
+    },
+    "2": {
+     "mc_id": 13,
+     "variant": 0,
+     "best_sad": 8069456,
+     "second_mc_id": 13,
+     "second_variant": 2,
+     "second_sad": 8129184,
+     "gap": 59728
+    }
+   }
+  },
+  "14": {
+   "mc_id": 38,
+   "variant": 0,
+   "best_sad": 2221320,
+   "second_mc_id": 14,
+   "second_variant": 0,
+   "second_sad": 2226149,
+   "gap": 4829,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 38,
+     "variant": 0,
+     "best_sad": 2221320,
+     "second_mc_id": 14,
+     "second_variant": 0,
+     "second_sad": 2226149,
+     "gap": 4829
+    },
+    "1": {
+     "mc_id": 38,
+     "variant": 1,
+     "best_sad": 2248494,
+     "second_mc_id": 14,
+     "second_variant": 1,
+     "second_sad": 2251969,
+     "gap": 3475
+    },
+    "2": {
+     "mc_id": 38,
+     "variant": 0,
+     "best_sad": 2221320,
+     "second_mc_id": 14,
+     "second_variant": 0,
+     "second_sad": 2226149,
+     "gap": 4829
+    }
+   }
+  },
+  "18": {
+   "mc_id": 27,
+   "variant": 0,
+   "best_sad": 8274720,
+   "second_mc_id": 27,
+   "second_variant": 1,
+   "second_sad": 8278487,
+   "gap": 3767,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 27,
+     "variant": 0,
+     "best_sad": 8274720,
+     "second_mc_id": 27,
+     "second_variant": 1,
+     "second_sad": 8278487,
+     "gap": 3767
+    },
+    "1": {
+     "mc_id": 27,
+     "variant": 0,
+     "best_sad": 8274720,
+     "second_mc_id": 27,
+     "second_variant": 1,
+     "second_sad": 8278487,
+     "gap": 3767
+    }
+   }
+  },
+  "19": {
+   "mc_id": 19,
+   "variant": 1,
+   "best_sad": 5660736,
+   "second_mc_id": 19,
+   "second_variant": 0,
+   "second_sad": 5750045,
+   "gap": 89309,
+   "best_palette": 1,
+   "by_palette": {
+    "0": {
+     "mc_id": 19,
+     "variant": 1,
+     "best_sad": 5669050,
+     "second_mc_id": 19,
+     "second_variant": 0,
+     "second_sad": 5781085,
+     "gap": 112035
+    },
+    "1": {
+     "mc_id": 19,
+     "variant": 1,
+     "best_sad": 5660736,
+     "second_mc_id": 19,
+     "second_variant": 0,
+     "second_sad": 5750045,
+     "gap": 89309
+    },
+    "2": {
+     "mc_id": 19,
+     "variant": 1,
+     "best_sad": 5669050,
+     "second_mc_id": 19,
+     "second_variant": 0,
+     "second_sad": 5781085,
+     "gap": 112035
+    }
+   }
+  },
+  "20": {
+   "mc_id": 20,
+   "variant": 0,
+   "best_sad": 291842,
+   "second_mc_id": 45,
+   "second_variant": 0,
+   "second_sad": 293498,
+   "gap": 1656,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 20,
+     "variant": 0,
+     "best_sad": 291842,
+     "second_mc_id": 45,
+     "second_variant": 0,
+     "second_sad": 293498,
+     "gap": 1656
+    },
+    "1": {
+     "mc_id": 20,
+     "variant": 0,
+     "best_sad": 291842,
+     "second_mc_id": 45,
+     "second_variant": 0,
+     "second_sad": 293498,
+     "gap": 1656
+    }
+   }
+  },
+  "21": {
+   "mc_id": 21,
+   "variant": 0,
+   "best_sad": 7787250,
+   "second_mc_id": 0,
+   "second_variant": 3,
+   "second_sad": 13618152,
+   "gap": 5830902,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 21,
+     "variant": 0,
+     "best_sad": 7787250,
+     "second_mc_id": 0,
+     "second_variant": 3,
+     "second_sad": 13618152,
+     "gap": 5830902
+    },
+    "1": {
+     "mc_id": 21,
+     "variant": 0,
+     "best_sad": 7787250,
+     "second_mc_id": 0,
+     "second_variant": 3,
+     "second_sad": 13618152,
+     "gap": 5830902
+    }
+   }
+  },
+  "22": {
+   "mc_id": 22,
+   "variant": 0,
+   "best_sad": 229170,
+   "second_mc_id": 29,
+   "second_variant": 1,
+   "second_sad": 350699,
+   "gap": 121529,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 22,
+     "variant": 0,
+     "best_sad": 229170,
+     "second_mc_id": 29,
+     "second_variant": 1,
+     "second_sad": 350699,
+     "gap": 121529
+    },
+    "1": {
+     "mc_id": 22,
+     "variant": 0,
+     "best_sad": 229170,
+     "second_mc_id": 29,
+     "second_variant": 1,
+     "second_sad": 350699,
+     "gap": 121529
+    }
+   }
+  },
+  "24": {
+   "mc_id": 24,
+   "variant": 1,
+   "best_sad": 8467844,
+   "second_mc_id": 24,
+   "second_variant": 0,
+   "second_sad": 8934572,
+   "gap": 466728,
+   "best_palette": 1,
+   "by_palette": {
+    "0": {
+     "mc_id": 24,
+     "variant": 0,
+     "best_sad": 8589830,
+     "second_mc_id": 58,
+     "second_variant": 0,
+     "second_sad": 8589830,
+     "gap": 0
+    },
+    "1": {
+     "mc_id": 24,
+     "variant": 1,
+     "best_sad": 8467844,
+     "second_mc_id": 24,
+     "second_variant": 0,
+     "second_sad": 8934572,
+     "gap": 466728
+    },
+    "2": {
+     "mc_id": 24,
+     "variant": 0,
+     "best_sad": 8589830,
+     "second_mc_id": 58,
+     "second_variant": 0,
+     "second_sad": 8589830,
+     "gap": 0
+    }
+   }
+  },
+  "25": {
+   "mc_id": 38,
+   "variant": 1,
+   "best_sad": 2322150,
+   "second_mc_id": 14,
+   "second_variant": 1,
+   "second_sad": 2326166,
+   "gap": 4016,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 38,
+     "variant": 1,
+     "best_sad": 2322150,
+     "second_mc_id": 14,
+     "second_variant": 1,
+     "second_sad": 2326166,
+     "gap": 4016
+    },
+    "1": {
+     "mc_id": 38,
+     "variant": 1,
+     "best_sad": 2515480,
+     "second_mc_id": 27,
+     "second_variant": 0,
+     "second_sad": 2515925,
+     "gap": 445
+    },
+    "2": {
+     "mc_id": 38,
+     "variant": 1,
+     "best_sad": 2322150,
+     "second_mc_id": 14,
+     "second_variant": 1,
+     "second_sad": 2326166,
+     "gap": 4016
+    }
+   }
+  },
+  "35": {
+   "mc_id": 35,
+   "variant": 0,
+   "best_sad": 5237359,
+   "second_mc_id": 54,
+   "second_variant": 0,
+   "second_sad": 5237359,
+   "gap": 0,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 35,
+     "variant": 0,
+     "best_sad": 5237359,
+     "second_mc_id": 54,
+     "second_variant": 0,
+     "second_sad": 5237359,
+     "gap": 0
+    },
+    "1": {
+     "mc_id": 35,
+     "variant": 0,
+     "best_sad": 5237359,
+     "second_mc_id": 54,
+     "second_variant": 0,
+     "second_sad": 5237359,
+     "gap": 0
+    }
+   }
+  },
+  "36": {
+   "mc_id": 36,
+   "variant": 0,
+   "best_sad": 651502,
+   "second_mc_id": 24,
+   "second_variant": 1,
+   "second_sad": 1285465,
+   "gap": 633963,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 36,
+     "variant": 0,
+     "best_sad": 651502,
+     "second_mc_id": 24,
+     "second_variant": 1,
+     "second_sad": 1285465,
+     "gap": 633963
+    },
+    "1": {
+     "mc_id": 36,
+     "variant": 0,
+     "best_sad": 651502,
+     "second_mc_id": 24,
+     "second_variant": 1,
+     "second_sad": 1285465,
+     "gap": 633963
+    }
+   }
+  },
+  "44": {
+   "mc_id": 44,
+   "variant": 0,
+   "best_sad": 466691,
+   "second_mc_id": 44,
+   "second_variant": 2,
+   "second_sad": 1257535,
+   "gap": 790844,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 44,
+     "variant": 0,
+     "best_sad": 466691,
+     "second_mc_id": 44,
+     "second_variant": 2,
+     "second_sad": 1257535,
+     "gap": 790844
+    },
+    "1": {
+     "mc_id": 44,
+     "variant": 0,
+     "best_sad": 466691,
+     "second_mc_id": 44,
+     "second_variant": 2,
+     "second_sad": 1257535,
+     "gap": 790844
+    }
+   }
+  },
+  "46": {
+   "mc_id": 46,
+   "variant": 0,
+   "best_sad": 6116899,
+   "second_mc_id": 0,
+   "second_variant": 3,
+   "second_sad": 15997491,
+   "gap": 9880592,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 46,
+     "variant": 0,
+     "best_sad": 6116899,
+     "second_mc_id": 0,
+     "second_variant": 3,
+     "second_sad": 15997491,
+     "gap": 9880592
+    },
+    "1": {
+     "mc_id": 46,
+     "variant": 0,
+     "best_sad": 6116899,
+     "second_mc_id": 0,
+     "second_variant": 3,
+     "second_sad": 15997491,
+     "gap": 9880592
+    }
+   }
+  },
+  "47": {
+   "mc_id": 47,
+   "variant": 0,
+   "best_sad": 253759,
+   "second_mc_id": 0,
+   "second_variant": 3,
+   "second_sad": 314158,
+   "gap": 60399,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 47,
+     "variant": 0,
+     "best_sad": 253759,
+     "second_mc_id": 0,
+     "second_variant": 3,
+     "second_sad": 314158,
+     "gap": 60399
+    },
+    "1": {
+     "mc_id": 47,
+     "variant": 0,
+     "best_sad": 253759,
+     "second_mc_id": 0,
+     "second_variant": 3,
+     "second_sad": 314158,
+     "gap": 60399
+    }
+   }
+  },
+  "48": {
+   "mc_id": 48,
+   "variant": 0,
+   "best_sad": 5393773,
+   "second_mc_id": 35,
+   "second_variant": 0,
+   "second_sad": 7846584,
+   "gap": 2452811,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 48,
+     "variant": 0,
+     "best_sad": 5393773,
+     "second_mc_id": 35,
+     "second_variant": 0,
+     "second_sad": 7846584,
+     "gap": 2452811
+    },
+    "1": {
+     "mc_id": 48,
+     "variant": 0,
+     "best_sad": 5393773,
+     "second_mc_id": 35,
+     "second_variant": 0,
+     "second_sad": 7846584,
+     "gap": 2452811
+    }
+   }
+  }
+ },
+ "Chapter4": {
+  "0": {
+   "mc_id": 0,
+   "variant": 0,
+   "best_sad": 6647548,
+   "second_mc_id": 0,
+   "second_variant": 1,
+   "second_sad": 8074829,
+   "gap": 1427281,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 0,
+     "variant": 0,
+     "best_sad": 6647548,
+     "second_mc_id": 0,
+     "second_variant": 1,
+     "second_sad": 8074829,
+     "gap": 1427281
+    },
+    "1": {
+     "mc_id": 0,
+     "variant": 1,
+     "best_sad": 7845167,
+     "second_mc_id": 0,
+     "second_variant": 2,
+     "second_sad": 8354602,
+     "gap": 509435
+    },
+    "2": {
+     "mc_id": 0,
+     "variant": 3,
+     "best_sad": 7877706,
+     "second_mc_id": 0,
+     "second_variant": 2,
+     "second_sad": 9997370,
+     "gap": 2119664
+    },
+    "3": {
+     "mc_id": 0,
+     "variant": 3,
+     "best_sad": 6717778,
+     "second_mc_id": 0,
+     "second_variant": 0,
+     "second_sad": 13035256,
+     "gap": 6317478
+    },
+    "4": {
+     "mc_id": 0,
+     "variant": 0,
+     "best_sad": 6647548,
+     "second_mc_id": 0,
+     "second_variant": 1,
+     "second_sad": 8074829,
+     "gap": 1427281
+    }
+   }
+  },
+  "1": {
+   "mc_id": 46,
+   "variant": 0,
+   "best_sad": 16291793,
+   "second_mc_id": 0,
+   "second_variant": 3,
+   "second_sad": 16341464,
+   "gap": 49671,
+   "best_palette": 3,
+   "by_palette": {
+    "0": {
+     "mc_id": 0,
+     "variant": 3,
+     "best_sad": 17063930,
+     "second_mc_id": 46,
+     "second_variant": 0,
+     "second_sad": 19239169,
+     "gap": 2175239
+    },
+    "1": {
+     "mc_id": 0,
+     "variant": 3,
+     "best_sad": 17255808,
+     "second_mc_id": 46,
+     "second_variant": 0,
+     "second_sad": 17947057,
+     "gap": 691249
+    },
+    "2": {
+     "mc_id": 0,
+     "variant": 1,
+     "best_sad": 17394708,
+     "second_mc_id": 0,
+     "second_variant": 2,
+     "second_sad": 17685012,
+     "gap": 290304
+    },
+    "3": {
+     "mc_id": 46,
+     "variant": 0,
+     "best_sad": 16291793,
+     "second_mc_id": 0,
+     "second_variant": 3,
+     "second_sad": 16341464,
+     "gap": 49671
+    },
+    "4": {
+     "mc_id": 0,
+     "variant": 3,
+     "best_sad": 17063930,
+     "second_mc_id": 46,
+     "second_variant": 0,
+     "second_sad": 19239169,
+     "gap": 2175239
+    }
+   }
+  },
+  "2": {
+   "mc_id": 2,
+   "variant": 0,
+   "best_sad": 8351293,
+   "second_mc_id": 2,
+   "second_variant": 1,
+   "second_sad": 8559270,
+   "gap": 207977,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 2,
+     "variant": 0,
+     "best_sad": 8351293,
+     "second_mc_id": 2,
+     "second_variant": 1,
+     "second_sad": 8559270,
+     "gap": 207977
+    },
+    "1": {
+     "mc_id": 2,
+     "variant": 0,
+     "best_sad": 8351293,
+     "second_mc_id": 2,
+     "second_variant": 1,
+     "second_sad": 8559270,
+     "gap": 207977
+    }
+   }
+  },
+  "3": {
+   "mc_id": 3,
+   "variant": 0,
+   "best_sad": 5302900,
+   "second_mc_id": 19,
+   "second_variant": 1,
+   "second_sad": 6902512,
+   "gap": 1599612,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 3,
+     "variant": 0,
+     "best_sad": 5302900,
+     "second_mc_id": 19,
+     "second_variant": 1,
+     "second_sad": 6902512,
+     "gap": 1599612
+    },
+    "1": {
+     "mc_id": 3,
+     "variant": 0,
+     "best_sad": 5302900,
+     "second_mc_id": 19,
+     "second_variant": 1,
+     "second_sad": 6902512,
+     "gap": 1599612
+    }
+   }
+  },
+  "4": {
+   "mc_id": 4,
+   "variant": 0,
+   "best_sad": 176886,
+   "second_mc_id": 20,
+   "second_variant": 0,
+   "second_sad": 335606,
+   "gap": 158720,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 4,
+     "variant": 0,
+     "best_sad": 176886,
+     "second_mc_id": 20,
+     "second_variant": 0,
+     "second_sad": 335606,
+     "gap": 158720
+    },
+    "1": {
+     "mc_id": 4,
+     "variant": 0,
+     "best_sad": 176886,
+     "second_mc_id": 20,
+     "second_variant": 0,
+     "second_sad": 335606,
+     "gap": 158720
+    }
+   }
+  },
+  "6": {
+   "mc_id": 6,
+   "variant": 0,
+   "best_sad": 12486410,
+   "second_mc_id": 0,
+   "second_variant": 1,
+   "second_sad": 19109384,
+   "gap": 6622974,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 6,
+     "variant": 0,
+     "best_sad": 12486410,
+     "second_mc_id": 0,
+     "second_variant": 1,
+     "second_sad": 19109384,
+     "gap": 6622974
+    },
+    "1": {
+     "mc_id": 6,
+     "variant": 0,
+     "best_sad": 12486410,
+     "second_mc_id": 0,
+     "second_variant": 1,
+     "second_sad": 19109384,
+     "gap": 6622974
+    }
+   }
+  },
+  "9": {
+   "mc_id": 9,
+   "variant": 0,
+   "best_sad": 7617522,
+   "second_mc_id": 79,
+   "second_variant": 0,
+   "second_sad": 9653606,
+   "gap": 2036084,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 9,
+     "variant": 0,
+     "best_sad": 7617522,
+     "second_mc_id": 79,
+     "second_variant": 0,
+     "second_sad": 9653606,
+     "gap": 2036084
+    },
+    "1": {
+     "mc_id": 9,
+     "variant": 1,
+     "best_sad": 7646448,
+     "second_mc_id": 40,
+     "second_variant": 0,
+     "second_sad": 7646448,
+     "gap": 0
+    },
+    "2": {
+     "mc_id": 9,
+     "variant": 0,
+     "best_sad": 7617522,
+     "second_mc_id": 79,
+     "second_variant": 0,
+     "second_sad": 9653606,
+     "gap": 2036084
+    }
+   }
+  },
+  "12": {
+   "mc_id": 12,
+   "variant": 0,
+   "best_sad": 5504823,
+   "second_mc_id": 12,
+   "second_variant": 2,
+   "second_sad": 7329045,
+   "gap": 1824222,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 12,
+     "variant": 0,
+     "best_sad": 5504823,
+     "second_mc_id": 12,
+     "second_variant": 2,
+     "second_sad": 7329045,
+     "gap": 1824222
+    },
+    "1": {
+     "mc_id": 12,
+     "variant": 0,
+     "best_sad": 5504823,
+     "second_mc_id": 12,
+     "second_variant": 2,
+     "second_sad": 7329045,
+     "gap": 1824222
+    }
+   }
+  },
+  "13": {
+   "mc_id": 13,
+   "variant": 0,
+   "best_sad": 8069456,
+   "second_mc_id": 13,
+   "second_variant": 2,
+   "second_sad": 8129184,
+   "gap": 59728,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 13,
+     "variant": 0,
+     "best_sad": 8069456,
+     "second_mc_id": 13,
+     "second_variant": 2,
+     "second_sad": 8129184,
+     "gap": 59728
+    },
+    "1": {
+     "mc_id": 13,
+     "variant": 1,
+     "best_sad": 8131011,
+     "second_mc_id": 37,
+     "second_variant": 2,
+     "second_sad": 8335633,
+     "gap": 204622
+    },
+    "2": {
+     "mc_id": 13,
+     "variant": 0,
+     "best_sad": 8069456,
+     "second_mc_id": 13,
+     "second_variant": 2,
+     "second_sad": 8129184,
+     "gap": 59728
+    }
+   }
+  },
+  "17": {
+   "mc_id": 17,
+   "variant": 0,
+   "best_sad": 8570796,
+   "second_mc_id": 17,
+   "second_variant": 1,
+   "second_sad": 13287603,
+   "gap": 4716807,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 17,
+     "variant": 0,
+     "best_sad": 8570796,
+     "second_mc_id": 17,
+     "second_variant": 1,
+     "second_sad": 13287603,
+     "gap": 4716807
+    },
+    "1": {
+     "mc_id": 17,
+     "variant": 0,
+     "best_sad": 8570796,
+     "second_mc_id": 17,
+     "second_variant": 1,
+     "second_sad": 13287603,
+     "gap": 4716807
+    }
+   }
+  },
+  "18": {
+   "mc_id": 27,
+   "variant": 0,
+   "best_sad": 8274720,
+   "second_mc_id": 27,
+   "second_variant": 1,
+   "second_sad": 8278487,
+   "gap": 3767,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 27,
+     "variant": 0,
+     "best_sad": 8274720,
+     "second_mc_id": 27,
+     "second_variant": 1,
+     "second_sad": 8278487,
+     "gap": 3767
+    },
+    "1": {
+     "mc_id": 27,
+     "variant": 0,
+     "best_sad": 8274720,
+     "second_mc_id": 27,
+     "second_variant": 1,
+     "second_sad": 8278487,
+     "gap": 3767
+    }
+   }
+  },
+  "19": {
+   "mc_id": 19,
+   "variant": 1,
+   "best_sad": 5660736,
+   "second_mc_id": 19,
+   "second_variant": 0,
+   "second_sad": 5750045,
+   "gap": 89309,
+   "best_palette": 1,
+   "by_palette": {
+    "0": {
+     "mc_id": 19,
+     "variant": 1,
+     "best_sad": 5669050,
+     "second_mc_id": 19,
+     "second_variant": 0,
+     "second_sad": 5781085,
+     "gap": 112035
+    },
+    "1": {
+     "mc_id": 19,
+     "variant": 1,
+     "best_sad": 5660736,
+     "second_mc_id": 19,
+     "second_variant": 0,
+     "second_sad": 5750045,
+     "gap": 89309
+    },
+    "2": {
+     "mc_id": 19,
+     "variant": 1,
+     "best_sad": 5669050,
+     "second_mc_id": 19,
+     "second_variant": 0,
+     "second_sad": 5781085,
+     "gap": 112035
+    }
+   }
+  },
+  "20": {
+   "mc_id": 20,
+   "variant": 0,
+   "best_sad": 291842,
+   "second_mc_id": 45,
+   "second_variant": 0,
+   "second_sad": 293498,
+   "gap": 1656,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 20,
+     "variant": 0,
+     "best_sad": 291842,
+     "second_mc_id": 45,
+     "second_variant": 0,
+     "second_sad": 293498,
+     "gap": 1656
+    },
+    "1": {
+     "mc_id": 20,
+     "variant": 0,
+     "best_sad": 291842,
+     "second_mc_id": 45,
+     "second_variant": 0,
+     "second_sad": 293498,
+     "gap": 1656
+    }
+   }
+  },
+  "21": {
+   "mc_id": 21,
+   "variant": 0,
+   "best_sad": 7787250,
+   "second_mc_id": 0,
+   "second_variant": 3,
+   "second_sad": 13618152,
+   "gap": 5830902,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 21,
+     "variant": 0,
+     "best_sad": 7787250,
+     "second_mc_id": 0,
+     "second_variant": 3,
+     "second_sad": 13618152,
+     "gap": 5830902
+    },
+    "1": {
+     "mc_id": 21,
+     "variant": 0,
+     "best_sad": 7787250,
+     "second_mc_id": 0,
+     "second_variant": 3,
+     "second_sad": 13618152,
+     "gap": 5830902
+    }
+   }
+  },
+  "22": {
+   "mc_id": 22,
+   "variant": 0,
+   "best_sad": 229170,
+   "second_mc_id": 29,
+   "second_variant": 1,
+   "second_sad": 350699,
+   "gap": 121529,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 22,
+     "variant": 0,
+     "best_sad": 229170,
+     "second_mc_id": 29,
+     "second_variant": 1,
+     "second_sad": 350699,
+     "gap": 121529
+    },
+    "1": {
+     "mc_id": 22,
+     "variant": 0,
+     "best_sad": 229170,
+     "second_mc_id": 29,
+     "second_variant": 1,
+     "second_sad": 350699,
+     "gap": 121529
+    }
+   }
+  },
+  "23": {
+   "mc_id": 23,
+   "variant": 1,
+   "best_sad": 6648121,
+   "second_mc_id": 23,
+   "second_variant": 0,
+   "second_sad": 9532143,
+   "gap": 2884022,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 23,
+     "variant": 1,
+     "best_sad": 6648121,
+     "second_mc_id": 23,
+     "second_variant": 0,
+     "second_sad": 9532143,
+     "gap": 2884022
+    },
+    "1": {
+     "mc_id": 23,
+     "variant": 1,
+     "best_sad": 6648121,
+     "second_mc_id": 23,
+     "second_variant": 0,
+     "second_sad": 9532143,
+     "gap": 2884022
+    }
+   }
+  },
+  "24": {
+   "mc_id": 24,
+   "variant": 1,
+   "best_sad": 8467844,
+   "second_mc_id": 24,
+   "second_variant": 0,
+   "second_sad": 8934572,
+   "gap": 466728,
+   "best_palette": 1,
+   "by_palette": {
+    "0": {
+     "mc_id": 24,
+     "variant": 0,
+     "best_sad": 8589830,
+     "second_mc_id": 58,
+     "second_variant": 0,
+     "second_sad": 8589830,
+     "gap": 0
+    },
+    "1": {
+     "mc_id": 24,
+     "variant": 1,
+     "best_sad": 8467844,
+     "second_mc_id": 24,
+     "second_variant": 0,
+     "second_sad": 8934572,
+     "gap": 466728
+    },
+    "2": {
+     "mc_id": 24,
+     "variant": 0,
+     "best_sad": 8589830,
+     "second_mc_id": 58,
+     "second_variant": 0,
+     "second_sad": 8589830,
+     "gap": 0
+    }
+   }
+  },
+  "32": {
+   "mc_id": 7,
+   "variant": 0,
+   "best_sad": 3958687,
+   "second_mc_id": 32,
+   "second_variant": 0,
+   "second_sad": 3958687,
+   "gap": 0,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 7,
+     "variant": 0,
+     "best_sad": 3958687,
+     "second_mc_id": 32,
+     "second_variant": 0,
+     "second_sad": 3958687,
+     "gap": 0
+    },
+    "1": {
+     "mc_id": 7,
+     "variant": 1,
+     "best_sad": 5217121,
+     "second_mc_id": 32,
+     "second_variant": 1,
+     "second_sad": 5217121,
+     "gap": 0
+    },
+    "2": {
+     "mc_id": 7,
+     "variant": 2,
+     "best_sad": 4162123,
+     "second_mc_id": 32,
+     "second_variant": 2,
+     "second_sad": 4162123,
+     "gap": 0
+    },
+    "3": {
+     "mc_id": 7,
+     "variant": 0,
+     "best_sad": 3958687,
+     "second_mc_id": 32,
+     "second_variant": 0,
+     "second_sad": 3958687,
+     "gap": 0
+    }
+   }
+  },
+  "33": {
+   "mc_id": 8,
+   "variant": 2,
+   "best_sad": 3621345,
+   "second_mc_id": 33,
+   "second_variant": 2,
+   "second_sad": 3621345,
+   "gap": 0,
+   "best_palette": 2,
+   "by_palette": {
+    "0": {
+     "mc_id": 8,
+     "variant": 0,
+     "best_sad": 3707104,
+     "second_mc_id": 33,
+     "second_variant": 0,
+     "second_sad": 3707104,
+     "gap": 0
+    },
+    "1": {
+     "mc_id": 8,
+     "variant": 1,
+     "best_sad": 5378252,
+     "second_mc_id": 33,
+     "second_variant": 1,
+     "second_sad": 5378252,
+     "gap": 0
+    },
+    "2": {
+     "mc_id": 8,
+     "variant": 2,
+     "best_sad": 3621345,
+     "second_mc_id": 33,
+     "second_variant": 2,
+     "second_sad": 3621345,
+     "gap": 0
+    },
+    "3": {
+     "mc_id": 8,
+     "variant": 0,
+     "best_sad": 3707104,
+     "second_mc_id": 33,
+     "second_variant": 0,
+     "second_sad": 3707104,
+     "gap": 0
+    }
+   }
+  },
+  "35": {
+   "mc_id": 35,
+   "variant": 0,
+   "best_sad": 5237359,
+   "second_mc_id": 54,
+   "second_variant": 0,
+   "second_sad": 5237359,
+   "gap": 0,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 35,
+     "variant": 0,
+     "best_sad": 5237359,
+     "second_mc_id": 54,
+     "second_variant": 0,
+     "second_sad": 5237359,
+     "gap": 0
+    },
+    "1": {
+     "mc_id": 35,
+     "variant": 0,
+     "best_sad": 5237359,
+     "second_mc_id": 54,
+     "second_variant": 0,
+     "second_sad": 5237359,
+     "gap": 0
+    }
+   }
+  },
+  "36": {
+   "mc_id": 36,
+   "variant": 0,
+   "best_sad": 651502,
+   "second_mc_id": 24,
+   "second_variant": 1,
+   "second_sad": 1285465,
+   "gap": 633963,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 36,
+     "variant": 0,
+     "best_sad": 651502,
+     "second_mc_id": 24,
+     "second_variant": 1,
+     "second_sad": 1285465,
+     "gap": 633963
+    },
+    "1": {
+     "mc_id": 36,
+     "variant": 0,
+     "best_sad": 651502,
+     "second_mc_id": 24,
+     "second_variant": 1,
+     "second_sad": 1285465,
+     "gap": 633963
+    }
+   }
+  },
+  "38": {
+   "mc_id": 38,
+   "variant": 2,
+   "best_sad": 5047738,
+   "second_mc_id": 38,
+   "second_variant": 1,
+   "second_sad": 5826458,
+   "gap": 778720,
+   "best_palette": 2,
+   "by_palette": {
+    "0": {
+     "mc_id": 38,
+     "variant": 0,
+     "best_sad": 5226104,
+     "second_mc_id": 38,
+     "second_variant": 2,
+     "second_sad": 6197410,
+     "gap": 971306
+    },
+    "1": {
+     "mc_id": 38,
+     "variant": 1,
+     "best_sad": 5290014,
+     "second_mc_id": 38,
+     "second_variant": 2,
+     "second_sad": 6713332,
+     "gap": 1423318
+    },
+    "2": {
+     "mc_id": 38,
+     "variant": 2,
+     "best_sad": 5047738,
+     "second_mc_id": 38,
+     "second_variant": 1,
+     "second_sad": 5826458,
+     "gap": 778720
+    },
+    "3": {
+     "mc_id": 38,
+     "variant": 0,
+     "best_sad": 5226104,
+     "second_mc_id": 38,
+     "second_variant": 2,
+     "second_sad": 6197410,
+     "gap": 971306
+    }
+   }
+  },
+  "42": {
+   "mc_id": 42,
+   "variant": 0,
+   "best_sad": 5679253,
+   "second_mc_id": 7,
+   "second_variant": 0,
+   "second_sad": 5989167,
+   "gap": 309914,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 42,
+     "variant": 0,
+     "best_sad": 5679253,
+     "second_mc_id": 7,
+     "second_variant": 0,
+     "second_sad": 5989167,
+     "gap": 309914
+    },
+    "1": {
+     "mc_id": 42,
+     "variant": 0,
+     "best_sad": 5679253,
+     "second_mc_id": 7,
+     "second_variant": 0,
+     "second_sad": 5989167,
+     "gap": 309914
+    }
+   }
+  },
+  "43": {
+   "mc_id": 43,
+   "variant": 0,
+   "best_sad": 0,
+   "second_mc_id": 8,
+   "second_variant": 0,
+   "second_sad": 1677652,
+   "gap": 1677652,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 43,
+     "variant": 0,
+     "best_sad": 0,
+     "second_mc_id": 8,
+     "second_variant": 0,
+     "second_sad": 1677652,
+     "gap": 1677652
+    },
+    "1": {
+     "mc_id": 43,
+     "variant": 0,
+     "best_sad": 0,
+     "second_mc_id": 8,
+     "second_variant": 0,
+     "second_sad": 1677652,
+     "gap": 1677652
+    }
+   }
+  }
+ },
+ "Chapter5": {
+  "0": {
+   "mc_id": 0,
+   "variant": 0,
+   "best_sad": 6647548,
+   "second_mc_id": 0,
+   "second_variant": 1,
+   "second_sad": 8074829,
+   "gap": 1427281,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 0,
+     "variant": 0,
+     "best_sad": 6647548,
+     "second_mc_id": 0,
+     "second_variant": 1,
+     "second_sad": 8074829,
+     "gap": 1427281
+    },
+    "1": {
+     "mc_id": 0,
+     "variant": 1,
+     "best_sad": 7845167,
+     "second_mc_id": 0,
+     "second_variant": 2,
+     "second_sad": 8354602,
+     "gap": 509435
+    },
+    "2": {
+     "mc_id": 0,
+     "variant": 3,
+     "best_sad": 7877706,
+     "second_mc_id": 0,
+     "second_variant": 2,
+     "second_sad": 9997370,
+     "gap": 2119664
+    },
+    "3": {
+     "mc_id": 0,
+     "variant": 3,
+     "best_sad": 6717778,
+     "second_mc_id": 0,
+     "second_variant": 0,
+     "second_sad": 13035256,
+     "gap": 6317478
+    },
+    "4": {
+     "mc_id": 0,
+     "variant": 0,
+     "best_sad": 6647548,
+     "second_mc_id": 0,
+     "second_variant": 1,
+     "second_sad": 8074829,
+     "gap": 1427281
+    }
+   }
+  },
+  "1": {
+   "mc_id": 46,
+   "variant": 0,
+   "best_sad": 16291793,
+   "second_mc_id": 0,
+   "second_variant": 3,
+   "second_sad": 16341464,
+   "gap": 49671,
+   "best_palette": 3,
+   "by_palette": {
+    "0": {
+     "mc_id": 0,
+     "variant": 3,
+     "best_sad": 17063930,
+     "second_mc_id": 46,
+     "second_variant": 0,
+     "second_sad": 19239169,
+     "gap": 2175239
+    },
+    "1": {
+     "mc_id": 0,
+     "variant": 3,
+     "best_sad": 17255808,
+     "second_mc_id": 46,
+     "second_variant": 0,
+     "second_sad": 17947057,
+     "gap": 691249
+    },
+    "2": {
+     "mc_id": 0,
+     "variant": 1,
+     "best_sad": 17394708,
+     "second_mc_id": 0,
+     "second_variant": 2,
+     "second_sad": 17685012,
+     "gap": 290304
+    },
+    "3": {
+     "mc_id": 46,
+     "variant": 0,
+     "best_sad": 16291793,
+     "second_mc_id": 0,
+     "second_variant": 3,
+     "second_sad": 16341464,
+     "gap": 49671
+    },
+    "4": {
+     "mc_id": 0,
+     "variant": 3,
+     "best_sad": 17063930,
+     "second_mc_id": 46,
+     "second_variant": 0,
+     "second_sad": 19239169,
+     "gap": 2175239
+    }
+   }
+  },
+  "13": {
+   "mc_id": 13,
+   "variant": 0,
+   "best_sad": 8069456,
+   "second_mc_id": 13,
+   "second_variant": 2,
+   "second_sad": 8129184,
+   "gap": 59728,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 13,
+     "variant": 0,
+     "best_sad": 8069456,
+     "second_mc_id": 13,
+     "second_variant": 2,
+     "second_sad": 8129184,
+     "gap": 59728
+    },
+    "1": {
+     "mc_id": 13,
+     "variant": 1,
+     "best_sad": 8131011,
+     "second_mc_id": 37,
+     "second_variant": 2,
+     "second_sad": 8335633,
+     "gap": 204622
+    },
+    "2": {
+     "mc_id": 13,
+     "variant": 0,
+     "best_sad": 8069456,
+     "second_mc_id": 13,
+     "second_variant": 2,
+     "second_sad": 8129184,
+     "gap": 59728
+    }
+   }
+  },
+  "14": {
+   "mc_id": 38,
+   "variant": 0,
+   "best_sad": 2221320,
+   "second_mc_id": 14,
+   "second_variant": 0,
+   "second_sad": 2226149,
+   "gap": 4829,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 38,
+     "variant": 0,
+     "best_sad": 2221320,
+     "second_mc_id": 14,
+     "second_variant": 0,
+     "second_sad": 2226149,
+     "gap": 4829
+    },
+    "1": {
+     "mc_id": 38,
+     "variant": 1,
+     "best_sad": 2248494,
+     "second_mc_id": 14,
+     "second_variant": 1,
+     "second_sad": 2251969,
+     "gap": 3475
+    },
+    "2": {
+     "mc_id": 38,
+     "variant": 0,
+     "best_sad": 2221320,
+     "second_mc_id": 14,
+     "second_variant": 0,
+     "second_sad": 2226149,
+     "gap": 4829
+    }
+   }
+  },
+  "17": {
+   "mc_id": 17,
+   "variant": 0,
+   "best_sad": 8570796,
+   "second_mc_id": 17,
+   "second_variant": 1,
+   "second_sad": 13287603,
+   "gap": 4716807,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 17,
+     "variant": 0,
+     "best_sad": 8570796,
+     "second_mc_id": 17,
+     "second_variant": 1,
+     "second_sad": 13287603,
+     "gap": 4716807
+    },
+    "1": {
+     "mc_id": 17,
+     "variant": 0,
+     "best_sad": 8570796,
+     "second_mc_id": 17,
+     "second_variant": 1,
+     "second_sad": 13287603,
+     "gap": 4716807
+    }
+   }
+  },
+  "19": {
+   "mc_id": 19,
+   "variant": 1,
+   "best_sad": 5660736,
+   "second_mc_id": 19,
+   "second_variant": 0,
+   "second_sad": 5750045,
+   "gap": 89309,
+   "best_palette": 1,
+   "by_palette": {
+    "0": {
+     "mc_id": 19,
+     "variant": 1,
+     "best_sad": 5669050,
+     "second_mc_id": 19,
+     "second_variant": 0,
+     "second_sad": 5781085,
+     "gap": 112035
+    },
+    "1": {
+     "mc_id": 19,
+     "variant": 1,
+     "best_sad": 5660736,
+     "second_mc_id": 19,
+     "second_variant": 0,
+     "second_sad": 5750045,
+     "gap": 89309
+    },
+    "2": {
+     "mc_id": 19,
+     "variant": 1,
+     "best_sad": 5669050,
+     "second_mc_id": 19,
+     "second_variant": 0,
+     "second_sad": 5781085,
+     "gap": 112035
+    }
+   }
+  },
+  "20": {
+   "mc_id": 20,
+   "variant": 0,
+   "best_sad": 291842,
+   "second_mc_id": 45,
+   "second_variant": 0,
+   "second_sad": 293498,
+   "gap": 1656,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 20,
+     "variant": 0,
+     "best_sad": 291842,
+     "second_mc_id": 45,
+     "second_variant": 0,
+     "second_sad": 293498,
+     "gap": 1656
+    },
+    "1": {
+     "mc_id": 20,
+     "variant": 0,
+     "best_sad": 291842,
+     "second_mc_id": 45,
+     "second_variant": 0,
+     "second_sad": 293498,
+     "gap": 1656
+    }
+   }
+  },
+  "21": {
+   "mc_id": 21,
+   "variant": 0,
+   "best_sad": 7787250,
+   "second_mc_id": 0,
+   "second_variant": 3,
+   "second_sad": 13618152,
+   "gap": 5830902,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 21,
+     "variant": 0,
+     "best_sad": 7787250,
+     "second_mc_id": 0,
+     "second_variant": 3,
+     "second_sad": 13618152,
+     "gap": 5830902
+    },
+    "1": {
+     "mc_id": 21,
+     "variant": 0,
+     "best_sad": 7787250,
+     "second_mc_id": 0,
+     "second_variant": 3,
+     "second_sad": 13618152,
+     "gap": 5830902
+    }
+   }
+  },
+  "23": {
+   "mc_id": 23,
+   "variant": 1,
+   "best_sad": 6648121,
+   "second_mc_id": 23,
+   "second_variant": 0,
+   "second_sad": 9532143,
+   "gap": 2884022,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 23,
+     "variant": 1,
+     "best_sad": 6648121,
+     "second_mc_id": 23,
+     "second_variant": 0,
+     "second_sad": 9532143,
+     "gap": 2884022
+    },
+    "1": {
+     "mc_id": 23,
+     "variant": 1,
+     "best_sad": 6648121,
+     "second_mc_id": 23,
+     "second_variant": 0,
+     "second_sad": 9532143,
+     "gap": 2884022
+    }
+   }
+  },
+  "24": {
+   "mc_id": 24,
+   "variant": 2,
+   "best_sad": 7781160,
+   "second_mc_id": 24,
+   "second_variant": 0,
+   "second_sad": 9666434,
+   "gap": 1885274,
+   "best_palette": 2,
+   "by_palette": {
+    "0": {
+     "mc_id": 24,
+     "variant": 0,
+     "best_sad": 8589830,
+     "second_mc_id": 58,
+     "second_variant": 0,
+     "second_sad": 8589830,
+     "gap": 0
+    },
+    "1": {
+     "mc_id": 24,
+     "variant": 1,
+     "best_sad": 8467844,
+     "second_mc_id": 24,
+     "second_variant": 0,
+     "second_sad": 8934572,
+     "gap": 466728
+    },
+    "2": {
+     "mc_id": 24,
+     "variant": 2,
+     "best_sad": 7781160,
+     "second_mc_id": 24,
+     "second_variant": 0,
+     "second_sad": 9666434,
+     "gap": 1885274
+    },
+    "3": {
+     "mc_id": 24,
+     "variant": 0,
+     "best_sad": 8589830,
+     "second_mc_id": 58,
+     "second_variant": 0,
+     "second_sad": 8589830,
+     "gap": 0
+    }
+   }
+  },
+  "25": {
+   "mc_id": 25,
+   "variant": 2,
+   "best_sad": 1583993,
+   "second_mc_id": 38,
+   "second_variant": 1,
+   "second_sad": 3587504,
+   "gap": 2003511,
+   "best_palette": 2,
+   "by_palette": {
+    "0": {
+     "mc_id": 38,
+     "variant": 1,
+     "best_sad": 2322150,
+     "second_mc_id": 14,
+     "second_variant": 1,
+     "second_sad": 2326166,
+     "gap": 4016
+    },
+    "1": {
+     "mc_id": 38,
+     "variant": 2,
+     "best_sad": 2292736,
+     "second_mc_id": 25,
+     "second_variant": 1,
+     "second_sad": 2294790,
+     "gap": 2054
+    },
+    "2": {
+     "mc_id": 25,
+     "variant": 2,
+     "best_sad": 1583993,
+     "second_mc_id": 38,
+     "second_variant": 1,
+     "second_sad": 3587504,
+     "gap": 2003511
+    },
+    "3": {
+     "mc_id": 38,
+     "variant": 1,
+     "best_sad": 2322150,
+     "second_mc_id": 14,
+     "second_variant": 1,
+     "second_sad": 2326166,
+     "gap": 4016
+    }
+   }
+  },
+  "28": {
+   "mc_id": 28,
+   "variant": 0,
+   "best_sad": 9135224,
+   "second_mc_id": 28,
+   "second_variant": 1,
+   "second_sad": 10062544,
+   "gap": 927320,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 28,
+     "variant": 0,
+     "best_sad": 9135224,
+     "second_mc_id": 28,
+     "second_variant": 1,
+     "second_sad": 10062544,
+     "gap": 927320
+    },
+    "1": {
+     "mc_id": 28,
+     "variant": 0,
+     "best_sad": 9135224,
+     "second_mc_id": 28,
+     "second_variant": 1,
+     "second_sad": 10062544,
+     "gap": 927320
+    }
+   }
+  },
+  "29": {
+   "mc_id": 38,
+   "variant": 2,
+   "best_sad": 3334487,
+   "second_mc_id": 25,
+   "second_variant": 1,
+   "second_sad": 3362773,
+   "gap": 28286,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 38,
+     "variant": 2,
+     "best_sad": 3334487,
+     "second_mc_id": 25,
+     "second_variant": 1,
+     "second_sad": 3362773,
+     "gap": 28286
+    },
+    "1": {
+     "mc_id": 38,
+     "variant": 2,
+     "best_sad": 3334487,
+     "second_mc_id": 25,
+     "second_variant": 1,
+     "second_sad": 3362773,
+     "gap": 28286
+    }
+   }
+  },
+  "30": {
+   "mc_id": 30,
+   "variant": 0,
+   "best_sad": 7897435,
+   "second_mc_id": 30,
+   "second_variant": 1,
+   "second_sad": 8147253,
+   "gap": 249818,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 30,
+     "variant": 0,
+     "best_sad": 7897435,
+     "second_mc_id": 30,
+     "second_variant": 1,
+     "second_sad": 8147253,
+     "gap": 249818
+    },
+    "1": {
+     "mc_id": 30,
+     "variant": 0,
+     "best_sad": 7897435,
+     "second_mc_id": 30,
+     "second_variant": 1,
+     "second_sad": 8147253,
+     "gap": 249818
+    }
+   }
+  },
+  "31": {
+   "mc_id": 31,
+   "variant": 0,
+   "best_sad": 12249947,
+   "second_mc_id": 31,
+   "second_variant": 1,
+   "second_sad": 12390946,
+   "gap": 140999,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 31,
+     "variant": 0,
+     "best_sad": 12249947,
+     "second_mc_id": 31,
+     "second_variant": 1,
+     "second_sad": 12390946,
+     "gap": 140999
+    },
+    "1": {
+     "mc_id": 31,
+     "variant": 0,
+     "best_sad": 12249947,
+     "second_mc_id": 31,
+     "second_variant": 1,
+     "second_sad": 12390946,
+     "gap": 140999
+    }
+   }
+  },
+  "32": {
+   "mc_id": 7,
+   "variant": 0,
+   "best_sad": 3958687,
+   "second_mc_id": 32,
+   "second_variant": 0,
+   "second_sad": 3958687,
+   "gap": 0,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 7,
+     "variant": 0,
+     "best_sad": 3958687,
+     "second_mc_id": 32,
+     "second_variant": 0,
+     "second_sad": 3958687,
+     "gap": 0
+    },
+    "1": {
+     "mc_id": 7,
+     "variant": 1,
+     "best_sad": 5217121,
+     "second_mc_id": 32,
+     "second_variant": 1,
+     "second_sad": 5217121,
+     "gap": 0
+    },
+    "2": {
+     "mc_id": 7,
+     "variant": 2,
+     "best_sad": 4162123,
+     "second_mc_id": 32,
+     "second_variant": 2,
+     "second_sad": 4162123,
+     "gap": 0
+    },
+    "3": {
+     "mc_id": 7,
+     "variant": 0,
+     "best_sad": 3958687,
+     "second_mc_id": 32,
+     "second_variant": 0,
+     "second_sad": 3958687,
+     "gap": 0
+    }
+   }
+  },
+  "40": {
+   "mc_id": 9,
+   "variant": 1,
+   "best_sad": 7646448,
+   "second_mc_id": 40,
+   "second_variant": 0,
+   "second_sad": 7646448,
+   "gap": 0,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 9,
+     "variant": 1,
+     "best_sad": 7646448,
+     "second_mc_id": 40,
+     "second_variant": 0,
+     "second_sad": 7646448,
+     "gap": 0
+    },
+    "1": {
+     "mc_id": 9,
+     "variant": 1,
+     "best_sad": 7646448,
+     "second_mc_id": 40,
+     "second_variant": 0,
+     "second_sad": 7646448,
+     "gap": 0
+    },
+    "2": {
+     "mc_id": 9,
+     "variant": 1,
+     "best_sad": 7646448,
+     "second_mc_id": 40,
+     "second_variant": 0,
+     "second_sad": 7646448,
+     "gap": 0
+    }
+   }
+  },
+  "41": {
+   "mc_id": 41,
+   "variant": 0,
+   "best_sad": 2507350,
+   "second_mc_id": 27,
+   "second_variant": 1,
+   "second_sad": 7342126,
+   "gap": 4834776,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 41,
+     "variant": 0,
+     "best_sad": 2507350,
+     "second_mc_id": 27,
+     "second_variant": 1,
+     "second_sad": 7342126,
+     "gap": 4834776
+    },
+    "1": {
+     "mc_id": 41,
+     "variant": 0,
+     "best_sad": 2507350,
+     "second_mc_id": 27,
+     "second_variant": 1,
+     "second_sad": 7342126,
+     "gap": 4834776
+    },
+    "2": {
+     "mc_id": 41,
+     "variant": 0,
+     "best_sad": 2507350,
+     "second_mc_id": 27,
+     "second_variant": 1,
+     "second_sad": 7342126,
+     "gap": 4834776
+    }
+   }
+  },
+  "45": {
+   "mc_id": 45,
+   "variant": 0,
+   "best_sad": 1324100,
+   "second_mc_id": 25,
+   "second_variant": 2,
+   "second_sad": 2343908,
+   "gap": 1019808,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 45,
+     "variant": 0,
+     "best_sad": 1324100,
+     "second_mc_id": 25,
+     "second_variant": 2,
+     "second_sad": 2343908,
+     "gap": 1019808
+    },
+    "1": {
+     "mc_id": 45,
+     "variant": 0,
+     "best_sad": 1324100,
+     "second_mc_id": 25,
+     "second_variant": 2,
+     "second_sad": 2343908,
+     "gap": 1019808
+    }
+   }
+  },
+  "49": {
+   "mc_id": 8,
+   "variant": 2,
+   "best_sad": 4787200,
+   "second_mc_id": 33,
+   "second_variant": 2,
+   "second_sad": 4787200,
+   "gap": 0,
+   "best_palette": 2,
+   "by_palette": {
+    "0": {
+     "mc_id": 8,
+     "variant": 2,
+     "best_sad": 6880384,
+     "second_mc_id": 33,
+     "second_variant": 2,
+     "second_sad": 6880384,
+     "gap": 0
+    },
+    "1": {
+     "mc_id": 8,
+     "variant": 2,
+     "best_sad": 6880384,
+     "second_mc_id": 33,
+     "second_variant": 2,
+     "second_sad": 6880384,
+     "gap": 0
+    },
+    "2": {
+     "mc_id": 8,
+     "variant": 2,
+     "best_sad": 4787200,
+     "second_mc_id": 33,
+     "second_variant": 2,
+     "second_sad": 4787200,
+     "gap": 0
+    },
+    "3": {
+     "mc_id": 8,
+     "variant": 2,
+     "best_sad": 6880384,
+     "second_mc_id": 33,
+     "second_variant": 2,
+     "second_sad": 6880384,
+     "gap": 0
+    }
+   }
+  }
+ },
+ "ChapterGladiatorHall": {
+  "7": {
+   "mc_id": 7,
+   "variant": 0,
+   "best_sad": 3958687,
+   "second_mc_id": 32,
+   "second_variant": 0,
+   "second_sad": 3958687,
+   "gap": 0,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 7,
+     "variant": 0,
+     "best_sad": 3958687,
+     "second_mc_id": 32,
+     "second_variant": 0,
+     "second_sad": 3958687,
+     "gap": 0
+    },
+    "1": {
+     "mc_id": 7,
+     "variant": 0,
+     "best_sad": 3958687,
+     "second_mc_id": 32,
+     "second_variant": 0,
+     "second_sad": 3958687,
+     "gap": 0
+    }
+   }
+  },
+  "8": {
+   "mc_id": 8,
+   "variant": 0,
+   "best_sad": 3707104,
+   "second_mc_id": 33,
+   "second_variant": 0,
+   "second_sad": 3707104,
+   "gap": 0,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 8,
+     "variant": 0,
+     "best_sad": 3707104,
+     "second_mc_id": 33,
+     "second_variant": 0,
+     "second_sad": 3707104,
+     "gap": 0
+    },
+    "1": {
+     "mc_id": 8,
+     "variant": 0,
+     "best_sad": 3707104,
+     "second_mc_id": 33,
+     "second_variant": 0,
+     "second_sad": 3707104,
+     "gap": 0
+    }
+   }
+  },
+  "19": {
+   "mc_id": 19,
+   "variant": 1,
+   "best_sad": 5660736,
+   "second_mc_id": 19,
+   "second_variant": 0,
+   "second_sad": 5750045,
+   "gap": 89309,
+   "best_palette": 1,
+   "by_palette": {
+    "0": {
+     "mc_id": 19,
+     "variant": 1,
+     "best_sad": 5669050,
+     "second_mc_id": 19,
+     "second_variant": 0,
+     "second_sad": 5781085,
+     "gap": 112035
+    },
+    "1": {
+     "mc_id": 19,
+     "variant": 1,
+     "best_sad": 5660736,
+     "second_mc_id": 19,
+     "second_variant": 0,
+     "second_sad": 5750045,
+     "gap": 89309
+    },
+    "2": {
+     "mc_id": 19,
+     "variant": 1,
+     "best_sad": 5669050,
+     "second_mc_id": 19,
+     "second_variant": 0,
+     "second_sad": 5781085,
+     "gap": 112035
+    }
+   }
+  },
+  "20": {
+   "mc_id": 20,
+   "variant": 0,
+   "best_sad": 291842,
+   "second_mc_id": 45,
+   "second_variant": 0,
+   "second_sad": 293498,
+   "gap": 1656,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 20,
+     "variant": 0,
+     "best_sad": 291842,
+     "second_mc_id": 45,
+     "second_variant": 0,
+     "second_sad": 293498,
+     "gap": 1656
+    },
+    "1": {
+     "mc_id": 20,
+     "variant": 0,
+     "best_sad": 291842,
+     "second_mc_id": 45,
+     "second_variant": 0,
+     "second_sad": 293498,
+     "gap": 1656
+    }
+   }
+  },
+  "51": {
+   "mc_id": 51,
+   "variant": 0,
+   "best_sad": 5586870,
+   "second_mc_id": 51,
+   "second_variant": 2,
+   "second_sad": 6332176,
+   "gap": 745306,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 51,
+     "variant": 0,
+     "best_sad": 5586870,
+     "second_mc_id": 51,
+     "second_variant": 2,
+     "second_sad": 6332176,
+     "gap": 745306
+    },
+    "1": {
+     "mc_id": 51,
+     "variant": 0,
+     "best_sad": 5586870,
+     "second_mc_id": 51,
+     "second_variant": 2,
+     "second_sad": 6332176,
+     "gap": 745306
+    },
+    "2": {
+     "mc_id": 51,
+     "variant": 0,
+     "best_sad": 5586870,
+     "second_mc_id": 51,
+     "second_variant": 2,
+     "second_sad": 6332176,
+     "gap": 745306
+    }
+   }
+  },
+  "52": {
+   "mc_id": 52,
+   "variant": 0,
+   "best_sad": 5315738,
+   "second_mc_id": 12,
+   "second_variant": 0,
+   "second_sad": 6383774,
+   "gap": 1068036,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 52,
+     "variant": 0,
+     "best_sad": 5315738,
+     "second_mc_id": 12,
+     "second_variant": 0,
+     "second_sad": 6383774,
+     "gap": 1068036
+    },
+    "1": {
+     "mc_id": 52,
+     "variant": 0,
+     "best_sad": 5315738,
+     "second_mc_id": 12,
+     "second_variant": 0,
+     "second_sad": 6383774,
+     "gap": 1068036
+    },
+    "2": {
+     "mc_id": 52,
+     "variant": 0,
+     "best_sad": 5315738,
+     "second_mc_id": 12,
+     "second_variant": 0,
+     "second_sad": 6383774,
+     "gap": 1068036
+    }
+   }
+  },
+  "55": {
+   "mc_id": 55,
+   "variant": 1,
+   "best_sad": 6183464,
+   "second_mc_id": 65,
+   "second_variant": 1,
+   "second_sad": 6183464,
+   "gap": 0,
+   "best_palette": 1,
+   "by_palette": {
+    "0": {
+     "mc_id": 55,
+     "variant": 0,
+     "best_sad": 6658757,
+     "second_mc_id": 65,
+     "second_variant": 0,
+     "second_sad": 6658757,
+     "gap": 0
+    },
+    "1": {
+     "mc_id": 55,
+     "variant": 1,
+     "best_sad": 6183464,
+     "second_mc_id": 65,
+     "second_variant": 1,
+     "second_sad": 6183464,
+     "gap": 0
+    },
+    "2": {
+     "mc_id": 55,
+     "variant": 0,
+     "best_sad": 6658757,
+     "second_mc_id": 65,
+     "second_variant": 0,
+     "second_sad": 6658757,
+     "gap": 0
+    }
+   }
+  },
+  "56": {
+   "mc_id": 56,
+   "variant": 0,
+   "best_sad": 3146893,
+   "second_mc_id": 66,
+   "second_variant": 0,
+   "second_sad": 3146893,
+   "gap": 0,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 56,
+     "variant": 0,
+     "best_sad": 3146893,
+     "second_mc_id": 66,
+     "second_variant": 0,
+     "second_sad": 3146893,
+     "gap": 0
+    },
+    "1": {
+     "mc_id": 56,
+     "variant": 1,
+     "best_sad": 3432904,
+     "second_mc_id": 66,
+     "second_variant": 1,
+     "second_sad": 3432904,
+     "gap": 0
+    },
+    "2": {
+     "mc_id": 56,
+     "variant": 0,
+     "best_sad": 3146893,
+     "second_mc_id": 66,
+     "second_variant": 0,
+     "second_sad": 3146893,
+     "gap": 0
+    }
+   }
+  },
+  "63": {
+   "mc_id": 0,
+   "variant": 3,
+   "best_sad": 8619853,
+   "second_mc_id": 0,
+   "second_variant": 1,
+   "second_sad": 8866892,
+   "gap": 247039,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 0,
+     "variant": 3,
+     "best_sad": 8619853,
+     "second_mc_id": 0,
+     "second_variant": 1,
+     "second_sad": 8866892,
+     "gap": 247039
+    },
+    "1": {
+     "mc_id": 0,
+     "variant": 3,
+     "best_sad": 11877097,
+     "second_mc_id": 17,
+     "second_variant": 0,
+     "second_sad": 12432321,
+     "gap": 555224
+    },
+    "2": {
+     "mc_id": 0,
+     "variant": 3,
+     "best_sad": 8619853,
+     "second_mc_id": 0,
+     "second_variant": 1,
+     "second_sad": 8866892,
+     "gap": 247039
+    }
+   }
+  }
+ },
+ "ChapterOnline": {
+  "0": {
+   "mc_id": 0,
+   "variant": 0,
+   "best_sad": 6624335,
+   "second_mc_id": 0,
+   "second_variant": 1,
+   "second_sad": 8046949,
+   "gap": 1422614,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 0,
+     "variant": 0,
+     "best_sad": 6624335,
+     "second_mc_id": 0,
+     "second_variant": 1,
+     "second_sad": 8046949,
+     "gap": 1422614
+    },
+    "1": {
+     "mc_id": 0,
+     "variant": 1,
+     "best_sad": 8143391,
+     "second_mc_id": 0,
+     "second_variant": 2,
+     "second_sad": 8536685,
+     "gap": 393294
+    },
+    "2": {
+     "mc_id": 0,
+     "variant": 3,
+     "best_sad": 8532339,
+     "second_mc_id": 0,
+     "second_variant": 2,
+     "second_sad": 10633287,
+     "gap": 2100948
+    },
+    "3": {
+     "mc_id": 0,
+     "variant": 0,
+     "best_sad": 6624335,
+     "second_mc_id": 0,
+     "second_variant": 1,
+     "second_sad": 8046949,
+     "gap": 1422614
+    }
+   }
+  },
+  "1": {
+   "mc_id": 0,
+   "variant": 1,
+   "best_sad": 12711574,
+   "second_mc_id": 0,
+   "second_variant": 2,
+   "second_sad": 13462511,
+   "gap": 750937,
+   "best_palette": 2,
+   "by_palette": {
+    "0": {
+     "mc_id": 0,
+     "variant": 3,
+     "best_sad": 16516023,
+     "second_mc_id": 46,
+     "second_variant": 0,
+     "second_sad": 17893251,
+     "gap": 1377228
+    },
+    "1": {
+     "mc_id": 46,
+     "variant": 0,
+     "best_sad": 16639593,
+     "second_mc_id": 0,
+     "second_variant": 3,
+     "second_sad": 16741395,
+     "gap": 101802
+    },
+    "2": {
+     "mc_id": 0,
+     "variant": 1,
+     "best_sad": 12711574,
+     "second_mc_id": 0,
+     "second_variant": 2,
+     "second_sad": 13462511,
+     "gap": 750937
+    },
+    "3": {
+     "mc_id": 0,
+     "variant": 3,
+     "best_sad": 16516023,
+     "second_mc_id": 46,
+     "second_variant": 0,
+     "second_sad": 17893251,
+     "gap": 1377228
+    }
+   }
+  },
+  "2": {
+   "mc_id": 2,
+   "variant": 0,
+   "best_sad": 8351293,
+   "second_mc_id": 2,
+   "second_variant": 1,
+   "second_sad": 8559270,
+   "gap": 207977,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 2,
+     "variant": 0,
+     "best_sad": 8351293,
+     "second_mc_id": 2,
+     "second_variant": 1,
+     "second_sad": 8559270,
+     "gap": 207977
+    },
+    "1": {
+     "mc_id": 2,
+     "variant": 0,
+     "best_sad": 8351293,
+     "second_mc_id": 2,
+     "second_variant": 1,
+     "second_sad": 8559270,
+     "gap": 207977
+    }
+   }
+  },
+  "3": {
+   "mc_id": 3,
+   "variant": 0,
+   "best_sad": 5669688,
+   "second_mc_id": 19,
+   "second_variant": 1,
+   "second_sad": 7269300,
+   "gap": 1599612,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 3,
+     "variant": 0,
+     "best_sad": 5669688,
+     "second_mc_id": 19,
+     "second_variant": 1,
+     "second_sad": 7269300,
+     "gap": 1599612
+    },
+    "1": {
+     "mc_id": 3,
+     "variant": 0,
+     "best_sad": 5669688,
+     "second_mc_id": 19,
+     "second_variant": 1,
+     "second_sad": 7269300,
+     "gap": 1599612
+    }
+   }
+  },
+  "4": {
+   "mc_id": 4,
+   "variant": 0,
+   "best_sad": 176886,
+   "second_mc_id": 20,
+   "second_variant": 0,
+   "second_sad": 335606,
+   "gap": 158720,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 4,
+     "variant": 0,
+     "best_sad": 176886,
+     "second_mc_id": 20,
+     "second_variant": 0,
+     "second_sad": 335606,
+     "gap": 158720
+    },
+    "1": {
+     "mc_id": 4,
+     "variant": 0,
+     "best_sad": 176886,
+     "second_mc_id": 20,
+     "second_variant": 0,
+     "second_sad": 335606,
+     "gap": 158720
+    }
+   }
+  },
+  "5": {
+   "mc_id": 5,
+   "variant": 1,
+   "best_sad": 7026806,
+   "second_mc_id": 30,
+   "second_variant": 0,
+   "second_sad": 7689728,
+   "gap": 662922,
+   "best_palette": 1,
+   "by_palette": {
+    "0": {
+     "mc_id": 5,
+     "variant": 0,
+     "best_sad": 7632979,
+     "second_mc_id": 5,
+     "second_variant": 2,
+     "second_sad": 7823458,
+     "gap": 190479
+    },
+    "1": {
+     "mc_id": 5,
+     "variant": 1,
+     "best_sad": 7026806,
+     "second_mc_id": 30,
+     "second_variant": 0,
+     "second_sad": 7689728,
+     "gap": 662922
+    },
+    "2": {
+     "mc_id": 5,
+     "variant": 0,
+     "best_sad": 7632979,
+     "second_mc_id": 5,
+     "second_variant": 2,
+     "second_sad": 7823458,
+     "gap": 190479
+    }
+   }
+  },
+  "6": {
+   "mc_id": 6,
+   "variant": 0,
+   "best_sad": 12486410,
+   "second_mc_id": 0,
+   "second_variant": 1,
+   "second_sad": 19109384,
+   "gap": 6622974,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 6,
+     "variant": 0,
+     "best_sad": 12486410,
+     "second_mc_id": 0,
+     "second_variant": 1,
+     "second_sad": 19109384,
+     "gap": 6622974
+    },
+    "1": {
+     "mc_id": 6,
+     "variant": 0,
+     "best_sad": 12486410,
+     "second_mc_id": 0,
+     "second_variant": 1,
+     "second_sad": 19109384,
+     "gap": 6622974
+    }
+   }
+  },
+  "7": {
+   "mc_id": 7,
+   "variant": 0,
+   "best_sad": 3795691,
+   "second_mc_id": 32,
+   "second_variant": 0,
+   "second_sad": 3795691,
+   "gap": 0,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 7,
+     "variant": 0,
+     "best_sad": 3795691,
+     "second_mc_id": 32,
+     "second_variant": 0,
+     "second_sad": 3795691,
+     "gap": 0
+    },
+    "1": {
+     "mc_id": 7,
+     "variant": 0,
+     "best_sad": 3795691,
+     "second_mc_id": 32,
+     "second_variant": 0,
+     "second_sad": 3795691,
+     "gap": 0
+    }
+   }
+  },
+  "8": {
+   "mc_id": 43,
+   "variant": 0,
+   "best_sad": 691992,
+   "second_mc_id": 8,
+   "second_variant": 0,
+   "second_sad": 1136811,
+   "gap": 444819,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 43,
+     "variant": 0,
+     "best_sad": 691992,
+     "second_mc_id": 8,
+     "second_variant": 0,
+     "second_sad": 1136811,
+     "gap": 444819
+    },
+    "1": {
+     "mc_id": 43,
+     "variant": 0,
+     "best_sad": 691992,
+     "second_mc_id": 8,
+     "second_variant": 0,
+     "second_sad": 1136811,
+     "gap": 444819
+    }
+   }
+  },
+  "9": {
+   "mc_id": 9,
+   "variant": 0,
+   "best_sad": 6822954,
+   "second_mc_id": 9,
+   "second_variant": 1,
+   "second_sad": 7926929,
+   "gap": 1103975,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 9,
+     "variant": 0,
+     "best_sad": 6822954,
+     "second_mc_id": 9,
+     "second_variant": 1,
+     "second_sad": 7926929,
+     "gap": 1103975
+    },
+    "1": {
+     "mc_id": 9,
+     "variant": 1,
+     "best_sad": 7971443,
+     "second_mc_id": 40,
+     "second_variant": 0,
+     "second_sad": 7971443,
+     "gap": 0
+    },
+    "2": {
+     "mc_id": 9,
+     "variant": 0,
+     "best_sad": 6822954,
+     "second_mc_id": 9,
+     "second_variant": 1,
+     "second_sad": 7926929,
+     "gap": 1103975
+    }
+   }
+  },
+  "10": {
+   "mc_id": 10,
+   "variant": 0,
+   "best_sad": 6060356,
+   "second_mc_id": 64,
+   "second_variant": 0,
+   "second_sad": 11681172,
+   "gap": 5620816,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 10,
+     "variant": 0,
+     "best_sad": 6060356,
+     "second_mc_id": 64,
+     "second_variant": 0,
+     "second_sad": 11681172,
+     "gap": 5620816
+    },
+    "1": {
+     "mc_id": 10,
+     "variant": 0,
+     "best_sad": 6060356,
+     "second_mc_id": 64,
+     "second_variant": 0,
+     "second_sad": 11681172,
+     "gap": 5620816
+    }
+   }
+  },
+  "11": {
+   "mc_id": 0,
+   "variant": 1,
+   "best_sad": 11592470,
+   "second_mc_id": 0,
+   "second_variant": 0,
+   "second_sad": 11730544,
+   "gap": 138074,
+   "best_palette": 1,
+   "by_palette": {
+    "0": {
+     "mc_id": 0,
+     "variant": 1,
+     "best_sad": 12013304,
+     "second_mc_id": 0,
+     "second_variant": 2,
+     "second_sad": 12480188,
+     "gap": 466884
+    },
+    "1": {
+     "mc_id": 0,
+     "variant": 1,
+     "best_sad": 11592470,
+     "second_mc_id": 0,
+     "second_variant": 0,
+     "second_sad": 11730544,
+     "gap": 138074
+    },
+    "2": {
+     "mc_id": 0,
+     "variant": 1,
+     "best_sad": 12013304,
+     "second_mc_id": 0,
+     "second_variant": 2,
+     "second_sad": 12480188,
+     "gap": 466884
+    }
+   }
+  },
+  "12": {
+   "mc_id": 12,
+   "variant": 0,
+   "best_sad": 3705776,
+   "second_mc_id": 12,
+   "second_variant": 2,
+   "second_sad": 5570596,
+   "gap": 1864820,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 12,
+     "variant": 0,
+     "best_sad": 3705776,
+     "second_mc_id": 12,
+     "second_variant": 2,
+     "second_sad": 5570596,
+     "gap": 1864820
+    },
+    "1": {
+     "mc_id": 12,
+     "variant": 0,
+     "best_sad": 3705776,
+     "second_mc_id": 12,
+     "second_variant": 2,
+     "second_sad": 5570596,
+     "gap": 1864820
+    }
+   }
+  },
+  "13": {
+   "mc_id": 13,
+   "variant": 0,
+   "best_sad": 7913295,
+   "second_mc_id": 37,
+   "second_variant": 0,
+   "second_sad": 7966548,
+   "gap": 53253,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 13,
+     "variant": 0,
+     "best_sad": 7913295,
+     "second_mc_id": 37,
+     "second_variant": 0,
+     "second_sad": 7966548,
+     "gap": 53253
+    },
+    "1": {
+     "mc_id": 13,
+     "variant": 0,
+     "best_sad": 7913295,
+     "second_mc_id": 37,
+     "second_variant": 0,
+     "second_sad": 7966548,
+     "gap": 53253
+    }
+   }
+  },
+  "14": {
+   "mc_id": 38,
+   "variant": 0,
+   "best_sad": 2221320,
+   "second_mc_id": 14,
+   "second_variant": 0,
+   "second_sad": 2226149,
+   "gap": 4829,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 38,
+     "variant": 0,
+     "best_sad": 2221320,
+     "second_mc_id": 14,
+     "second_variant": 0,
+     "second_sad": 2226149,
+     "gap": 4829
+    },
+    "1": {
+     "mc_id": 38,
+     "variant": 0,
+     "best_sad": 2221320,
+     "second_mc_id": 14,
+     "second_variant": 0,
+     "second_sad": 2226149,
+     "gap": 4829
+    }
+   }
+  },
+  "15": {
+   "mc_id": 15,
+   "variant": 0,
+   "best_sad": 11226114,
+   "second_mc_id": 15,
+   "second_variant": 1,
+   "second_sad": 11655810,
+   "gap": 429696,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 15,
+     "variant": 0,
+     "best_sad": 11226114,
+     "second_mc_id": 15,
+     "second_variant": 1,
+     "second_sad": 11655810,
+     "gap": 429696
+    },
+    "1": {
+     "mc_id": 15,
+     "variant": 0,
+     "best_sad": 11226114,
+     "second_mc_id": 15,
+     "second_variant": 1,
+     "second_sad": 11655810,
+     "gap": 429696
+    }
+   }
+  },
+  "16": {
+   "mc_id": 16,
+   "variant": 0,
+   "best_sad": 4350537,
+   "second_mc_id": 16,
+   "second_variant": 1,
+   "second_sad": 4483989,
+   "gap": 133452,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 16,
+     "variant": 0,
+     "best_sad": 4350537,
+     "second_mc_id": 16,
+     "second_variant": 1,
+     "second_sad": 4483989,
+     "gap": 133452
+    },
+    "1": {
+     "mc_id": 16,
+     "variant": 0,
+     "best_sad": 4350537,
+     "second_mc_id": 16,
+     "second_variant": 1,
+     "second_sad": 4483989,
+     "gap": 133452
+    }
+   }
+  },
+  "17": {
+   "mc_id": 17,
+   "variant": 0,
+   "best_sad": 8940812,
+   "second_mc_id": 17,
+   "second_variant": 1,
+   "second_sad": 13657619,
+   "gap": 4716807,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 17,
+     "variant": 0,
+     "best_sad": 8940812,
+     "second_mc_id": 17,
+     "second_variant": 1,
+     "second_sad": 13657619,
+     "gap": 4716807
+    },
+    "1": {
+     "mc_id": 17,
+     "variant": 0,
+     "best_sad": 8940812,
+     "second_mc_id": 17,
+     "second_variant": 1,
+     "second_sad": 13657619,
+     "gap": 4716807
+    }
+   }
+  },
+  "18": {
+   "mc_id": 27,
+   "variant": 0,
+   "best_sad": 8274720,
+   "second_mc_id": 27,
+   "second_variant": 1,
+   "second_sad": 8278487,
+   "gap": 3767,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 27,
+     "variant": 0,
+     "best_sad": 8274720,
+     "second_mc_id": 27,
+     "second_variant": 1,
+     "second_sad": 8278487,
+     "gap": 3767
+    },
+    "1": {
+     "mc_id": 27,
+     "variant": 0,
+     "best_sad": 8274720,
+     "second_mc_id": 27,
+     "second_variant": 1,
+     "second_sad": 8278487,
+     "gap": 3767
+    }
+   }
+  },
+  "19": {
+   "mc_id": 19,
+   "variant": 1,
+   "best_sad": 6034640,
+   "second_mc_id": 19,
+   "second_variant": 0,
+   "second_sad": 6123949,
+   "gap": 89309,
+   "best_palette": 1,
+   "by_palette": {
+    "0": {
+     "mc_id": 19,
+     "variant": 1,
+     "best_sad": 6044754,
+     "second_mc_id": 19,
+     "second_variant": 0,
+     "second_sad": 6156789,
+     "gap": 112035
+    },
+    "1": {
+     "mc_id": 19,
+     "variant": 1,
+     "best_sad": 6034640,
+     "second_mc_id": 19,
+     "second_variant": 0,
+     "second_sad": 6123949,
+     "gap": 89309
+    },
+    "2": {
+     "mc_id": 19,
+     "variant": 1,
+     "best_sad": 6044754,
+     "second_mc_id": 19,
+     "second_variant": 0,
+     "second_sad": 6156789,
+     "gap": 112035
+    }
+   }
+  },
+  "20": {
+   "mc_id": 20,
+   "variant": 0,
+   "best_sad": 291842,
+   "second_mc_id": 45,
+   "second_variant": 0,
+   "second_sad": 293498,
+   "gap": 1656,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 20,
+     "variant": 0,
+     "best_sad": 291842,
+     "second_mc_id": 45,
+     "second_variant": 0,
+     "second_sad": 293498,
+     "gap": 1656
+    },
+    "1": {
+     "mc_id": 20,
+     "variant": 0,
+     "best_sad": 291842,
+     "second_mc_id": 45,
+     "second_variant": 0,
+     "second_sad": 293498,
+     "gap": 1656
+    }
+   }
+  },
+  "21": {
+   "mc_id": 21,
+   "variant": 0,
+   "best_sad": 7787250,
+   "second_mc_id": 0,
+   "second_variant": 3,
+   "second_sad": 13618152,
+   "gap": 5830902,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 21,
+     "variant": 0,
+     "best_sad": 7787250,
+     "second_mc_id": 0,
+     "second_variant": 3,
+     "second_sad": 13618152,
+     "gap": 5830902
+    },
+    "1": {
+     "mc_id": 21,
+     "variant": 0,
+     "best_sad": 7787250,
+     "second_mc_id": 0,
+     "second_variant": 3,
+     "second_sad": 13618152,
+     "gap": 5830902
+    }
+   }
+  },
+  "22": {
+   "mc_id": 22,
+   "variant": 0,
+   "best_sad": 229170,
+   "second_mc_id": 29,
+   "second_variant": 1,
+   "second_sad": 350699,
+   "gap": 121529,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 22,
+     "variant": 0,
+     "best_sad": 229170,
+     "second_mc_id": 29,
+     "second_variant": 1,
+     "second_sad": 350699,
+     "gap": 121529
+    },
+    "1": {
+     "mc_id": 22,
+     "variant": 0,
+     "best_sad": 229170,
+     "second_mc_id": 29,
+     "second_variant": 1,
+     "second_sad": 350699,
+     "gap": 121529
+    }
+   }
+  },
+  "23": {
+   "mc_id": 23,
+   "variant": 1,
+   "best_sad": 6643747,
+   "second_mc_id": 23,
+   "second_variant": 0,
+   "second_sad": 9527785,
+   "gap": 2884038,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 23,
+     "variant": 1,
+     "best_sad": 6643747,
+     "second_mc_id": 23,
+     "second_variant": 0,
+     "second_sad": 9527785,
+     "gap": 2884038
+    },
+    "1": {
+     "mc_id": 23,
+     "variant": 1,
+     "best_sad": 6643747,
+     "second_mc_id": 23,
+     "second_variant": 0,
+     "second_sad": 9527785,
+     "gap": 2884038
+    }
+   }
+  },
+  "44": {
+   "mc_id": 44,
+   "variant": 0,
+   "best_sad": 466691,
+   "second_mc_id": 44,
+   "second_variant": 2,
+   "second_sad": 1257535,
+   "gap": 790844,
+   "best_palette": 0,
+   "by_palette": {
+    "0": {
+     "mc_id": 44,
+     "variant": 0,
+     "best_sad": 466691,
+     "second_mc_id": 44,
+     "second_variant": 2,
+     "second_sad": 1257535,
+     "gap": 790844
+    },
+    "1": {
+     "mc_id": 44,
+     "variant": 0,
+     "best_sad": 466691,
+     "second_mc_id": 44,
+     "second_variant": 2,
+     "second_sad": 1257535,
+     "gap": 790844
+    }
+   }
+  }
+ }
+}

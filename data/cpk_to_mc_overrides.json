@@ -1,0 +1,119 @@
+{
+  "format_version": 1,
+  "comment": "Manual user overrides for cpk -> mc auto-match. Takes precedence over cpk_to_mc.json. Edit via the GUI's Save override button or by hand.",
+  "entries": {
+    "Prologue": {
+      "1": {
+        "by_palette": {
+          "0": {
+            "mc_id": 1,
+            "variant": 0
+          },
+          "1": {
+            "mc_id": 1,
+            "variant": 1
+          }
+        }
+      },
+      "0": {
+        "by_palette": {
+          "0": {
+            "mc_id": 0,
+            "variant": 0
+          },
+          "1": {
+            "mc_id": 0,
+            "variant": 1
+          },
+          "2": {
+            "mc_id": 0,
+            "variant": 2
+          }
+        }
+      },
+      "5": {
+        "by_palette": {
+          "1": {
+            "mc_id": 5,
+            "variant": 1
+          },
+          "0": {
+            "mc_id": 5,
+            "variant": 0
+          }
+        }
+      },
+      "9": {
+        "by_palette": {
+          "0": {
+            "mc_id": 9,
+            "variant": 0
+          },
+          "1": {
+            "mc_id": 9,
+            "variant": 1
+          }
+        }
+      },
+      "12": {
+        "by_palette": {
+          "0": {
+            "mc_id": 12,
+            "variant": 0
+          }
+        }
+      },
+      "16": {
+        "by_palette": {
+          "0": {
+            "mc_id": 16,
+            "variant": 0
+          }
+        }
+      },
+      "18": {
+        "by_palette": {
+          "0": {
+            "mc_id": 18,
+            "variant": 0
+          }
+        }
+      },
+      "15": {
+        "by_palette": {
+          "0": {
+            "mc_id": 15,
+            "variant": 0
+          }
+        }
+      }
+    },
+    "Chapter3": {
+      "8": {
+        "by_palette": {
+          "0": {
+            "mc_id": 8,
+            "variant": 0
+          }
+        }
+      },
+      "24": {
+        "by_palette": {
+          "0": {
+            "mc_id": 24,
+            "variant": 0
+          },
+          "1": {
+            "mc_id": 24,
+            "variant": 1
+          },
+          "2": {
+            "mc_id": 24,
+            "variant": 2
+          }
+        }
+      }
+    },
+    "Chapter5": {}
+  }
+}
