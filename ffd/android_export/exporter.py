@@ -23,7 +23,7 @@ import io
 import traceback
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, Dict, List, Optional, Tuple
+from typing import List
 
 from PIL import Image
 

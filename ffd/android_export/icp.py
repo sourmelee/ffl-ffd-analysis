@@ -29,9 +29,8 @@ from __future__ import annotations
 
 import io
 import struct
-import zlib
 from pathlib import Path
-from typing import Optional, Iterable, Tuple, List
+from typing import Optional, Tuple, List
 
 from PIL import Image
 

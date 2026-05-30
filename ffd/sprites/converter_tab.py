@@ -41,17 +41,15 @@ from ..gui_core.base import TabBase
 from ..animation.parser import parse_field_anm, parse_btl_anm
 from .mobile_to_android import (
     MOBILE_COLS, MOBILE_ROWS, MOBILE_CELL_W, MOBILE_CELL_H,
-    MOBILE_NATIVE_W, MOBILE_NATIVE_H,
-    make_starter_spec, load_mapping_spec, save_mapping_spec,
-    convert_mobile_sheet_to_android,
+    make_starter_spec, load_mapping_spec,
+    save_mapping_spec, convert_mobile_sheet_to_android,
 )
 from .mobile_tile_to_android import (
-    MOBILE_TILE_CELL, ANDROID_TILE_CELL, DEFAULT_OUTPUT_SIZE as TILE_DEFAULT_OUTPUT_SIZE,
-    make_tileset_starter_spec, load_tileset_mapping_spec,
-    save_tileset_mapping_spec, lookup_mc_for_cpk, lookup_cpk_for_mc,
-    convert_mobile_tileset_to_android, apply_variant_palette_swap,
-    load_android_mc_png, list_android_mc_variants, list_android_mc_ids,
-    count_cpk_palettes,
+    MOBILE_TILE_CELL, ANDROID_TILE_CELL, make_tileset_starter_spec,
+    load_tileset_mapping_spec, lookup_mc_for_cpk,
+    lookup_cpk_for_mc, convert_mobile_tileset_to_android, apply_variant_palette_swap,
+    load_android_mc_png, list_android_mc_variants,
+    list_android_mc_ids, count_cpk_palettes,
 )
 
 
@@ -1359,7 +1357,6 @@ class SpriteConverterTab(TabBase):
         per (entry_idx, palette_idx) pair. Each option carries the
         loaded ICImage so we can render it on demand."""
         from .container import parse_sprite_container
-        from ..images.ic import render_ic
         opts = []
         for slot_label, files in (self.data.sp_slots or {}).items():
             if not files:
@@ -2780,7 +2777,6 @@ class SpriteConverterTab(TabBase):
         """Mouse released inside the Mobile pane — same cell as origin,
         treat as a regular click (already done in _on_click_mobile).
         No-op."""
-        pass
 
     def _on_click_android_tileset(self, ev):
         """Either commit the current Mobile selection into cell_map at

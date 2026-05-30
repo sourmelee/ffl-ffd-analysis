@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import struct
 
-from .opcodes import EVENT_SCRIPT_OPCODES, disassemble_script_block
+from .opcodes import disassemble_script_block
 
 
 def map_event_script_region(parsed_map: dict, raw_chunk: bytes):

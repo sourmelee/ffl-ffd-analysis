@@ -66,6 +66,33 @@ commit as the changelog entry.
 
 ### Changed
 
+- **OBB XOR de-obfuscation is now a single bulk pass**
+  (`ffd.containers.obb`): the 0x14 XOR over the ~209 MB OBB
+  payload no longer loops byte-by-byte in Python. New
+  `_xor14_inplace` helper does an in-place NumPy XOR on a
+  `frombuffer` view when NumPy is importable, falling back to
+  `bytes.translate` with a precomputed 256-entry table otherwise —
+  both single C-level passes. Shared by decode
+  (`_decrypted_obb_bytes` / `load_obb_as_dict`), encode
+  (`dict_to_obb` / `folder_to_obb`), and the `is_ffd_obb_path`
+  magic sniff. ~4× faster decode on the dependency-free path,
+  ~40× with NumPy; output is byte-identical (golden SHA-256
+  verified on both paths, plus an encode round-trip).
+- **`render_ic` palette→RGBA conversion vectorised**
+  (`ffd.images.ic`): the per-pixel `PixelAccess` write loop is
+  replaced by a 256-entry RGBA lookup table handed straight to
+  `Image.frombytes`. Uses NumPy when present, with a pure-Python
+  `bytes`-join fallback. Index 0 and out-of-palette indices stay
+  transparent, so every rendered thumbnail / map / sprite is
+  byte-identical to the previous renderer (verified on both
+  paths). ~3× faster in pure Python, 10×+ with NumPy — speeds
+  up effectively every image the toolkit draws. (The now-unused
+  `Image.new` scratch allocation it replaced is also gone.)
+- **Unused-import sweep across `ffd/`**: autoflake removed unused
+  imports from 31 modules (~1,300 fewer lines); the wildcard
+  re-export shims in the package `__init__.py` files were left
+  untouched. Import-only change with no behavioural difference —
+  trims module import time and the pyflakes baseline.
 - **`cpk_to_mc.json` regenerated with the v3 palette-aware matcher**.
   40 of ~125 cpks now have a different `mc_id` vs v2. Backup of the
   pre-regen file saved as `cpk_to_mc_v2_backup.json`. Each record

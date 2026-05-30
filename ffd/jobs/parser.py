@@ -25,7 +25,7 @@ delta-spec work.
 
 from __future__ import annotations
 
-from ..binary import be_u16, be_u32
+from ..binary import be_u32
 from ..boot.sections import _parse_namedesc_section
 
 

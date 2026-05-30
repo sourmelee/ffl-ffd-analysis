@@ -11,7 +11,6 @@ raise as soon as a real Tk widget call is made.
 
 from __future__ import annotations
 
-import sys
 
 
 class _GuiStub:

@@ -46,7 +46,7 @@ parser in ffd/text/parser.py).
 from __future__ import annotations
 
 import struct
-from typing import List, Optional
+from typing import List
 
 
 LANGUAGES = ["ja", "en", "fr", "zh_cn", "zh_tw", "ko"]

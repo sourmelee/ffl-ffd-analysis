@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import struct
 
-from ..binary import be_u32
 
 
 def parse_mobile_map_chunk(chunk: bytes):

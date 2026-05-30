@@ -364,7 +364,6 @@ class AndroidExportTab(TabBase):
         # Imports kept local so the tab module loads cleanly without
         # PIL/Tk during headless test
         import os
-        from PIL import Image
         from ..sprites.container import parse_sprite_container
         from ..images.ic import render_ic
         from ..sprites.mobile_to_android import (

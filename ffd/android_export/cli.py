@@ -16,7 +16,7 @@ import sys
 from pathlib import Path
 
 from .exporter import (
-    AndroidExportOptions, export_chapter_to_android, export_all_chapters,
+    AndroidExportOptions, export_all_chapters,
 )
 from .icp import encode_icp_directory
 

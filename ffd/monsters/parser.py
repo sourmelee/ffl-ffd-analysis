@@ -28,7 +28,7 @@ Attribution: Mobile-side section identification builds on GuyPerfect's
 
 from __future__ import annotations
 
-from ..binary import be_s8, be_u16, be_u32, le_u32, read_pstr_sjis
+from ..binary import be_u16, be_u32, le_u32
 
 
 # Per-record body size on both platforms.

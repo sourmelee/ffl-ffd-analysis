@@ -50,7 +50,6 @@ import argparse
 import io
 import os
 import struct
-import sys
 import zlib
 
 # Files that proper_obb stores with a .msd extension. Bytes are unchanged from
@@ -314,7 +313,7 @@ def is_ffd_obb_path(path) -> bool:
     if len(head) < 12:
         return False
     # Decrypt bytes 4..12 with XOR 0x14 to read the chunk count.
-    decrypted = bytes(b ^ 0x14 for b in head[4:12])
+    decrypted = head[4:12].translate(_XOR14_TABLE)
     num_chunks = struct.unpack("<I", decrypted[4:8])[0]
     # Real FFD OBBs have ~80 chunks. Allow a generous range.
     return 1 <= num_chunks <= 4096
@@ -370,12 +369,35 @@ def _iter_obb_entries(data: bytearray, mode: str):
             yield (filename, file_data, "raw")
 
 
+# Precomputed XOR-0x14 byte map. XOR-with-a-constant is a fixed 1->1 byte
+# substitution, so the whole buffer can be transformed in one C-level
+# bytes.translate() call instead of a per-byte Python loop (~4x faster, and
+# the per-byte loop over the ~200 MB OBB was the dominant decode cost).
+_XOR14_TABLE = bytes(b ^ 0x14 for b in range(256))
+
+
+def _xor14_inplace(data: bytearray, start: int = 4) -> None:
+    """Apply the global XOR 0x14 to ``data[start:]`` in place.
+
+    Uses NumPy when importable (fastest, vectorised in-place XOR), otherwise a
+    dependency-free ``bytes.translate``. Both are byte-identical to the naive
+    ``for i in range(start, len(data)): data[i] ^= 0x14`` loop.
+    """
+    if start >= len(data):
+        return
+    try:
+        import numpy as _np
+        arr = _np.frombuffer(data, dtype=_np.uint8)  # writable view onto the bytearray
+        arr[start:] ^= 0x14
+    except Exception:
+        data[start:] = bytes(data[start:]).translate(_XOR14_TABLE)
+
+
 def _decrypted_obb_bytes(obb_path) -> bytearray:
     """Read an .obb file and apply the global XOR 0x14 from byte 4 onwards."""
     with open(obb_path, "rb") as f:
         data = bytearray(f.read())
-    for i in range(4, len(data)):
-        data[i] ^= 0x14
+    _xor14_inplace(data, 4)
     return data
 
 
@@ -544,8 +566,7 @@ def dict_to_obb(files, out_path, *, junk_bytes=b"FFDL"):
         out[cstart : cstart + len(file_data)] = file_data
 
     # XOR-encrypt from byte 4 onwards (bytes 0..4 stay plaintext)
-    for i in range(4, total_size):
-        out[i] ^= 0x14
+    _xor14_inplace(out, 4)
 
     with open(out_path, "wb") as f:
         f.write(out)

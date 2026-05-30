@@ -21,4 +21,3 @@ class TabBase(ttk.Frame):
 
     def on_data_change(self):
         """Override in subclasses to refresh from updated FFData."""
-        pass

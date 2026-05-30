@@ -24,14 +24,13 @@ extracted contents (Android/proper_obb/, etc.).
 from __future__ import annotations
 
 import argparse
-import os
 import sys
 from pathlib import Path
 
 from ..constants import SP_SLOTS
-from ..containers import parse_sp, load_folder_as_archive, load_zip_container
+from ..containers import load_folder_as_archive
 from ..data.ffdata import FFData
-from .registry import ASSET_KINDS, compare_records, list_asset_kinds, list_sources, ALL_SOURCES_KEY
+from .registry import ASSET_KINDS, compare_records, list_asset_kinds, list_sources
 
 
 def _build_arg_parser(prog="ffd_toolkit.py"):
