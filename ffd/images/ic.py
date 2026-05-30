@@ -251,14 +251,16 @@ def find_ic_offsets(data: bytes):
     pos = 0
     n = len(data)
     while pos < n - 7:
-        if data[pos] == 0x69 and data[pos+1] == 0x63:  # 'i','c'
-            w  = (data[pos+2] << 8) | data[pos+3]
-            h  = (data[pos+4] << 8) | data[pos+5]
-            nc = data[pos+6]
-            if 8 <= w <= 1024 and 8 <= h <= 1024 and 1 <= nc <= 256 \
-               and w % 8 == 0 and h % 8 == 0:
-                out.append(pos)
-                pos += 7 + nc*3
-                continue
-        pos += 1
+        pos = data.find(b"ic", pos)
+        if pos < 0 or pos >= n - 7:
+            break
+        w  = (data[pos+2] << 8) | data[pos+3]
+        h  = (data[pos+4] << 8) | data[pos+5]
+        nc = data[pos+6]
+        if 8 <= w <= 1024 and 8 <= h <= 1024 and 1 <= nc <= 256 \
+           and w % 8 == 0 and h % 8 == 0:
+            out.append(pos)
+            pos += 7 + nc*3
+        else:
+            pos += 1
     return out

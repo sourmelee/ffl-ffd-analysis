@@ -125,7 +125,13 @@ def scan_mobile_mpk_chunks(data: bytes, mpk_index_for_pack=None):
             }
         return
 
-    # Heuristic fallback — walk forwards using parsed chunk sizes
+    # Heuristic fallback — walk forwards using parsed chunk sizes.
+    # A memoryview makes the per-offset slice O(1): the previous
+    # ``data[pos:pos + 0x40000]`` copied up to 256 KB on *every* byte we
+    # stepped over. ``len``/indexing/``struct``/``bytes()`` all behave
+    # identically on a memoryview slice, and parse_mobile_map_chunk already
+    # materialises its output to ``bytes``, so results are unchanged.
+    mv = memoryview(data)
     pos = 0
     n = len(data)
     while pos < n - 36:
@@ -134,7 +140,7 @@ def scan_mobile_mpk_chunks(data: bytes, mpk_index_for_pack=None):
         # size without an index, so we use tile_end as a lower bound and
         # advance there, accepting that any event-script region may bleed
         # into the next chunk.
-        parsed = parse_mobile_map_chunk(data[pos:pos + 0x40000])
+        parsed = parse_mobile_map_chunk(mv[pos:pos + 0x40000])
         if parsed and parsed["w"] >= 4 and parsed["h"] >= 4:
             tile_end = parsed["tile_end"]
             yield {

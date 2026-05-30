@@ -88,6 +88,26 @@ commit as the changelog entry.
   paths). ~3× faster in pure Python, 10×+ with NumPy — speeds
   up effectively every image the toolkit draws. (The now-unused
   `Image.new` scratch allocation it replaced is also gone.)
+- **Magic-byte container scans use `bytes.find`** instead of a
+  byte-by-byte Python loop. gzip-member discovery in `parse_snd` and
+  `parse_resbin` (`ffd.music.parser`, `1f 8b`) and the `ic` image scan
+  in `find_ic_offsets` (`ffd.images.ic`) now let the C runtime locate
+  each magic. Output is byte-identical — verified function-by-function
+  against the prior implementation over every real
+  `snd*.dat`/`res.bin`/`cpk*.dat` — at ~8–10× for the audio scans and
+  100×+ for the `ic` scan on dense cpks.
+- **Sprite-container entry boundaries computed in one O(n) reverse
+  pass** (`ffd.sprites.container`): `parse_sprite_container` and
+  `iter_dat_entries` replaced a per-entry forward rescan for the next
+  populated offset (O(n²)) with a single precomputed `next_off` table.
+  Byte-identical output, verified on 2,775 `.dat` files plus a 200,000-
+  case equivalence fuzz of the boundary logic.
+- **Mobile map heuristic fallback avoids a 256 KB copy per byte**
+  (`ffd.maps.mobile`): with no mpk index available,
+  `scan_mobile_mpk_chunks` walks every offset; it now slices a
+  `memoryview` (O(1)) rather than copying up to 256 KB of
+  `data[pos:pos+0x40000]` on each step. ~6.7× faster across the 24 real
+  Mobile `mpk*.dat` files (673 chunks, byte-identical output).
 - **Unused-import sweep across `ffd/`**: autoflake removed unused
   imports from 31 modules (~1,300 fewer lines); the wildcard
   re-export shims in the package `__init__.py` files were left

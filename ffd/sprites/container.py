@@ -33,17 +33,19 @@ def parse_sprite_container(data: bytes):
         else:
             entry_offs.append(eo)
 
-    # Compute end-of-entry by looking ahead to next non-None offset
-    def _next_after(idx):
-        for j in range(idx + 1, len(entry_offs)):
-            if entry_offs[j] is not None:
-                return entry_offs[j]
-        return len(data)
+    # End-of-entry = next non-None offset; precompute in one reverse pass (O(n)).
+    _eof = len(data)
+    next_off = [_eof] * len(entry_offs)
+    _nxt = _eof
+    for j in range(len(entry_offs) - 1, -1, -1):
+        next_off[j] = _nxt
+        if entry_offs[j] is not None:
+            _nxt = entry_offs[j]
 
     for i, eo in enumerate(entry_offs):
         if eo is None:
             continue
-        e_end = _next_after(i)
+        e_end = next_off[i]
         entry_blob = data[eo:e_end]
         if len(entry_blob) < 4:
             continue
@@ -141,16 +143,19 @@ def iter_dat_entries(data: bytes):
         else:
             entry_offs.append(eo)
 
-    def _next_after(idx):
-        for j in range(idx + 1, len(entry_offs)):
-            if entry_offs[j] is not None:
-                return entry_offs[j]
-        return len(data)
+    # Precompute next non-None offset in one reverse pass (O(n)).
+    _eof = len(data)
+    next_off = [_eof] * len(entry_offs)
+    _nxt = _eof
+    for j in range(len(entry_offs) - 1, -1, -1):
+        next_off[j] = _nxt
+        if entry_offs[j] is not None:
+            _nxt = entry_offs[j]
 
     for i, eo in enumerate(entry_offs):
         if eo is None:
             continue
-        e_end = _next_after(i)
+        e_end = next_off[i]
         yield i, data[eo:e_end]
 
 
