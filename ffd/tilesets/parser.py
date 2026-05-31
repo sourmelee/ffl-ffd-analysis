@@ -191,6 +191,71 @@ def load_mobile_tileset(cpk_data: bytes, chunk_off: int, chunk_sz: int,
     return render_ic(ic, palette=pal)
 
 
+def cpk_native_palette(cpk_data: bytes, chunk_off: int, chunk_sz: int,
+                       pal_idx: int = 0):
+    """Return ``(nc, [(r,g,b), ...])`` for a cpk entry's palette.
+
+    Mirrors :func:`load_mobile_tileset`'s palette-resolution logic but
+    returns the palette colours instead of a rendered image. ``pal_idx``
+    selects a native alternate palette (0 = the ic-embedded default).
+    Returns ``(0, [])`` if the chunk can't be parsed."""
+    chunk = cpk_data[chunk_off:chunk_off + chunk_sz]
+    if len(chunk) < 4:
+        return (0, [])
+    first4 = struct.unpack(">I", chunk[:4])[0]
+    if first4 == 0 or first4 % 4 != 0 or first4 > len(chunk):
+        return (0, [])
+    n_sub = first4 // 4
+    ic_rel = first4
+    if ic_rel + 2 > len(chunk) or chunk[ic_rel:ic_rel + 2] != b"ic":
+        if first4 == 8 and chunk[8:10] == b"ic":
+            ic = parse_ic(chunk, 8)
+            return (ic.nc, list(ic.palette)) if ic is not None else (0, [])
+        return (0, [])
+    ic = parse_ic(chunk, ic_rel)
+    if ic is None:
+        return (0, [])
+    pal = list(ic.palette)
+    nc = ic.nc
+    if 0 < pal_idx < n_sub:
+        pal_rel = struct.unpack(">I", chunk[pal_idx*4:(pal_idx+1)*4])[0]
+        if pal_idx + 1 < n_sub:
+            nxt = struct.unpack(">I", chunk[(pal_idx+1)*4:(pal_idx+2)*4])[0]
+        else:
+            nxt = chunk_sz
+        if 0 < pal_rel < nxt <= chunk_sz and (nxt - pal_rel) >= nc * 3:
+            pal = _decode_palette_rgb(chunk[pal_rel:pal_rel + nc*3], nc)
+    return (nc, list(pal))
+
+
+def render_cpk_with_palette(cpk_data: bytes, chunk_off: int, chunk_sz: int,
+                            palette_rgb) -> Optional["Image.Image"]:
+    """Render a cpk entry's ic image using an explicit RGB palette.
+
+    ``palette_rgb`` is a list of ``(r,g,b)`` tuples; index 0 renders as
+    transparent (matching :func:`render_ic`). Used by the custom-palette
+    editor to author Android variants the Mobile build never shipped a
+    palette for. Returns an RGBA image, or None if the chunk can't be
+    parsed."""
+    chunk = cpk_data[chunk_off:chunk_off + chunk_sz]
+    if len(chunk) < 4:
+        return None
+    first4 = struct.unpack(">I", chunk[:4])[0]
+    if first4 == 0 or first4 % 4 != 0 or first4 > len(chunk):
+        return None
+    ic_rel = first4
+    pal = [tuple(int(x) for x in c[:3]) for c in (palette_rgb or [])]
+    if ic_rel + 2 > len(chunk) or chunk[ic_rel:ic_rel + 2] != b"ic":
+        if first4 == 8 and chunk[8:10] == b"ic":
+            ic = parse_ic(chunk, 8)
+            return render_ic(ic, palette=pal) if ic is not None else None
+        return None
+    ic = parse_ic(chunk, ic_rel)
+    if ic is None:
+        return None
+    return render_ic(ic, palette=pal)
+
+
 class MobileTilesetResolver:
     """
     Loads cpk tilesets on demand by (entry_id, palette_idx).
@@ -228,6 +293,27 @@ class MobileTilesetResolver:
         img = load_mobile_tileset(self.cpk_files[pack], off, sz, pal_idx)
         self.cache[key] = img
         return img
+
+    def get_palette(self, entry_id: int, pal_idx: int = 0):
+        """Return ``(nc, [(r,g,b), ...])`` for a cpk entry's native
+        palette ``pal_idx``. ``(0, [])`` if the entry is unknown."""
+        if entry_id == 255 or entry_id not in self.cpk_index:
+            return (0, [])
+        pack, off, sz = self.cpk_index[entry_id]
+        if pack not in self.cpk_files:
+            return (0, [])
+        return cpk_native_palette(self.cpk_files[pack], off, sz, pal_idx)
+
+    def get_with_palette(self, entry_id: int, palette_rgb):
+        """Render a cpk entry using an explicit RGB palette (the
+        custom-palette path). Not cached -- callers hold the palette."""
+        if entry_id == 255 or entry_id not in self.cpk_index:
+            return None
+        pack, off, sz = self.cpk_index[entry_id]
+        if pack not in self.cpk_files:
+            return None
+        return render_cpk_with_palette(self.cpk_files[pack], off, sz,
+                                       palette_rgb)
 
     def get_all_tilesets(self):
         """Return dict of (entry_id, pal_idx=0) → image for all known entries."""

@@ -17,6 +17,41 @@ commit as the changelog entry.
 
 ## [Unreleased]
 
+### Added
+
+- **Custom Mobile palettes for missing Android variants
+  (`SpriteConverterTab`, Tilesets mode)**: a new **Build custom
+  palette...** button in the tileset action bar opens a modal where the
+  user hand-crafts a Mobile `cpk` palette for Android `mc` variants the
+  Mobile build never shipped a palette for (e.g. Chapter 5 cpk7 has 2
+  Mobile palettes but the matching `mc` has 4 variants; the RGBA-only
+  `mc34_0`/`mc60_0` sheets also break the `swap` path). The editor shows
+  one swatch per palette colour; the user clicks **Pick from Android**
+  then clicks the Android pane to sample that pixel's RGB into the active
+  index (the index stays put until **Next** is pressed), or opens a Tk
+  colour chooser for arbitrary colours, or resets to the native palette.
+  The Mobile pane re-renders live as colours are assigned. Saved palettes
+  persist in `data/custom_palettes.json` keyed per `(chapter, cpk_entry)`
+  and **extend the Mobile-palette dropdown** as extra indices
+  (`n_native`, `n_native+1`, ...). Selecting a custom index renders the
+  cpk through that palette and runs the normal 2x nearest-neighbour
+  upscale + `fill_from_android` flow, so the missing variant is authored
+  from Mobile pixels (stays integer nearest-neighbour per the pixel-art
+  rule; verified 0 non-palette pixels introduced).
+- **New sidecar `data/custom_palettes.json`** with helpers in
+  `ffd.maps.mc_overrides`: `empty_custom_palettes`,
+  `load_custom_palettes`, `save_custom_palettes`, `list_custom_palettes`,
+  `get_custom_palette`, `add_custom_palette`, `delete_custom_palette`
+  (+ `CUSTOM_PALETTES_FILENAME`). New `FFData` accessors:
+  `custom_palettes_path`, `custom_palettes`, `save_custom_palettes`.
+- **`ffd.tilesets.parser`**: `cpk_native_palette(cpk_data, off, sz,
+  pal_idx)` returns `(nc, [(r,g,b), ...])` for a cpk palette;
+  `render_cpk_with_palette(cpk_data, off, sz, palette_rgb)` renders a cpk
+  entry through an explicit RGB palette. New `MobileTilesetResolver`
+  methods `get_palette(eid, pal_idx)` and `get_with_palette(eid,
+  palette_rgb)`.
+
+
 ## [0.2.1] - 2026-05-31
 
 ### Changed

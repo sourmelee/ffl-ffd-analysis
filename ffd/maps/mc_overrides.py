@@ -30,6 +30,7 @@ import os
 MC_OVERRIDES_FILENAME = "mc_overrides.json"
 CPK_TO_MC_FILENAME = "cpk_to_mc.json"
 CPK_TO_MC_OVERRIDES_FILENAME = "cpk_to_mc_overrides.json"
+CUSTOM_PALETTES_FILENAME = "custom_palettes.json"
 
 
 def empty_mc_overrides() -> dict:
@@ -290,3 +291,129 @@ def lookup_cpk_to_mc_override(overrides: dict, chapter: str,
                     int(rec.get("variant", 0)),
                     "override_chapter")
     return (None, None, None)
+
+
+# ---------------------------------------------------------------------------
+# custom_palettes.json — hand-built Mobile palettes for Android variants the
+# Mobile build never shipped a palette for.
+#
+# Model: per-(chapter, cpk_entry) EXTRA palette indices. Each cpk entry can
+# carry a list of custom palettes; a custom palette at list position ``i`` is
+# selectable in the GUI as Mobile-palette index ``n_native + i`` (i.e. it
+# extends the native palette dropdown). A custom palette is a flat list of
+# ``[r, g, b]`` triplets of length ``nc`` (index 0 renders transparent, like
+# every ic palette). See [[ffd-mobile-to-android-tileset-converter]].
+# ---------------------------------------------------------------------------
+
+def empty_custom_palettes() -> dict:
+    """Return a fresh empty custom-palettes structure."""
+    return {
+        "format_version": 1,
+        "comment": ("Hand-built Mobile cpk palettes for Android mc variants "
+                    "the Mobile build never shipped. Each cpk entry's "
+                    "'palettes' list extends its native palette dropdown: "
+                    "custom palette i is selectable as index n_native + i. "
+                    "Edit via the GUI's 'Build custom palette...' dialog."),
+        "entries": {},
+    }
+
+
+def load_custom_palettes(path) -> dict:
+    """Load custom_palettes.json from ``path``. Returns an empty structure
+    if the file does not exist or fails to parse."""
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = _json.load(f)
+        if not isinstance(data, dict):
+            return empty_custom_palettes()
+        data.setdefault("format_version", 1)
+        data.setdefault("entries", {})
+        return data
+    except FileNotFoundError:
+        return empty_custom_palettes()
+    except Exception:
+        return empty_custom_palettes()
+
+
+def save_custom_palettes(path, data: dict) -> bool:
+    """Atomically save custom_palettes.json. Returns True on success."""
+    try:
+        tmp = str(path) + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            _json.dump(data, f, indent=2, ensure_ascii=False)
+        os.replace(tmp, str(path))
+        return True
+    except Exception:
+        return False
+
+
+def list_custom_palettes(data: dict, chapter, cpk_entry) -> list:
+    """Return the list of custom-palette records for (chapter, cpk_entry).
+
+    Tries the chapter label literally AND the dense (space-stripped) form
+    so 'Chapter 5' finds 'Chapter5'. Each record is
+    ``{"nc": int, "colors": [[r,g,b], ...], "note": str}``. Returns an
+    empty list when none are stored."""
+    if not isinstance(data, dict) or chapter is None:
+        return []
+    entries = data.get("entries") or {}
+    eid_str = str(cpk_entry)
+    for k in (chapter, str(chapter).replace(" ", "")):
+        chap = entries.get(k)
+        if not chap:
+            continue
+        rec = chap.get(eid_str)
+        if rec and isinstance(rec.get("palettes"), list):
+            return rec["palettes"]
+    return []
+
+
+def get_custom_palette(data: dict, chapter, cpk_entry, index):
+    """Return the ``colors`` list (of ``[r,g,b]``) for custom palette
+    ``index`` of (chapter, cpk_entry), or None if absent."""
+    pals = list_custom_palettes(data, chapter, cpk_entry)
+    if 0 <= index < len(pals):
+        cols = pals[index].get("colors") or []
+        return [tuple(int(x) for x in c[:3]) for c in cols]
+    return None
+
+
+def add_custom_palette(data: dict, chapter, cpk_entry, colors,
+                       nc=None, note="", index=None) -> int:
+    """Append (or overwrite at ``index``) a custom palette for
+    (chapter, cpk_entry). Chapter is normalised to dense form on store.
+    Returns the list position the palette ended up at."""
+    entries = data.setdefault("entries", {})
+    chap = entries.setdefault(str(chapter).replace(" ", ""), {})
+    rec = chap.setdefault(str(cpk_entry), {})
+    pals = rec.setdefault("palettes", [])
+    entry = {
+        "nc": int(nc) if nc else len(colors),
+        "colors": [[int(c[0]), int(c[1]), int(c[2])] for c in colors],
+        "note": note or "",
+    }
+    if index is None or not (0 <= index < len(pals)):
+        pals.append(entry)
+        return len(pals) - 1
+    pals[index] = entry
+    return index
+
+
+def delete_custom_palette(data: dict, chapter, cpk_entry, index) -> bool:
+    """Remove custom palette ``index`` for (chapter, cpk_entry). Returns
+    True if something was removed."""
+    if not isinstance(data, dict):
+        return False
+    entries = data.get("entries") or {}
+    eid_str = str(cpk_entry)
+    for k in (chapter, str(chapter).replace(" ", "")):
+        chap = entries.get(k)
+        if not chap:
+            continue
+        rec = chap.get(eid_str)
+        if rec and isinstance(rec.get("palettes"), list):
+            pals = rec["palettes"]
+            if 0 <= index < len(pals):
+                pals.pop(index)
+                return True
+    return False

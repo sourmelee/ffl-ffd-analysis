@@ -2979,6 +2979,10 @@ class SpriteConverterTab(TabBase):
                    command=self._save_tileset_override
                    ).pack(side="left", padx=4)
 
+        ttk.Button(self._tileset_bar, text="Build custom palette...",
+                   command=self._open_custom_palette_dialog
+                   ).pack(side="left", padx=4)
+
         ttk.Label(self._tileset_bar,
                   text=("Click Mobile, then Android to remap. "
                         "Right-click Android cell for source override. "
@@ -3092,3 +3096,523 @@ class SpriteConverterTab(TabBase):
         self._status.config(
             text=f"Saved override: {chapter} cpk{cpk_entry} ({scope}) "
                  f"-> mc{mc_id}_{variant}")
+
+    # ==================================================================
+    # Tileset mode v4 — custom Mobile palettes for missing variants
+    # ==================================================================
+    #
+    # Some Android mc tilesets ship more colour variants than the Mobile
+    # cpk has palettes (e.g. Chapter 5 cpk7 has 2 Mobile palettes but the
+    # matching mc has 4 variants). Neither 'verbatim' (copies Android) nor
+    # 'swap' (needs a paletted Android variant pair) lets you author the
+    # missing variants from Mobile pixels. The RGBA-only sheets (mc34_0,
+    # mc60_0) break 'swap' entirely.
+    #
+    # Fix (per [[feedback-workflow]] manual annotation > heuristics): the
+    # user hand-builds a Mobile palette by sampling colours directly off
+    # the Android pane. Custom palettes are stored per-(chapter, cpk_entry)
+    # in custom_palettes.json and EXTEND the Mobile palette dropdown:
+    # custom palette i is selectable as index n_native + i. When a custom
+    # palette is selected, the converter renders the cpk through it, then
+    # runs the normal 2x NN upscale + fill_from_android flow.
+    # ==================================================================
+
+    @staticmethod
+    def _rgb_to_hex(rgb):
+        r, g, b = (int(rgb[0]) & 255, int(rgb[1]) & 255, int(rgb[2]) & 255)
+        return f"#{r:02x}{g:02x}{b:02x}"
+
+    def _cur_mobile_palette_idx(self):
+        """Current Mobile-palette dropdown index as an int (0 on error)."""
+        try:
+            return int(self._tileset_mobile_palette_var.get())
+        except Exception:
+            return 0
+
+    def _cpk_native_palette_count(self, sp_slot, cpk_entry):
+        """How many NATIVE palettes the cpk entry exposes (>= 1)."""
+        sp_files = (self.data.sp_slots or {}).get(sp_slot)
+        try:
+            return max(1, count_cpk_palettes(sp_files, cpk_entry))
+        except Exception:
+            return 1
+
+    def _custom_palettes_for(self, sp_slot, cpk_entry):
+        """List of stored custom-palette records for (chapter, cpk_entry)."""
+        try:
+            from ..maps.mc_overrides import list_custom_palettes
+            return list_custom_palettes(self.data.custom_palettes(),
+                                        sp_slot, cpk_entry)
+        except Exception:
+            return []
+
+    def _get_custom_palette_rgb(self, sp_slot, cpk_entry, custom_idx):
+        """Return custom palette ``custom_idx`` as a list of (r,g,b), or
+        None if absent."""
+        try:
+            from ..maps.mc_overrides import get_custom_palette
+            return get_custom_palette(self.data.custom_palettes(),
+                                      sp_slot, cpk_entry, custom_idx)
+        except Exception:
+            return None
+
+    def _palette_combo_values(self, sp_slot, cpk_entry):
+        """Return ``(n_native, ["0", "1", ...])`` covering native palettes
+        plus any stored custom palettes (which extend the dropdown)."""
+        n_native = self._cpk_native_palette_count(sp_slot, cpk_entry)
+        n_custom = len(self._custom_palettes_for(sp_slot, cpk_entry))
+        return n_native, [str(i) for i in range(n_native + n_custom)]
+
+    def _selected_palette_is_custom(self):
+        """True when the current Mobile-palette index points at a custom
+        (hand-built) palette rather than a native cpk palette."""
+        opt = self._get_current_mobile_pick()
+        if not opt:
+            return False
+        n_native = self._cpk_native_palette_count(opt.get("sp_slot"),
+                                                  opt.get("cpk_entry"))
+        return self._cur_mobile_palette_idx() >= n_native
+
+    # ---- custom-aware overrides (last def wins) -----------------------
+
+    def _load_mobile_tileset_img(self, sp_slot, cpk_entry, pal_idx):
+        """Override: render the Mobile cpk at ``pal_idx``. Indices >=
+        n_native resolve to a stored custom palette (rendered via
+        ``MobileTilesetResolver.get_with_palette``); native indices use
+        the normal resolver path."""
+        from ..tilesets.parser import MobileTilesetResolver
+        sp_files = (self.data.sp_slots or {}).get(sp_slot)
+        if not sp_files:
+            return None
+        resolver = MobileTilesetResolver(sp_files)
+        n_native = self._cpk_native_palette_count(sp_slot, cpk_entry)
+        if pal_idx is not None and pal_idx >= n_native:
+            custom = self._get_custom_palette_rgb(
+                sp_slot, cpk_entry, pal_idx - n_native)
+            if custom:
+                img = resolver.get_with_palette(cpk_entry, custom)
+                if img is not None:
+                    return img.convert("RGBA")
+            pal_idx = 0   # custom missing -> fall back to native 0
+        img = resolver.get(cpk_entry, pal_idx)
+        return img.convert("RGBA") if img is not None else None
+
+    def _on_mobile_pick_selected_tileset(self):
+        """Override: populate the Mobile palette dropdown with native AND
+        custom indices, then render the picked cpk at the chosen palette."""
+        sel = self._mobile_pick_var.get()
+        opts = getattr(self, "_mobile_pick_options", [])
+        for opt in opts:
+            if opt["label"] != sel:
+                continue
+            sp_slot = opt.get("sp_slot")
+            cpk_entry = opt.get("cpk_entry")
+            n_native, values = self._palette_combo_values(sp_slot, cpk_entry)
+            opt["n_palettes"] = n_native
+            self._tileset_n_native_palettes = n_native
+            combo = getattr(self, "_tileset_mobile_palette_combo", None)
+            try:
+                cur_pal = int(self._tileset_mobile_palette_var.get())
+            except Exception:
+                cur_pal = 0
+            new_pal = cur_pal if cur_pal < len(values) else 0
+            if combo is not None:
+                combo.config(values=values)
+            self._suppress_variant_cb = True
+            try:
+                self._tileset_mobile_palette_var.set(str(new_pal))
+            finally:
+                self._suppress_variant_cb = False
+            try:
+                self._mobile_img = self._load_mobile_tileset_img(
+                    sp_slot, cpk_entry, new_pal)
+            except Exception as e:
+                messagebox.showerror("Error",
+                    f"Failed to render Mobile cpk: {e}")
+                return
+            self._mobile_label.config(text=opt["label"][:32])
+            self._mobile_path = None
+            if self._spec is not None:
+                ms = self._spec.setdefault("mobile_source", {})
+                ms["chapter"] = sp_slot
+                ms["cpk_entry"] = cpk_entry
+                ms["palette"] = new_pal
+            self._sel_mobile_tileset_cell = None
+            self._refresh_all()
+            n_custom = len(values) - n_native
+            extra = f" + {n_custom} custom" if n_custom else ""
+            self._status.config(
+                text=f"Loaded Mobile cpk: {opt['label']} "
+                     f"(palettes: {n_native} native{extra})")
+            if not getattr(self, "_suppress_auto_match", False):
+                self._auto_match_android_tileset(sp_slot, cpk_entry)
+            return
+
+    def _render_tileset_preview(self):
+        """Override: when a custom Mobile palette is selected, always
+        render from Mobile pixels through that palette (skip the
+        verbatim/swap variant short-circuits) so the user can author the
+        missing variant. Otherwise identical to the v3 behaviour."""
+        if self._mobile_img is None:
+            return None
+        spec = self._spec or make_tileset_starter_spec(
+            "preview", cpk_entry=0, mc_id=0, variant=0)
+        at = spec.setdefault("android_target", {})
+        at["variant"] = int(self._tileset_variant_idx or 0)
+        at["fill_from_android"] = bool(self._t_fill_from_android.get())
+        at["palette_strategy"] = self._t_palette_strategy.get()
+        if self._android_img is not None:
+            at["output_size"] = list(self._android_img.size)
+        variant = int(self._tileset_variant_idx or 0)
+        strategy = self._t_palette_strategy.get()
+        is_custom = self._selected_palette_is_custom()
+        if not is_custom and variant > 0 and strategy == "verbatim":
+            return (self._android_img.convert("RGBA")
+                    if self._android_img else None)
+        base_out = convert_mobile_tileset_to_android(
+            self._mobile_img, spec, self._tileset_android_orig_img)
+        if not is_custom and variant > 0 and strategy == "swap":
+            obb = self.data.obb_files or {}
+            base_pal_img = load_android_mc_png(obb, self._tileset_mc_id, 0,
+                                               preserve_palette=True)
+            target_pal_img = load_android_mc_png(
+                obb, self._tileset_mc_id, variant, preserve_palette=True)
+            if base_pal_img is not None and target_pal_img is not None:
+                return apply_variant_palette_swap(
+                    base_out, base_pal_img, target_pal_img)
+        return base_out
+
+    def _sample_android_pixel(self, ev):
+        """Return the (r,g,b) of the Android pane pixel under the event,
+        or None if outside the image."""
+        if self._android_img is None:
+            return None
+        zoom = max(1, int(self._zoom_android.get() or 1))
+        cx = self._android_canvas.canvasx(ev.x)
+        cy = self._android_canvas.canvasy(ev.y)
+        px = int(cx // zoom)
+        py = int(cy // zoom)
+        img = self._android_img.convert("RGB")
+        w, h = img.size
+        if not (0 <= px < w and 0 <= py < h):
+            return None
+        return img.getpixel((px, py))
+
+    def _on_click_android_tileset(self, ev):
+        """Override: when the custom-palette picker is armed, sample the
+        clicked Android pixel into the active palette index instead of
+        doing a cell remap."""
+        if getattr(self, "_custom_palette_pick_armed", False):
+            rgb = self._sample_android_pixel(ev)
+            if rgb is not None:
+                self._cp_assign_active(rgb)
+            else:
+                self._status.config(text="Clicked outside the Android sheet")
+            return
+        cell = self._cell_from_event_android(ev)
+        if cell is None:
+            return
+        sel = getattr(self, "_sel_mobile_tileset_cell", None)
+        if sel is None:
+            self._status.config(
+                text=f"Android cell: {cell[0]},{cell[1]} "
+                     f"(no Mobile selection — click Mobile first to remap)")
+            return
+        self._commit_cell_remap(sel, cell)
+
+    # ---- custom-palette editor dialog --------------------------------
+
+    def _open_custom_palette_dialog(self):
+        """Open the modal that lets the user hand-build a Mobile palette
+        by sampling colours off the Android pane."""
+        opt = self._get_current_mobile_pick()
+        if opt is None:
+            messagebox.showinfo("No Mobile cpk",
+                "Pick a Mobile cpk entry first.")
+            return
+        sp_slot = opt.get("sp_slot")
+        cpk_entry = opt.get("cpk_entry")
+        sp_files = (self.data.sp_slots or {}).get(sp_slot)
+        if not sp_files:
+            messagebox.showerror("No data",
+                "That chapter's scratchpad is not loaded.")
+            return
+        from ..tilesets.parser import MobileTilesetResolver
+        resolver = MobileTilesetResolver(sp_files)
+        n_native = self._cpk_native_palette_count(sp_slot, cpk_entry)
+        cur_idx = self._cur_mobile_palette_idx()
+        editing_index = None
+        if cur_idx >= n_native:
+            editing_index = cur_idx - n_native
+            seed = self._get_custom_palette_rgb(sp_slot, cpk_entry,
+                                                editing_index)
+            nc, native0 = resolver.get_palette(cpk_entry, 0)
+            if not seed:
+                seed = native0
+        else:
+            nc, seed = resolver.get_palette(cpk_entry, cur_idx)
+        if not nc or not seed:
+            messagebox.showerror("No palette",
+                "Could not read the cpk palette to seed the editor.")
+            return
+        seed = [tuple(int(x) for x in c[:3]) for c in seed][:nc]
+        while len(seed) < nc:
+            seed.append((0, 0, 0))
+        self._custom_palette_working = list(seed)
+        self._custom_palette_active_idx = 1 if nc > 1 else 0
+        self._custom_palette_pick_armed = False
+        self._custom_palette_editing_index = editing_index
+        self._custom_palette_ctx = (sp_slot, cpk_entry, nc, n_native)
+
+        dlg = tk.Toplevel(self)
+        self._custom_palette_dialog = dlg
+        tgt = (f"mc{self._tileset_mc_id}_{self._tileset_variant_idx}"
+               if self._tileset_mc_id is not None else "(no Android target)")
+        verb = "Edit" if editing_index is not None else "Build"
+        dlg.title(f"{verb} custom Mobile palette — {sp_slot} cpk{cpk_entry}")
+        dlg.transient(self.winfo_toplevel())
+        dlg.protocol("WM_DELETE_WINDOW", self._cp_cancel)
+
+        ttk.Label(dlg,
+                  text=(f"Chapter {sp_slot}  cpk{cpk_entry}   "
+                        f"nc={nc} colours   target {tgt}"),
+                  font=("TkDefaultFont", 9, "bold")
+                  ).pack(side="top", anchor="w", padx=8, pady=(8, 2))
+        ttk.Label(dlg, foreground="#666",
+                  text=("Click a swatch to make it active. 'Pick from "
+                        "Android' then click the Android pane to sample a "
+                        "colour into the active index. Index 0 is always "
+                        "transparent.")
+                  ).pack(side="top", anchor="w", padx=8, pady=(0, 6))
+
+        grid = ttk.Frame(dlg)
+        grid.pack(side="top", padx=8, pady=4)
+        self._cp_swatch_btns = []
+        cols = 16
+        for i in range(nc):
+            b = tk.Button(grid, text=str(i), width=3, height=1,
+                          relief="solid", bd=1,
+                          command=lambda k=i: self._cp_set_active(k))
+            b.grid(row=i // cols, column=i % cols, padx=1, pady=1)
+            self._cp_swatch_btns.append(b)
+
+        self._cp_active_label = ttk.Label(dlg, text="")
+        self._cp_active_label.pack(side="top", anchor="w", padx=8, pady=(4, 2))
+
+        ctrls = ttk.Frame(dlg)
+        ctrls.pack(side="top", fill="x", padx=8, pady=4)
+        self._cp_arm_btn = ttk.Button(ctrls, text="Pick from Android",
+                                      command=self._cp_toggle_pick)
+        self._cp_arm_btn.pack(side="left", padx=2)
+        ttk.Button(ctrls, text="Next ▶",
+                   command=self._cp_next).pack(side="left", padx=2)
+        ttk.Button(ctrls, text="Choose colour…",
+                   command=self._cp_choose_color).pack(side="left", padx=2)
+        ttk.Button(ctrls, text="Reset to native",
+                   command=self._cp_reset_native).pack(side="left", padx=8)
+
+        btns = ttk.Frame(dlg)
+        btns.pack(side="bottom", fill="x", padx=8, pady=8)
+        ttk.Button(btns, text="Save", command=self._cp_save).pack(
+            side="right", padx=2)
+        ttk.Button(btns, text="Cancel", command=self._cp_cancel).pack(
+            side="right", padx=2)
+
+        self._cp_live_render()
+        self._cp_refresh_swatches()
+
+    def _cp_set_active(self, idx):
+        self._custom_palette_active_idx = idx
+        self._cp_refresh_swatches()
+
+    def _cp_next(self):
+        work = getattr(self, "_custom_palette_working", None) or []
+        if not work:
+            return
+        self._custom_palette_active_idx = (
+            (self._custom_palette_active_idx + 1) % len(work))
+        self._cp_refresh_swatches()
+
+    def _cp_toggle_pick(self):
+        armed = not getattr(self, "_custom_palette_pick_armed", False)
+        self._custom_palette_pick_armed = armed
+        if getattr(self, "_cp_arm_btn", None) is not None:
+            self._cp_arm_btn.config(
+                text=("Picking… (click Android)" if armed
+                      else "Pick from Android"))
+        idx = self._custom_palette_active_idx
+        self._status.config(
+            text=(f"Armed: click the Android pane to set palette index "
+                  f"{idx}" if armed else "Pick-from-Android disarmed"))
+
+    def _cp_choose_color(self):
+        try:
+            from tkinter import colorchooser
+        except Exception:
+            return
+        idx = self._custom_palette_active_idx
+        work = getattr(self, "_custom_palette_working", None) or []
+        if not (0 <= idx < len(work)):
+            return
+        initial = self._rgb_to_hex(work[idx])
+        res = colorchooser.askcolor(color=initial,
+                                    title=f"Colour for palette index {idx}")
+        if res and res[0] is not None:
+            self._cp_assign_active(tuple(int(v) for v in res[0]))
+
+    def _cp_reset_native(self):
+        ctx = getattr(self, "_custom_palette_ctx", None)
+        if not ctx:
+            return
+        sp_slot, cpk_entry, nc, n_native = ctx
+        from ..tilesets.parser import MobileTilesetResolver
+        sp_files = (self.data.sp_slots or {}).get(sp_slot)
+        if not sp_files:
+            return
+        resolver = MobileTilesetResolver(sp_files)
+        _nc, native0 = resolver.get_palette(cpk_entry, 0)
+        seed = [tuple(int(x) for x in c[:3]) for c in native0][:nc]
+        while len(seed) < nc:
+            seed.append((0, 0, 0))
+        self._custom_palette_working = list(seed)
+        self._cp_live_render()
+        self._cp_refresh_swatches()
+        self._status.config(text="Reset working palette to native palette 0")
+
+    def _cp_assign_active(self, rgb):
+        work = getattr(self, "_custom_palette_working", None)
+        if work is None:
+            return
+        idx = self._custom_palette_active_idx
+        if not (0 <= idx < len(work)):
+            return
+        work[idx] = (int(rgb[0]) & 255, int(rgb[1]) & 255, int(rgb[2]) & 255)
+        self._cp_live_render()
+        self._cp_refresh_swatches()
+        armed = getattr(self, "_custom_palette_pick_armed", False)
+        self._status.config(
+            text=(f"Set palette index {idx} = RGB{work[idx]}"
+                  + ("  (still armed — pick next or click Next)"
+                     if armed else "")))
+
+    def _cp_live_render(self):
+        """Re-render the Mobile pane using the in-progress working
+        palette so the user sees the effect immediately."""
+        ctx = getattr(self, "_custom_palette_ctx", None)
+        if not ctx:
+            return
+        sp_slot, cpk_entry, nc, n_native = ctx
+        from ..tilesets.parser import MobileTilesetResolver
+        sp_files = (self.data.sp_slots or {}).get(sp_slot)
+        if not sp_files:
+            return
+        resolver = MobileTilesetResolver(sp_files)
+        img = resolver.get_with_palette(cpk_entry,
+                                        self._custom_palette_working)
+        if img is not None:
+            self._mobile_img = img.convert("RGBA")
+            self._refresh_all()
+
+    def _cp_refresh_swatches(self):
+        btns = getattr(self, "_cp_swatch_btns", None)
+        work = getattr(self, "_custom_palette_working", None)
+        if not btns or work is None:
+            return
+        active = self._custom_palette_active_idx
+        for i, b in enumerate(btns):
+            if i >= len(work):
+                continue
+            hexc = self._rgb_to_hex(work[i])
+            # contrasting label colour
+            r, g, b_ = work[i]
+            fg = "#000000" if (r*299 + g*587 + b_*114) / 1000 > 128 else "#ffffff"
+            cfg = dict(bg=hexc, fg=fg, activebackground=hexc)
+            if i == 0:
+                cfg["text"] = "T"   # transparent sentinel
+            if i == active:
+                cfg["relief"] = "solid"
+                cfg["bd"] = 3
+            else:
+                cfg["relief"] = "solid"
+                cfg["bd"] = 1
+            try:
+                b.config(**cfg)
+            except Exception:
+                pass
+        if getattr(self, "_cp_active_label", None) is not None:
+            self._cp_active_label.config(
+                text=f"Active index: {active}   "
+                     f"RGB{tuple(work[active]) if active < len(work) else ()}")
+
+    def _cp_save(self):
+        ctx = getattr(self, "_custom_palette_ctx", None)
+        if not ctx:
+            return
+        sp_slot, cpk_entry, nc, n_native = ctx
+        try:
+            from ..maps.mc_overrides import add_custom_palette
+            data = self.data.custom_palettes()
+            note = ""
+            if self._tileset_mc_id is not None:
+                note = (f"hand-built for mc{self._tileset_mc_id}_"
+                        f"{self._tileset_variant_idx}")
+            idx = add_custom_palette(
+                data, sp_slot, cpk_entry, self._custom_palette_working,
+                nc=nc, note=note,
+                index=getattr(self, "_custom_palette_editing_index", None))
+            ok = self.data.save_custom_palettes()
+        except Exception as e:
+            messagebox.showerror("Save failed", str(e))
+            return
+        if not ok:
+            messagebox.showerror("Save failed",
+                "Could not write custom_palettes.json")
+            return
+        n_native2, values = self._palette_combo_values(sp_slot, cpk_entry)
+        combo = getattr(self, "_tileset_mobile_palette_combo", None)
+        if combo is not None:
+            combo.config(values=values)
+        new_combo_idx = n_native2 + idx
+        self._suppress_variant_cb = True
+        try:
+            self._tileset_mobile_palette_var.set(str(new_combo_idx))
+        finally:
+            self._suppress_variant_cb = False
+        self._custom_palette_pick_armed = False
+        try:
+            self._mobile_img = self._load_mobile_tileset_img(
+                sp_slot, cpk_entry, new_combo_idx)
+        except Exception:
+            pass
+        if getattr(self, "_custom_palette_dialog", None) is not None:
+            try:
+                self._custom_palette_dialog.destroy()
+            except Exception:
+                pass
+            self._custom_palette_dialog = None
+        if self._spec is not None:
+            ms = self._spec.setdefault("mobile_source", {})
+            ms["palette"] = new_combo_idx
+        self._refresh_all()
+        self._status.config(
+            text=(f"Saved custom palette {idx} for {sp_slot} cpk{cpk_entry} "
+                  f"-> selectable as Mobile palette {new_combo_idx}"))
+
+    def _cp_cancel(self):
+        self._custom_palette_pick_armed = False
+        opt = self._get_current_mobile_pick()
+        if opt is not None:
+            try:
+                self._mobile_img = self._load_mobile_tileset_img(
+                    opt.get("sp_slot"), opt.get("cpk_entry"),
+                    self._cur_mobile_palette_idx())
+            except Exception:
+                pass
+        if getattr(self, "_custom_palette_dialog", None) is not None:
+            try:
+                self._custom_palette_dialog.destroy()
+            except Exception:
+                pass
+            self._custom_palette_dialog = None
+        self._refresh_all()
+        self._status.config(text="Custom palette editing cancelled")

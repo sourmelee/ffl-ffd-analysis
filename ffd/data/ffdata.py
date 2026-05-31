@@ -24,6 +24,9 @@ from ..maps.mc_overrides import (
     invert_cpk_to_mc,
     load_cpk_to_mc_overrides,
     save_cpk_to_mc_overrides,
+    CUSTOM_PALETTES_FILENAME,
+    load_custom_palettes,
+    save_custom_palettes,
 )
 
 
@@ -295,3 +298,30 @@ class FFData:
         if ok and hasattr(self, "_cpk_to_mc_inv_cache"):
             self._cpk_to_mc_inv_cache = None
         return ok
+
+    # ---- custom_palettes (hand-built Mobile palettes) ---------------------
+    def custom_palettes_path(self):
+        """Where custom_palettes.json lives — fixed at
+        ``Python/data/custom_palettes.json`` so hand-built palettes ship
+        with the toolkit (and get checked into git)."""
+        d = self._data_dir()
+        d.mkdir(parents=True, exist_ok=True)
+        return d / CUSTOM_PALETTES_FILENAME
+
+    def custom_palettes(self, reload: bool = False):
+        """Lazy-loaded custom-palettes dict. Returns the cached copy unless
+        ``reload=True`` forces a re-read from disk."""
+        path = self.custom_palettes_path()
+        cache = getattr(self, "_custom_palettes_cache", None)
+        cache_path = getattr(self, "_custom_palettes_path_cache", None)
+        if reload or cache is None or str(path) != cache_path:
+            self._custom_palettes_cache = load_custom_palettes(path)
+            self._custom_palettes_path_cache = str(path)
+        return self._custom_palettes_cache
+
+    def save_custom_palettes(self) -> bool:
+        """Persist the cached custom palettes to disk. True on success."""
+        cache = getattr(self, "_custom_palettes_cache", None)
+        if cache is None:
+            return False
+        return save_custom_palettes(self.custom_palettes_path(), cache)

@@ -112,6 +112,26 @@
             "variant": 2
           }
         }
+      },
+      "0": {
+        "by_palette": {
+          "3": {
+            "mc_id": 0,
+            "variant": 3
+          },
+          "2": {
+            "mc_id": 0,
+            "variant": 2
+          },
+          "1": {
+            "mc_id": 0,
+            "variant": 1
+          },
+          "0": {
+            "mc_id": 0,
+            "variant": 0
+          }
+        }
       }
     },
     "Chapter5": {}
