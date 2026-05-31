@@ -739,6 +739,18 @@ class MapTab(TabBase):
                     if sad < any_variant_match[mc][3]:
                         any_variant_match[mc] = (chap, cpk_id, var, sad)
 
+        # Build-aware production: pull any saved (cpk, variant) build and
+        # render via the converter so palette / cell_map / force-Android
+        # edits show up here too. normalize=True forces a uniform 512px
+        # (32px tile) sheet so the Android map renderer never mixes tile
+        # sizes across slots.
+        from ..sprites.mobile_tile_to_android import produce_build_tile
+        try:
+            builds_data = self.data.custom_palettes()
+        except Exception:
+            builds_data = {}
+        obb = self.data.obb_files or {}
+
         img_cache = {}
         missing_log = set()
 
@@ -751,7 +763,8 @@ class MapTab(TabBase):
             for (chap, cpk_id, _sad) in inv.get(key, []):
                 res = find_resolver(chap)
                 if res is None: continue
-                img = res.get(cpk_id, 0)
+                img = produce_build_tile(res, cpk_id, mc_id, variant,
+                                         builds_data, obb=obb, normalize=True)
                 if img is not None:
                     img_cache[key] = img
                     return img
@@ -760,7 +773,8 @@ class MapTab(TabBase):
             for (chap, cpk_id, _sad) in inv.get((mc_id, 0), []):
                 res = find_resolver(chap)
                 if res is None: continue
-                img = res.get(cpk_id, 0)
+                img = produce_build_tile(res, cpk_id, mc_id, variant,
+                                         builds_data, obb=obb, normalize=True)
                 if img is not None:
                     img_cache[key] = img
                     return img
@@ -774,7 +788,9 @@ class MapTab(TabBase):
                 chap, cpk_id, found_var, _sad = any_variant_match[mc_id]
                 res = find_resolver(chap)
                 if res is not None:
-                    img = res.get(cpk_id, 0)
+                    img = produce_build_tile(res, cpk_id, mc_id, variant,
+                                             builds_data, obb=obb,
+                                             normalize=True)
                     if img is not None:
                         img_cache[key] = img
                         if key not in missing_log:
@@ -795,10 +811,8 @@ class MapTab(TabBase):
             # preferred behaviour — full maps render, even if a few tile
             # positions land in transparent regions of the chosen sheet.
             for slot, res in resolvers.items():
-                img = res.get(mc_id, variant)
-                if img is None and variant != 0:
-                    # cpk may not carry this exact palette — try palette 0
-                    img = res.get(mc_id, 0)
+                img = produce_build_tile(res, mc_id, mc_id, variant,
+                                         builds_data, obb=obb, normalize=True)
                 if img is not None:
                     img_cache[key] = img
                     if key not in missing_log:

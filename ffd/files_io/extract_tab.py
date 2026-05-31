@@ -929,6 +929,15 @@ class ExtractTab(TabBase):
             slot = stem_to_slot.get(stem.lower())
             return resolvers.get(slot) if slot else None
 
+        # Build-aware production (palette / cell_map / force-Android edits)
+        # + normalize to 512px so map tiles are uniform 32px.
+        from ..sprites.mobile_tile_to_android import produce_build_tile
+        try:
+            builds_data = self.data.custom_palettes()
+        except Exception:
+            builds_data = {}
+        obb = self.data.obb_files or {}
+
         img_cache = {}
 
         def get(mc_id, variant=0):
@@ -939,14 +948,16 @@ class ExtractTab(TabBase):
             for (chap, cpk_id, _sad) in inv.get(key, []):
                 res = find_resolver(chap)
                 if res is None: continue
-                img = res.get(cpk_id, 0)
+                img = produce_build_tile(res, cpk_id, mc_id, variant,
+                                         builds_data, obb=obb, normalize=True)
                 if img is not None:
                     img_cache[key] = img; return img
             # Tier 2: (mc_id, 0)
             for (chap, cpk_id, _sad) in inv.get((mc_id, 0), []):
                 res = find_resolver(chap)
                 if res is None: continue
-                img = res.get(cpk_id, 0)
+                img = produce_build_tile(res, cpk_id, mc_id, variant,
+                                         builds_data, obb=obb, normalize=True)
                 if img is not None:
                     img_cache[key] = img; return img
             # Tier 3: any variant of mc_id
@@ -954,14 +965,15 @@ class ExtractTab(TabBase):
                 chap, cpk_id, _var, _sad = any_variant[mc_id]
                 res = find_resolver(chap)
                 if res is not None:
-                    img = res.get(cpk_id, 0)
+                    img = produce_build_tile(res, cpk_id, mc_id, variant,
+                                             builds_data, obb=obb,
+                                             normalize=True)
                     if img is not None:
                         img_cache[key] = img; return img
             # Tier 4: naive id-equals-id rule, variant-aware
             for slot, res in resolvers.items():
-                img = res.get(mc_id, variant)
-                if img is None and variant != 0:
-                    img = res.get(mc_id, 0)
+                img = produce_build_tile(res, mc_id, mc_id, variant,
+                                         builds_data, obb=obb, normalize=True)
                 if img is not None:
                     img_cache[key] = img; return img
             img_cache[key] = None

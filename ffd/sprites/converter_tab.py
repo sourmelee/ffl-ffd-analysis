@@ -155,6 +155,10 @@ class SpriteConverterTab(TabBase):
         # Status hint for the auto-match source ("chapter" / "aggregate"
         # / "numeric_fallback") — shown in the action bar.
         self._tileset_match_source: str = ""
+        # When ticked (default), picking a Mobile cpk auto-selects the
+        # matching Android mc (and vice-versa) via cpk_to_mc. Untick to
+        # select cpk and mc independently.
+        self._link_auto_match = tk.BooleanVar(value=True)
 
         self._build_top_bars()
         self._build_three_panes()
@@ -2160,7 +2164,10 @@ class SpriteConverterTab(TabBase):
 
     def _auto_match_mobile_tileset(self, mc_id, variant=0):
         """Android->Mobile: pick the cpk option whose cpk_to_mc entry
-        best matches (mc_id, variant); fall back to numeric cpk_entry."""
+        best matches (mc_id, variant); fall back to numeric cpk_entry.
+        No-op when the user has unticked 'Link auto-match'."""
+        if not self._is_link_enabled():
+            return
         if mc_id is None:
             return
         cpk_to_mc = {}
@@ -2751,7 +2758,16 @@ class SpriteConverterTab(TabBase):
         return (col, row)
 
     def _on_click_mobile_tileset(self, ev):
-        """Pick a Mobile cell as the remap source."""
+        """Pick a Mobile cell as the remap source. When the custom-palette
+        dialog has armed Mobile->Android picking, a Mobile click instead
+        selects the palette index under the cursor."""
+        if getattr(self, "_cp_mobile_pick_armed", False):
+            rgba = self._sample_mobile_pixel(ev)
+            if rgba is not None:
+                self._cp_mobile_pick_to_index(rgba)
+            else:
+                self._status.config(text="Clicked outside the Mobile sheet")
+            return
         cell = self._cell_from_event_mobile(ev)
         if cell is None:
             return
@@ -2983,6 +2999,14 @@ class SpriteConverterTab(TabBase):
                    command=self._open_custom_palette_dialog
                    ).pack(side="left", padx=4)
 
+        ttk.Button(self._tileset_bar, text="Save tileset build",
+                   command=self._save_tileset_build
+                   ).pack(side="left", padx=4)
+
+        ttk.Checkbutton(self._tileset_bar, text="Link auto-match",
+                        variable=self._link_auto_match
+                        ).pack(side="left", padx=8)
+
         ttk.Label(self._tileset_bar,
                   text=("Click Mobile, then Android to remap. "
                         "Right-click Android cell for source override. "
@@ -3000,8 +3024,11 @@ class SpriteConverterTab(TabBase):
 
     def _auto_match_android_tileset(self, chapter, cpk_entry):
         """Override v3: looks up overrides first, then cpk_to_mc.json.
-        Passes the current Mobile palette so per-palette overrides fire."""
+        Passes the current Mobile palette so per-palette overrides fire.
+        No-op when the user has unticked 'Link auto-match'."""
         if cpk_entry is None:
+            return
+        if not self._is_link_enabled():
             return
         cpk_to_mc = {}
         try:
@@ -3361,6 +3388,7 @@ class SpriteConverterTab(TabBase):
         self._custom_palette_working = list(seed)
         self._custom_palette_active_idx = 1 if nc > 1 else 0
         self._custom_palette_pick_armed = False
+        self._cp_mobile_pick_armed = False
         self._custom_palette_editing_index = editing_index
         self._custom_palette_ctx = (sp_slot, cpk_entry, nc, n_native)
 
@@ -3379,10 +3407,11 @@ class SpriteConverterTab(TabBase):
                   font=("TkDefaultFont", 9, "bold")
                   ).pack(side="top", anchor="w", padx=8, pady=(8, 2))
         ttk.Label(dlg, foreground="#666",
-                  text=("Click a swatch to make it active. 'Pick from "
-                        "Android' then click the Android pane to sample a "
-                        "colour into the active index. Index 0 is always "
-                        "transparent.")
+                  text=("Click a swatch to make it active, or use "
+                        "'Pick: Mobile→Android' then click a Mobile colour "
+                        "to select its index and an Android pixel for the "
+                        "replacement. 'Pick from Android' assigns to the "
+                        "active index. Index 0 is always transparent.")
                   ).pack(side="top", anchor="w", padx=8, pady=(0, 6))
 
         grid = ttk.Frame(dlg)
@@ -3404,6 +3433,9 @@ class SpriteConverterTab(TabBase):
         self._cp_arm_btn = ttk.Button(ctrls, text="Pick from Android",
                                       command=self._cp_toggle_pick)
         self._cp_arm_btn.pack(side="left", padx=2)
+        self._cp_m2a_btn = ttk.Button(ctrls, text="Pick: Mobile→Android",
+                                      command=self._cp_toggle_mobile_pick)
+        self._cp_m2a_btn.pack(side="left", padx=2)
         ttk.Button(ctrls, text="Next ▶",
                    command=self._cp_next).pack(side="left", padx=2)
         ttk.Button(ctrls, text="Choose colour…",
@@ -3560,6 +3592,20 @@ class SpriteConverterTab(TabBase):
                 data, sp_slot, cpk_entry, self._custom_palette_working,
                 nc=nc, note=note,
                 index=getattr(self, "_custom_palette_editing_index", None))
+            # Bind this palette to the current Android variant as a build so
+            # Maps + exports apply it automatically (cell_map / force / fill
+            # captured from the current spec).
+            from ..maps.mc_overrides import set_tileset_build
+            _spec = self._spec or {}
+            _at = _spec.get("android_target", {}) or {}
+            set_tileset_build(
+                data, sp_slot, cpk_entry,
+                int(self._tileset_variant_idx or 0),
+                palette=self._custom_palette_working,
+                cell_map=dict(_spec.get("cell_map") or {}),
+                force_android_cells=list(_at.get("force_android_cells") or []),
+                fill_from_android=bool(self._t_fill_from_android.get()),
+                note=note)
             ok = self.data.save_custom_palettes()
         except Exception as e:
             messagebox.showerror("Save failed", str(e))
@@ -3616,3 +3662,146 @@ class SpriteConverterTab(TabBase):
             self._custom_palette_dialog = None
         self._refresh_all()
         self._status.config(text="Custom palette editing cancelled")
+
+    # ==================================================================
+    # Tileset mode v5 — link toggle, Mobile-click palette pick, builds
+    # ==================================================================
+
+    def _is_link_enabled(self):
+        """True when cpk<->mc auto-match is linked (default). The user can
+        untick 'Link auto-match' to select cpk and mc independently."""
+        v = getattr(self, "_link_auto_match", None)
+        if v is None:
+            return True
+        try:
+            return bool(v.get())
+        except Exception:
+            return True
+
+    def _sample_mobile_pixel(self, ev):
+        """Return (r,g,b,a) of the Mobile pane pixel under the event, or
+        None if outside the image."""
+        if self._mobile_img is None:
+            return None
+        zoom = max(1, int(self._zoom_mobile.get() or 1))
+        cx = self._mobile_canvas.canvasx(ev.x)
+        cy = self._mobile_canvas.canvasy(ev.y)
+        px = int(cx // zoom)
+        py = int(cy // zoom)
+        img = self._mobile_img.convert("RGBA")
+        w, h = img.size
+        if not (0 <= px < w and 0 <= py < h):
+            return None
+        return img.getpixel((px, py))
+
+    def _cp_mobile_pick_to_index(self, rgba):
+        """Map a clicked Mobile pixel to the palette index that produced it
+        and make that index active. Transparent pixels map to index 0."""
+        work = getattr(self, "_custom_palette_working", None)
+        if work is None:
+            return
+        r, g, b, a = rgba
+        if a == 0:
+            idx = 0
+        else:
+            idx = None
+            for i, c in enumerate(work):
+                if i == 0:
+                    continue
+                if (int(c[0]), int(c[1]), int(c[2])) == (r, g, b):
+                    idx = i
+                    break
+            if idx is None:
+                self._status.config(
+                    text=f"Mobile pixel RGB({r},{g},{b}) isn't in the "
+                         f"working palette — click a solid tile colour")
+                return
+        self._custom_palette_active_idx = idx
+        self._cp_refresh_swatches()
+        self._status.config(
+            text=f"Active palette index {idx} (from Mobile click) — now "
+                 f"click the Android pane for its replacement")
+
+    def _cp_toggle_mobile_pick(self):
+        """Arm the 'click Mobile colour, then click Android replacement'
+        flow. Arms BOTH Mobile-pick (select index) and Android-pick
+        (assign replacement)."""
+        armed = not getattr(self, "_cp_mobile_pick_armed", False)
+        self._cp_mobile_pick_armed = armed
+        # Android assignment shares the existing armed flag.
+        self._custom_palette_pick_armed = armed
+        if getattr(self, "_cp_m2a_btn", None) is not None:
+            self._cp_m2a_btn.config(
+                text=("Mobile→Android: ON" if armed
+                      else "Pick: Mobile→Android"))
+        if getattr(self, "_cp_arm_btn", None) is not None:
+            # Keep the Android-only button label in sync.
+            self._cp_arm_btn.config(
+                text=("Picking… (click Android)" if armed
+                      else "Pick from Android"))
+        self._status.config(
+            text=("Click a Mobile-pane colour to select the index to "
+                  "replace, then click the Android pane for the new colour"
+                  if armed else "Mobile→Android picking disarmed"))
+
+    def _save_tileset_build(self):
+        """Persist EVERYTHING about the current tileset edit — palette
+        (native or custom), cell_map remaps, force-Android cells, and the
+        fill-from-Android flag — as a build bound to (chapter, cpk,
+        current variant). Maps 'Android, mobile tilesets' and the export
+        pipelines consult these builds (chapter-agnostic, highest-numbered
+        chapter wins) so the edit shows up everywhere."""
+        opt = self._get_current_mobile_pick()
+        if opt is None:
+            messagebox.showinfo("Nothing to save",
+                "Pick a Mobile cpk entry first.")
+            return
+        sp_slot = opt.get("sp_slot")
+        cpk_entry = opt.get("cpk_entry")
+        variant = int(self._tileset_variant_idx or 0)
+        # Resolve the palette RGB currently in effect (native or custom).
+        pal_idx = self._cur_mobile_palette_idx()
+        n_native = self._cpk_native_palette_count(sp_slot, cpk_entry)
+        palette = None
+        try:
+            if pal_idx >= n_native:
+                palette = self._get_custom_palette_rgb(
+                    sp_slot, cpk_entry, pal_idx - n_native)
+            else:
+                from ..tilesets.parser import MobileTilesetResolver
+                sp_files = (self.data.sp_slots or {}).get(sp_slot)
+                if sp_files:
+                    _nc, palette = MobileTilesetResolver(
+                        sp_files).get_palette(cpk_entry, pal_idx)
+        except Exception:
+            palette = None
+        spec = self._spec or {}
+        cell_map = dict(spec.get("cell_map") or {})
+        at = spec.get("android_target", {}) or {}
+        force = list(at.get("force_android_cells") or [])
+        fill = bool(self._t_fill_from_android.get())
+        note = ""
+        if self._tileset_mc_id is not None:
+            note = f"build for mc{self._tileset_mc_id}_{variant}"
+        try:
+            from ..maps.mc_overrides import set_tileset_build
+            data = self.data.custom_palettes()
+            set_tileset_build(
+                data, sp_slot, cpk_entry, variant,
+                palette=palette, cell_map=cell_map,
+                force_android_cells=force, fill_from_android=fill,
+                note=note)
+            ok = self.data.save_custom_palettes()
+        except Exception as e:
+            messagebox.showerror("Save failed", str(e))
+            return
+        if not ok:
+            messagebox.showerror("Save failed",
+                "Could not write custom_palettes.json")
+            return
+        n_cells = len(cell_map)
+        n_force = len(force)
+        self._status.config(
+            text=(f"Saved tileset build: {sp_slot} cpk{cpk_entry} "
+                  f"variant {variant} (palette {pal_idx}, {n_cells} remaps, "
+                  f"{n_force} force-Android) — Maps + exports will use it"))

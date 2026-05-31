@@ -17,7 +17,50 @@ commit as the changelog entry.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-05-31
+
 ### Added
+
+- **Independent cpk/mc selection (`SpriteConverterTab`, Tilesets mode)**:
+  a new **Link auto-match** checkbox (default on) in the tileset action
+  bar. While ticked, picking a Mobile cpk auto-selects the matching
+  Android mc (and vice-versa) via `cpk_to_mc` as before; unticking it
+  guards both `_auto_match_android_tileset` and `_auto_match_mobile_tileset`
+  so cpk and mc can be chosen completely independently.
+- **Mobile→Android colour picking in the custom-palette editor**: the
+  dialog gains a **Pick: Mobile→Android** mode. Click a colour in the
+  Mobile pane to select the palette index that produced it, then click the
+  Android pane to assign the replacement RGB. Supplements (does not
+  replace) the existing swatch grid, **Pick from Android**, colour
+  chooser, and reset-to-native controls.
+- **Tileset *builds* — manual edits now reach Maps + exports**: a new
+  **Save tileset build** button (and an automatic bind on custom-palette
+  save) records the current palette (native or custom), `cell_map`
+  remaps, force-Android cells, and the fill-from-Android flag as a
+  *build* bound to `(cpk_entry, variant)` in `data/custom_palettes.json`
+  (under a new `builds` key). Builds are resolved **chapter-agnostically**:
+  when several chapters carry a build for the same `(cpk, variant)` the
+  highest-numbered chapter wins (treated as most up-to-date). New
+  `ffd.maps.mc_overrides` helpers: `set_tileset_build`, `get_tileset_build`,
+  `resolve_tileset_build`, `list_tileset_builds`, `bound_variants_for_cpk`,
+  `delete_tileset_build`. New shared producer
+  `ffd.sprites.mobile_tile_to_android.produce_build_tile` renders a cpk
+  through a resolved build (palette + cells), normalising to a uniform
+  512×512 (32px-tile) sheet.
+- **Maps "Android, mobile tilesets" view honours builds**: all four
+  resolver tiers in `_collect_android_with_mobile_tilesets` now route
+  through `produce_build_tile`, so manual palette/cell edits appear in the
+  live preview — on top of the routing overrides (`cpk_to_mc_overrides.json`)
+  that already fed it via `cpk_to_mc_inverse()`. Sheets are normalised to
+  512px so the renderer never mixes 16px/32px tiles across a map's two
+  slots (verified byte-identical to a plain 2× nearest-neighbour upscale,
+  so tile addressing is unchanged).
+- **Extracted Mobile-tileset maps + mass-convert honour builds**:
+  `ExtractTab._make_mobile_ts_cache_for_extract` (used by *Extract maps,
+  mobile tilesets*) routes through the same build-aware producer, and the
+  *Mass convert tilesets* sub-tab applies a build for `(cpk, variant)`
+  when emitting each variant and additionally emits any user-built
+  variant the OBB never shipped (e.g. a hand-authored `mc{id}_3`).
 
 - **Custom Mobile palettes for missing Android variants
   (`SpriteConverterTab`, Tilesets mode)**: a new **Build custom
@@ -311,59 +354,4 @@ project went up on GitHub.
   chapter-scoped, Android little-endian/16-byte header full-roster.
 - Message tables (`message.dat`, `.msd`), `snd.dat` audio, `resbin`
   audio-name table, field animations (`field_anm`), and `form.bin`.
-- Event-script disassembler (`opcodes 0..0xab`, big-endian operands)
-  with Mobile and Android container loaders and a SJIS string scanner.
-
-### GUI
-
-- Tk-based notebook of tabs: Files, Extract, Map, Map Annotation,
-  Event Script, Text, Character, Animation, Tileset, Background,
-  Battle Effect, Monster, Music, Ability, Item, Job, Cross-Ref,
-  Comparison.
-- Per-tab data refresh via `FFData` listeners.
-- Status bar with archive / SP-slot summary.
-
-### Project save / load
-
-- `File > Save Project` writes a lightweight `.ffdproj` JSON snapshot
-  of every loaded SP slot and archive path.
-- `File > Save Project Bundle (embed files)` additionally embeds every
-  referenced file (and zips folder-style sources) as base64 inside the
-  `.ffdproj`, producing a self-contained workspace.
-- Each entry stores both `path_rel` (relative to the `.ffdproj` file)
-  and `path_abs`; the loader prefers relative, falls back to absolute,
-  then to bundled bytes.
-- `File > Load Project` restores everything in one click; missing slots
-  surface as warnings rather than blocking the load.
-- `File > Recent Projects` submenu, automatically updated on save/load,
-  with a `Clear list` option.
-- Auto-load: the toolkit reopens the last project on startup. State
-  lives in `Python/.ffd_toolkit_config.json` (gitignored).
-- Bundles materialize embedded bytes into a per-process temp dir which
-  is cleaned up on the next load and on shutdown (both `Quit` menu and
-  window-close handlers).
-- `.ffdproj` files record both a wire-format version (`version: 1`,
-  bumped only on schema changes) and an informational `toolkit_version`
-  (the release that wrote the file).
-
-### Comparison framework
-
-- Phase-1 Mobile-vs-Android divergence mapper (`ffd.comparison`)
-  exposed via both a `Comparison` tab and the headless
-  `python ffd_toolkit.py --compare` CLI.
-- Wired asset kinds: items. Stubs in place for the remaining 8 kinds.
-
-### CLI
-
-- `python ffd_toolkit.py` — launch GUI.
-- `python ffd_toolkit.py --version` / `-V` — print version and exit.
-- `python ffd_toolkit.py --compare ...` — headless asset comparison.
-
-[Unreleased]: https://github.com/sourmelee/ffl-ffd-analysis/compare/v0.2.1...HEAD
-[0.2.1]: https://github.com/sourmelee/ffl-ffd-analysis/compare/v0.2.0...v0.2.1
-[0.2.0]: https://github.com/sourmelee/ffl-ffd-analysis/compare/v0.1.4...v0.2.0
-[0.1.4]: https://github.com/sourmelee/ffl-ffd-analysis/compare/v0.1.3...v0.1.4
-[0.1.3]: https://github.com/sourmelee/ffl-ffd-analysis/compare/v0.1.2...v0.1.3
-[0.1.2]: https://github.com/sourmelee/ffl-ffd-analysis/compare/v0.1.1...v0.1.2
-[0.1.1]: https://github.com/sourmelee/ffl-ffd-analysis/compare/v0.1.0...v0.1.1
-[0.1.0]: https://github.com/sourmelee/ffl-ffd-analysis/releases/tag/v0.1.0
+- Event-script d

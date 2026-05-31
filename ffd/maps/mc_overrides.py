@@ -315,6 +315,7 @@ def empty_custom_palettes() -> dict:
                     "custom palette i is selectable as index n_native + i. "
                     "Edit via the GUI's 'Build custom palette...' dialog."),
         "entries": {},
+        "builds": {},
     }
 
 
@@ -328,6 +329,7 @@ def load_custom_palettes(path) -> dict:
             return empty_custom_palettes()
         data.setdefault("format_version", 1)
         data.setdefault("entries", {})
+        data.setdefault("builds", {})
         return data
     except FileNotFoundError:
         return empty_custom_palettes()
@@ -416,4 +418,148 @@ def delete_custom_palette(data: dict, chapter, cpk_entry, index) -> bool:
             if 0 <= index < len(pals):
                 pals.pop(index)
                 return True
+    return False
+
+
+# ---------------------------------------------------------------------------
+# Tileset BUILDS — self-contained per-(chapter, cpk, variant) recipes that
+# bind a hand-built palette + cell_map + force_android edits to a specific
+# Android mc variant. Stored in the same custom_palettes.json under "builds".
+#
+# Resolution is CHAPTER-AGNOSTIC: a physical cpk can appear in several
+# chapters, so when several chapters carry a build for the same
+# (cpk_entry, variant) we take the one from the HIGHEST-numbered chapter
+# (treated as the most up-to-date). See [[feedback-workflow]].
+#
+# Build record shape:
+#   {"palette": [[r,g,b], ...] | null,    # inline; null = native palette 0
+#    "cell_map": {"c,r": {mobile_col, mobile_row, flip_h}, ...},
+#    "force_android_cells": ["c,r", ...],
+#    "fill_from_android": bool,
+#    "note": str}
+# ---------------------------------------------------------------------------
+
+def _chapter_sort_key(chapter) -> int:
+    """Rank a chapter label so the 'highest-numbered' wins. Numbered
+    chapters sort by their embedded integer (Chapter10 > Chapter5);
+    non-numbered labels (Prologue, ChapterOnline, Postgame, ...) sort
+    below all numbered ones (key -1) since the user's rule is about
+    numbered chapters being newest."""
+    if chapter is None:
+        return -1
+    digits = "".join(ch for ch in str(chapter) if ch.isdigit())
+    if digits:
+        try:
+            return int(digits)
+        except ValueError:
+            return -1
+    return -1
+
+
+def _builds_root(data: dict) -> dict:
+    if not isinstance(data, dict):
+        return {}
+    return data.get("builds") or {}
+
+
+def set_tileset_build(data: dict, chapter, cpk_entry, variant,
+                      palette=None, cell_map=None, force_android_cells=None,
+                      fill_from_android=False, note="") -> None:
+    """Store/overwrite a build for (chapter, cpk_entry, variant). Chapter
+    is normalised to dense form on write. ``palette`` is an inline list of
+    (r,g,b) (or None to use the cpk's native palette 0)."""
+    builds = data.setdefault("builds", {})
+    chap = builds.setdefault(str(chapter).replace(" ", ""), {})
+    cpk = chap.setdefault(str(cpk_entry), {})
+    rec = {
+        "fill_from_android": bool(fill_from_android),
+        "note": note or "",
+    }
+    if palette is not None:
+        rec["palette"] = [[int(c[0]), int(c[1]), int(c[2])] for c in palette]
+    if cell_map:
+        rec["cell_map"] = {str(k): dict(v) for k, v in cell_map.items()}
+    if force_android_cells:
+        rec["force_android_cells"] = [str(x) for x in force_android_cells]
+    cpk[str(variant)] = rec
+
+
+def get_tileset_build(data: dict, chapter, cpk_entry, variant):
+    """Return the build dict stored for the EXACT (chapter, cpk_entry,
+    variant), trying literal and dense chapter forms. None if absent."""
+    builds = _builds_root(data)
+    vk = str(variant)
+    ek = str(cpk_entry)
+    for k in (chapter, str(chapter).replace(" ", "")):
+        chap = builds.get(k)
+        if chap and ek in chap and vk in chap[ek]:
+            return chap[ek][vk]
+    return None
+
+
+def resolve_tileset_build(data: dict, cpk_entry, variant):
+    """Chapter-agnostic lookup: scan every chapter's builds for
+    (cpk_entry, variant) and return ``(chapter, build)`` from the
+    highest-numbered chapter, or ``(None, None)`` if none exist."""
+    builds = _builds_root(data)
+    ek = str(cpk_entry)
+    vk = str(variant)
+    best = None  # (sort_key, chapter, build)
+    for chap, chap_entries in builds.items():
+        if not isinstance(chap_entries, dict):
+            continue
+        rec = (chap_entries.get(ek) or {}).get(vk)
+        if not isinstance(rec, dict):
+            continue
+        sk = _chapter_sort_key(chap)
+        if best is None or sk > best[0]:
+            best = (sk, chap, rec)
+    if best is None:
+        return (None, None)
+    return (best[1], best[2])
+
+
+def list_tileset_builds(data: dict):
+    """Yield (chapter, cpk_entry_str, variant_str, build) for every stored
+    build — handy for export pipelines that emit all bound variants."""
+    for chap, chap_entries in _builds_root(data).items():
+        if not isinstance(chap_entries, dict):
+            continue
+        for ek, by_var in chap_entries.items():
+            if not isinstance(by_var, dict):
+                continue
+            for vk, rec in by_var.items():
+                if isinstance(rec, dict):
+                    yield (chap, ek, vk, rec)
+
+
+def bound_variants_for_cpk(data: dict, cpk_entry):
+    """Return the set of int variants that have a build for this cpk_entry
+    in ANY chapter (used to emit missing variants in mass-convert)."""
+    out = set()
+    ek = str(cpk_entry)
+    for chap, chap_entries in _builds_root(data).items():
+        if not isinstance(chap_entries, dict):
+            continue
+        by_var = chap_entries.get(ek)
+        if isinstance(by_var, dict):
+            for vk in by_var:
+                try:
+                    out.add(int(vk))
+                except (TypeError, ValueError):
+                    pass
+    return out
+
+
+def delete_tileset_build(data: dict, chapter, cpk_entry, variant) -> bool:
+    """Remove a build for the exact (chapter, cpk_entry, variant). Returns
+    True if something was removed."""
+    builds = _builds_root(data)
+    ek = str(cpk_entry)
+    vk = str(variant)
+    for k in (chapter, str(chapter).replace(" ", "")):
+        chap = builds.get(k)
+        if chap and ek in chap and vk in chap[ek]:
+            del chap[ek][vk]
+            return True
     return False

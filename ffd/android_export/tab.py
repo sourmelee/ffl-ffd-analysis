@@ -632,10 +632,18 @@ class AndroidExportTab(TabBase):
             load_android_mc_png,
             list_android_mc_variants,
             make_tileset_starter_spec,
+            produce_build_tile,
+        )
+        from ..maps.mc_overrides import (
+            resolve_tileset_build, bound_variants_for_cpk,
         )
 
         obb = self.data.obb_files or {}
         cpk_to_mc = self.data.cpk_to_mc() or {}
+        try:
+            builds_data = self.data.custom_palettes()
+        except Exception:
+            builds_data = {}
 
         # Cache loaded cpk_to_mc for telemetry
         self._mt_logln(f"Output:         {out_path}")
@@ -709,14 +717,22 @@ class AndroidExportTab(TabBase):
                     pass
                 else:
                     try:
-                        out_img = convert_mobile_tileset_to_android(
-                            mobile_img, spec, android_orig)
+                        _c0, _b0 = resolve_tileset_build(
+                            builds_data, cpk_entry, 0)
+                        if _b0 is not None:
+                            out_img = produce_build_tile(
+                                resolver, cpk_entry, mc_id, 0,
+                                builds_data, obb=obb)
+                        else:
+                            out_img = convert_mobile_tileset_to_android(
+                                mobile_img, spec, android_orig)
                         out_img.save(out_file)
                         emitted.add(key0)
                         n_done += 1
                         self._mt_logln(
                             f"  cpk[{cpk_entry:02d}] -> "
-                            f"mc{mc_id}_0.png  [{source}]")
+                            f"mc{mc_id}_0.png  [{source}"
+                            f"{'+build' if _b0 is not None else ''}]")
                     except Exception as e:
                         self._mt_logln(
                             f"  cpk[{cpk_entry:02d}] -> mc{mc_id}_0: "
@@ -739,6 +755,27 @@ class AndroidExportTab(TabBase):
                                 and os.path.exists(out_var)):
                             emitted.add(keyN)
                             continue
+
+                        _cv, _bv = resolve_tileset_build(
+                            builds_data, cpk_entry, var)
+                        if _bv is not None:
+                            try:
+                                bimg = produce_build_tile(
+                                    resolver, cpk_entry, mc_id, var,
+                                    builds_data, obb=obb)
+                                if bimg is not None:
+                                    bimg.save(out_var)
+                                    emitted.add(keyN)
+                                    n_variants += 1
+                                    self._mt_logln(
+                                        f"    mc{mc_id}_{var}: built "
+                                        f"variant (custom)")
+                                    continue
+                            except Exception as e:
+                                self._mt_logln(
+                                    f"    mc{mc_id}_{var}: build FAIL: {e}")
+                                n_failed += 1
+                                continue
 
                         try:
                             if strategy == "verbatim":
@@ -782,6 +819,36 @@ class AndroidExportTab(TabBase):
                             self._mt_logln(
                                 f"    mc{mc_id}_{var}: FAIL: {e}")
                             n_failed += 1
+
+                # Emit any user-built variants the OBB never shipped
+                # (e.g. a hand-authored mc{id}_3). Builds are explicit so
+                # they emit even when "include variants" is off.
+                for var in sorted(bound_variants_for_cpk(
+                        builds_data, cpk_entry)):
+                    keyB = (mc_id, var)
+                    if keyB in emitted:
+                        continue
+                    out_b = os.path.join(out_path, f"mc{mc_id}_{var}.png")
+                    if (self._mt_skip_existing.get()
+                            and os.path.exists(out_b)):
+                        emitted.add(keyB)
+                        continue
+                    try:
+                        bimg = produce_build_tile(
+                            resolver, cpk_entry, mc_id, var,
+                            builds_data, obb=obb)
+                        if bimg is not None:
+                            bimg.save(out_b)
+                            emitted.add(keyB)
+                            n_variants += 1
+                            self._mt_logln(
+                                f"  cpk[{cpk_entry:02d}] -> "
+                                f"mc{mc_id}_{var}.png  [build, "
+                                f"missing variant]")
+                    except Exception as e:
+                        self._mt_logln(
+                            f"    mc{mc_id}_{var}: build FAIL: {e}")
+                        n_failed += 1
 
         self._mt_logln("")
         self._mt_logln(f"DONE: {n_done} mc_0 converted, "

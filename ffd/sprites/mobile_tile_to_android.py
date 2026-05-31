@@ -690,3 +690,95 @@ def count_cpk_palettes(sp_files: dict, entry_id: int) -> int:
         return max(1, int(n))
     except Exception:
         return 1
+
+
+# ---------------------------------------------------------------------------
+# Build-aware tile production (shared by Maps preview + map/tileset exports)
+# ---------------------------------------------------------------------------
+
+def _spec_for_build(build, output_size=(512, 512)):
+    """Translate a stored build record into a convert_mobile_tileset_to_android
+    spec dict. ``build`` may be None (plain identity 2x upscale)."""
+    at = {
+        "mode": "tileset",
+        "output_size": [int(output_size[0]), int(output_size[1])],
+        "scale": DEFAULT_SCALE,
+        "cell_w": ANDROID_TILE_CELL, "cell_h": ANDROID_TILE_CELL,
+        "fill_from_android": bool(build.get("fill_from_android")) if build else False,
+    }
+    if build and build.get("force_android_cells"):
+        at["force_android_cells"] = list(build["force_android_cells"])
+    spec = {
+        "name": "build",
+        "mobile_source": {"cell_w": MOBILE_TILE_CELL, "cell_h": MOBILE_TILE_CELL},
+        "android_target": at,
+        "cell_map": dict(build.get("cell_map") or {}) if build else {},
+    }
+    return spec
+
+
+def produce_build_tile(resolver, cpk_id, mc_id, variant, builds_data,
+                       obb=None, normalize=False, output_size=(512, 512)):
+    """Produce an Android-layout tile sheet for (mc_id, variant) sourced
+    from Mobile ``cpk_id`` via ``resolver``, honouring any stored build.
+
+    Resolution (chapter-agnostic, highest-chapter-wins) is delegated to
+    ``ffd.maps.mc_overrides.resolve_tileset_build``.
+
+    * Build present -> render the cpk through the build's inline palette
+      (or native palette 0), then run the converter with the build's
+      cell_map / force_android_cells / fill_from_android. Output is a
+      ``output_size`` RGBA sheet (32px tiles).
+    * No build, ``normalize=True`` -> plain integer 2x upscale into an
+      ``output_size`` canvas (no Android pixels) so the map renderer sees
+      a uniform 32px tile size across every slot.
+    * No build, ``normalize=False`` -> the raw resolver image (legacy
+      16px), unchanged.
+
+    Returns None if the underlying cpk image can't be produced (so callers
+    can fall through to the next resolution tier).
+    """
+    chap = build = None
+    if builds_data:
+        try:
+            from ..maps.mc_overrides import resolve_tileset_build
+            chap, build = resolve_tileset_build(builds_data, cpk_id, variant)
+        except Exception:
+            chap = build = None
+
+    if build is not None:
+        pal = build.get("palette")
+        try:
+            if pal:
+                base = resolver.get_with_palette(
+                    cpk_id, [tuple(int(x) for x in c[:3]) for c in pal])
+            else:
+                base = resolver.get(cpk_id, 0)
+        except Exception:
+            base = resolver.get(cpk_id, 0)
+        if base is None:
+            return None
+        spec = _spec_for_build(build, output_size)
+        android_orig = None
+        if obb is not None and (build.get("fill_from_android")
+                                or build.get("force_android_cells")):
+            android_orig = load_android_mc_png(obb, mc_id, variant)
+            if android_orig is None:
+                android_orig = load_android_mc_png(obb, mc_id, 0)
+        try:
+            return convert_mobile_tileset_to_android(
+                base.convert("RGBA"), spec, android_orig)
+        except Exception:
+            return base.convert("RGBA")
+
+    base = resolver.get(cpk_id, 0)
+    if base is None:
+        return None
+    if normalize:
+        spec = _spec_for_build(None, output_size)
+        try:
+            return convert_mobile_tileset_to_android(
+                base.convert("RGBA"), spec, None)
+        except Exception:
+            return base.convert("RGBA")
+    return base
