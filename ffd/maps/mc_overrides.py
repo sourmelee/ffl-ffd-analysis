@@ -99,10 +99,19 @@ def load_cpk_to_mc(path) -> dict:
         return {}
 
 
-def invert_cpk_to_mc(cpk_to_mc: dict) -> dict:
+def invert_cpk_to_mc(cpk_to_mc: dict, overrides: dict = None) -> dict:
     """Build the reverse map: (mc_id, variant) -> list of (chapter,
     cpk_entry_id, best_sad). Sorted ascending by best_sad so the most
-    confident chapter wins."""
+    confident chapter wins.
+
+    When ``overrides`` is supplied (a ``cpk_to_mc_overrides.json``
+    dict), each override entry is also pushed into the inverse map
+    with ``best_sad = 0`` so it sorts FIRST — manual overrides win
+    over SAD-matched candidates. Handles both top-level overrides
+    (``{mc_id, variant}``) and per-palette overrides
+    (``by_palette[N] = {mc_id, variant}``); both contribute reverse
+    entries since either palette choice still maps the cpk to the
+    same Mobile sheet."""
     out = {}
     for chap, entries in cpk_to_mc.items():
         for eid_str, info in entries.items():
@@ -114,6 +123,40 @@ def invert_cpk_to_mc(cpk_to_mc: dict) -> dict:
                 continue
             best_sad = info.get("best_sad", 10**9)
             out.setdefault((mc_id, var), []).append((chap, eid, best_sad))
+
+    # Overlay manual overrides with sad=0 so they sort first.
+    if overrides and isinstance(overrides, dict):
+        for chap, chap_entries in (overrides.get("entries") or {}).items():
+            if not isinstance(chap_entries, dict):
+                continue
+            for eid_str, rec in chap_entries.items():
+                if not isinstance(rec, dict):
+                    continue
+                try:
+                    eid = int(eid_str)
+                except (TypeError, ValueError):
+                    continue
+                # Top-level override
+                if "mc_id" in rec:
+                    try:
+                        mc_id = int(rec["mc_id"])
+                        var = int(rec.get("variant", 0))
+                        out.setdefault((mc_id, var), []).insert(
+                            0, (chap, eid, 0))
+                    except (TypeError, ValueError):
+                        pass
+                # Per-palette overrides also contribute reverse entries
+                for pal_rec in (rec.get("by_palette") or {}).values():
+                    if not isinstance(pal_rec, dict) or "mc_id" not in pal_rec:
+                        continue
+                    try:
+                        mc_id = int(pal_rec["mc_id"])
+                        var = int(pal_rec.get("variant", 0))
+                        out.setdefault((mc_id, var), []).insert(
+                            0, (chap, eid, 0))
+                    except (TypeError, ValueError):
+                        pass
+
     for key in out:
         out[key].sort(key=lambda t: t[2])
     return out

@@ -116,10 +116,14 @@ class FFData:
         return self._cpk_to_mc_cache
 
     def cpk_to_mc_inverse(self):
-        """Reverse lookup: (mc_id, variant) -> list of (chapter, cpk_id, sad)."""
+        """Reverse lookup: (mc_id, variant) -> list of (chapter, cpk_id,
+        sad). Overlays ``cpk_to_mc_overrides.json`` entries with sad=0
+        so manual overrides win over the SAD-derived table — same
+        precedence as the forward lookup."""
         cache = getattr(self, "_cpk_to_mc_inv_cache", None)
         if cache is None:
-            self._cpk_to_mc_inv_cache = invert_cpk_to_mc(self.cpk_to_mc())
+            self._cpk_to_mc_inv_cache = invert_cpk_to_mc(
+                self.cpk_to_mc(), self.cpk_to_mc_overrides())
         return self._cpk_to_mc_inv_cache
 
     # ---- slot management --------------------------------------------------
@@ -279,9 +283,15 @@ class FFData:
         return self._cpk_to_mc_overrides_cache
 
     def save_cpk_to_mc_overrides(self) -> bool:
-        """Persist the cached overrides to disk. Returns True on success."""
+        """Persist the cached overrides to disk. Returns True on success.
+
+        Also clears the reverse-lookup cache so the next Maps render
+        sees the new override immediately (without restarting)."""
         cache = getattr(self, "_cpk_to_mc_overrides_cache", None)
         if cache is None:
             return False
-        return save_cpk_to_mc_overrides(self.cpk_to_mc_overrides_path(),
-                                         cache)
+        ok = save_cpk_to_mc_overrides(self.cpk_to_mc_overrides_path(),
+                                       cache)
+        if ok and hasattr(self, "_cpk_to_mc_inv_cache"):
+            self._cpk_to_mc_inv_cache = None
+        return ok

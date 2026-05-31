@@ -17,6 +17,22 @@ commit as the changelog entry.
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-05-31
+
+### Changed
+
+- **Manual overrides now propagate to the Maps tab**:
+  `FFData.cpk_to_mc_inverse()` overlays `cpk_to_mc_overrides.json`
+  entries on the SAD-derived reverse table with `best_sad = 0` so
+  they sort first. Both top-level overrides and `by_palette[N]`
+  entries contribute reverse candidates. Saving an override via the
+  Sprite Converter's "Save override" button also invalidates
+  `_cpk_to_mc_inv_cache` so the next Maps render picks it up
+  immediately (no restart needed). Effect: a `Chapter 5 cpk1 → mc1_0`
+  override now correctly renders Android maps that reference mc1 with
+  the Chapter 5 cpk1 tileset in the "Android with Mobile tilesets"
+  Maps view, matching the Sprite Converter's auto-match.
+
 ## [0.2.0] - 2026-05-30
 
 ### Added
@@ -306,4 +322,13 @@ project went up on GitHub.
 
 - `python ffd_toolkit.py` — launch GUI.
 - `python ffd_toolkit.py --version` / `-V` — print version and exit.
-- `python ffd_toolkit.py --compare ...
+- `python ffd_toolkit.py --compare ...` — headless asset comparison.
+
+[Unreleased]: https://github.com/sourmelee/ffl-ffd-analysis/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/sourmelee/ffl-ffd-analysis/compare/v0.2.0...v0.2.1
+[0.2.0]: https://github.com/sourmelee/ffl-ffd-analysis/compare/v0.1.4...v0.2.0
+[0.1.4]: https://github.com/sourmelee/ffl-ffd-analysis/compare/v0.1.3...v0.1.4
+[0.1.3]: https://github.com/sourmelee/ffl-ffd-analysis/compare/v0.1.2...v0.1.3
+[0.1.2]: https://github.com/sourmelee/ffl-ffd-analysis/compare/v0.1.1...v0.1.2
+[0.1.1]: https://github.com/sourmelee/ffl-ffd-analysis/compare/v0.1.0...v0.1.1
+[0.1.0]: https://github.com/sourmelee/ffl-ffd-analysis/releases/tag/v0.1.0
