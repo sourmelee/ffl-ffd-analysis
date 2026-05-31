@@ -132,8 +132,33 @@
             "variant": 0
           }
         }
+      },
+      "25": {
+        "by_palette": {
+          "0": {
+            "mc_id": 25,
+            "variant": 0
+          }
+        }
       }
     },
-    "Chapter5": {}
+    "Chapter5": {
+      "25": {
+        "by_palette": {
+          "1": {
+            "mc_id": 25,
+            "variant": 1
+          },
+          "2": {
+            "mc_id": 25,
+            "variant": 2
+          },
+          "0": {
+            "mc_id": 25,
+            "variant": 0
+          }
+        }
+      }
+    }
   }
 }
