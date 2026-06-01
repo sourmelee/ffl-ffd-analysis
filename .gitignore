@@ -39,3 +39,6 @@ ffd_toolkit_BACKUP.py
 # *.local.py
 char13_0.json
 fldchr13_0.png
+
+#Baked for FFSmith
+baked/

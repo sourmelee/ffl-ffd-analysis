@@ -17,6 +17,27 @@ commit as the changelog entry.
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-06-01
+
+### Added
+
+- **FFSmith engine asset baker (`--bake-ffsmith`)**: new
+  `ffd/android_export/ffsmith_bake.py` emits an asset bundle consumed directly
+  by the companion clean-room C++ engine **FFSmith** (`../Engine`). Output:
+  `manifest.json`, `maps/g{G}_p{P}_m{M}.ffmap` (flat little-endian map: dims,
+  layer tile-words, engine-resolved mc slot0/slot1, raw event region), and
+  `tex/mc{N}_{V}.tex` (raw-RGBA `FTEX` tilesheets). Maps come from
+  `parse_android_map_chunk` + `parse_android_map_engine`; tilesheets are
+  decoded from the OBB's `mc*.png`. CLI:
+  `--bake-ffsmith <out_dir> [--obb PATH | --proper DIR] [--limit N] [--only KEY]`.
+- The Toolkit is now the single source of truth for the engine's content
+  pipeline: FFSmith's renderer mirrors `ExtractTab._render_android_map`
+  (slot dispatch on the tile-word high byte, zero-skip on `0x0000`,
+  `TS = 32 if sheet width >= 512 else 16`, PIL `div255` alpha rounding).
+  Verified **byte-identical** (100.0% exact pixels, max channel diff 0)
+  against the toolkit render on `g0_p0_m101` (1 layer) and `g0_p0_m501`
+  (2 layers, dual slot).
+
 ## [0.4.1] - 2026-06-01
 
 ### Changed

@@ -159,6 +159,28 @@
           }
         }
       }
+    },
+    "Chapter4": {
+      "9": {
+        "by_palette": {
+          "0": {
+            "mc_id": 9,
+            "variant": 0
+          },
+          "1": {
+            "mc_id": 9,
+            "variant": 1
+          }
+        }
+      },
+      "18": {
+        "by_palette": {
+          "0": {
+            "mc_id": 18,
+            "variant": 0
+          }
+        }
+      }
     }
   }
 }

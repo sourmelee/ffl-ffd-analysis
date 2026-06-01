@@ -121,39 +121,53 @@ from ffd.gui_core.base import TabBase
 from ffd.gui_core.app  import FFDApp
 from ffd.files_io.extract_tab import EXTRACT_OPTIONS
 
-# Comparison framework re-exports (phase-1 Mobile<->Android divergence
-# mapper). The GUI ComparisonTab is auto-registered in TAB_ORDER; the
-# `run_cli` helper drives the headless `--compare` flag below.
 from ffd.comparison import (
     ASSET_KINDS, AssetKind, compare_records, list_asset_kinds,
     diff_dicts, diff_bytes, DiffRow, run_cli as _run_comparison_cli,
 )
 
-# Android exporter / ICP encoder re-exports
 from ffd.android_export import (
     AndroidExportOptions, export_chapter_to_android, export_all_chapters,
     encode_icp_dat, encode_icp_directory, ICPEncodeError,
 )
 
 
+def _bake_ffsmith_cli(argv):
+    """Handle --bake-ffsmith <out_dir> [--obb PATH | --proper DIR] [--limit N] [--only KEY]."""
+    from ffd.android_export.ffsmith_bake import bake
+    idx = argv.index("--bake-ffsmith")
+    rest = argv[idx + 1:]
+    usage = ("usage: python ffd_toolkit.py --bake-ffsmith <out_dir> "
+             "[--obb PATH | --proper DIR] [--limit N] [--only KEY]")
+    if not rest or rest[0].startswith("--"):
+        print(usage, file=sys.stderr)
+        return 2
+    out_dir = rest[0]
+    def get_opt(name):
+        return rest[rest.index(name) + 1] if name in rest else None
+    obb = get_opt("--obb")
+    proper = get_opt("--proper")
+    limit = get_opt("--limit")
+    only = get_opt("--only")
+    if obb is None and proper is None:
+        print("error: provide --obb PATH or --proper DIR", file=sys.stderr)
+        return 2
+    man = bake(obb_path=obb, out_dir=out_dir, proper_dir=proper,
+               limit=int(limit) if limit else None, only=only)
+    print("Baked %d maps, %d tilesheets -> %s"
+          % (len(man["maps"]), len(man["tilesheets"]), out_dir))
+    return 0
+
+
 def main():
-    """Entry point: dispatch to --compare or --android-* CLI if requested, else launch GUI."""
+    """Entry point: dispatch to a headless CLI if requested, else launch GUI."""
     argv = sys.argv[1:]
-    # Allow `python ffd_toolkit.py --version` to print and exit, the same
-    # way most CLIs handle it.
     if "--version" in argv or "-V" in argv:
         print(f"FFD/FFL Toolkit v{__version__}")
         sys.exit(0)
-    # Android export / encoder CLI -- dispatched before comparison so the
-    # --sp flag isn't ambiguous (both CLIs accept it, but only one of these
-    # dispatcher flags is ever present at a time).
     from ffd.android_export.cli import is_android_cli, run as _run_android_cli
     if is_android_cli(argv):
         sys.exit(_run_android_cli(argv))
-    # --pack-obb <input-folder> <output.obb>
-    # Pack the contents of <input-folder> (recursively) into an FFD-format
-    # main.obb. Used to rebuild the OBB the modded engine reads from
-    # /sdcard/FFD_assets/main.obb after the loadAsset smali redirect.
     if "--pack-obb" in argv:
         idx = argv.index("--pack-obb")
         rest = argv[idx+1:]
@@ -165,6 +179,10 @@ def main():
         n = folder_to_obb(in_folder, out_obb)
         print(f"Packed {in_folder!r} -> {out_obb!r} ({n:,} bytes)")
         sys.exit(0)
+    # Bake an FFSmith engine asset bundle from the Android OBB. The engine
+    # consumes these directly; see Engine/docs/ASSET_PIPELINE.md.
+    if "--bake-ffsmith" in argv:
+        sys.exit(_bake_ffsmith_cli(argv))
     cli_flags = {"--compare", "--list-kinds", "--sp", "--obb", "--apk",
                  "--raw", "--show-identical", "--link-id"}
     if any(a in cli_flags or a.startswith("--compare=") for a in argv):
@@ -175,8 +193,6 @@ def main():
               "cannot start. Parser modules in `ffd.*` still import fine for "
               "headless analysis.", file=sys.stderr)
         sys.exit(1)
-    # Startup banner -- handy in bug reports so users can read off the
-    # version they were running.
     print(f"FFD/FFL Toolkit v{__version__} -- starting GUI...")
     FFDApp().mainloop()
 
