@@ -95,7 +95,9 @@ from ffd.characters.parser import parse_chara_set
 from ffd.text.parser import (
     MESSAGE_SECTION_LABELS, parse_message, parse_msd, _msd_read_strings,
 )
-from ffd.music.parser import parse_snd, parse_resbin, parse_audio_names_resbin
+from ffd.music.parser import (
+    parse_snd, parse_resbin, parse_audio_names_resbin, SndEntry, BANK_ROLES,
+)
 from ffd.animation.parser import parse_field_anm
 from ffd.formats.form_bin import parse_form_bin
 from ffd.events.opcodes import (

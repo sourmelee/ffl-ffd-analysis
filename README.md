@@ -1,6 +1,6 @@
 # FFL / FFD Toolkit
 
-[![version](https://img.shields.io/badge/version-0.3.0-blue.svg)](CHANGELOG.md)
+[![version](https://img.shields.io/badge/version-0.4.0-blue.svg)](CHANGELOG.md)
 
 Reverse-engineering toolkit for **Final Fantasy Legends** (DoCoMo FOMA feature-phone, 2010 — Japan-only mobile release) and its 2013 Android remaster **Final Fantasy Dimensions**. The two builds share roughly 80% of their asset format DNA — the Android port re-encoded the mobile data files almost field-for-field, mostly flipping big-endian to little-endian and stuffing the obfuscated payloads inside an XOR-wrapped OBB. This codebase parses both.
 
@@ -105,7 +105,7 @@ The four panes (Mobile | Android | Preview | Inspector) sit inside a `ttk.PanedW
 
 **Monsters** — bestiary. Mobile uses big-endian boot_data section 12 (with section 16 as fallback); Android uses LE section 9 via the shared name+desc+body record layout.
 
-**Music** — `snd.dat` and `res.bin`. `snd.dat` is a container of gzip-wrapped MFi (`melo…`) / MLD (`MThd…`) melodies; the audio-name list comes from `res.bin`.
+**Music** — `snd.dat` and `res.bin`. `snd.dat` is an uncompressed 3-bank container of raw MFi (`melo…`) melodies exported as `.mld` (banks 0/1 = BGM, bank 2 = SFX); the Music tab pulls them from every loaded Mobile chapter and the Android `.obb` (single save or **Export all**). The audio-name list comes from `res.bin`. MFi v5 → `.mid` conversion is deferred.
 
 **Abilities** — magic / passive / command, all from the Android boot_data section TOC (sections 2 / 3 / 4 in the namedesc TOC).
 
@@ -203,7 +203,7 @@ All three are Android-only and use the same namedesc decoder, differing only in 
 `parse_message(data)` decodes mobile `message.dat` (multi-section length-prefixed Shift-JIS). `parse_msd(data)` decodes Android `.msd` (same shape but UTF-8); falls back to a flat string scan for files like `bem.msd`. `MESSAGE_SECTION_LABELS` names the 16+ sections (Common UI, Ch1-7 Light/Dark, Cutscenes, Challenge Dungeon, etc.).
 
 ### `music/parser.py`
-`parse_snd(data)` scans `snd.dat` for gzip streams (magic `\x1f\x8b`) and unpacks each into an MFi (`melo…`) or MLD (`MThd…`) melody. `parse_resbin(data)` and `parse_audio_names_resbin(data)` decode the Android `res.bin` audio-name table.
+`parse_snd(data)` parses the `snd.dat` container — three big-endian sound banks, each a `u16` count + `u32` offset table — into a list of `SndEntry` (bank, role, slot index, format, raw bytes), one per non-empty melody (every one an MFi `melo…` `.mld`). `parse_resbin(data)` and `parse_audio_names_resbin(data)` decode the Android `res.bin` audio-name table.
 
 ### `animation/parser.py`
 `parse_field_anm(data)` decodes Android `field_anm.dat`. Verified against `MtxAnmCtrl::SetAnimeData` and `MtxAnmData::Draw` in `libjniproxy.so`. File layout: LE u32 `n_entries` (63), then `n_entries` × LE u32 absolute offsets. Each entry has six sub-section offsets (header, keyframes, parts, …) producing a flat frame table plus decoded sub-animations (static / walk / etc.) with playback metadata so callers don't have to re-walk the raw structures.
@@ -299,7 +299,7 @@ A compressed cheat sheet of the formats this toolkit parses. The full per-byte d
 | `chpk.dat` | Mobile | BE | `sprites/container.py` | Character atlases; engine hardcodes cell layout (typically 16×16) |
 | `message.dat` | Mobile | BE | `text/parser.py` | Multi-section length-prefixed Shift-JIS |
 | `.msd` | Android | LE | `text/parser.py` | Same shape as message.dat but UTF-8 |
-| `snd.dat` | Mobile | — | `music/parser.py` | gzip-wrapped MFi/MLD melodies |
+| `snd.dat` | Mobile + Android | BE | `music/parser.py` | 3-bank container of raw MFi (`melo…`) `.mld` melodies |
 | `form.bin` | Mobile | BE | `formats/form_bin.py` | u16 offset table → per-formation enemy+drop records |
 | event scripts | Both | BE operands | `events/opcodes.py` | Per-command length-prefixed packets; 96 opcodes catalogued (range 0x00..0xAB with gaps) |
 | `cpk_to_mc.json` | Both (sidecar) | — | `maps/mc_overrides.py`, `sprites/mobile_tile_to_android.py` | SAD-matcher output: `{chapter: {cpk_entry: {mc_id, variant, best_sad, by_palette: {N: {…}}}}}`. Regenerate via `tools/regenerate_cpk_to_mc.py` |

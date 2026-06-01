@@ -487,8 +487,8 @@ class ExtractTab(TabBase):
                 d = sub("audio_snd") / slot_name(slot)
                 d.mkdir(parents=True, exist_ok=True)
                 tracks = parse_snd(blob)
-                for idx, mld in tracks:
-                    (d / f"track_{idx:03d}.mld").write_bytes(mld)
+                for e in tracks:
+                    (d / f"{e.bank_role}_{e.index:03d}{e.ext}").write_bytes(e.data)
                 self._log(f"  {slot}: {len(tracks)} tracks → {d}")
                 total += len(tracks)
             self._log(f"  audio total across all chapters: {total}")

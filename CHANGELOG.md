@@ -17,6 +17,47 @@ commit as the changelog entry.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-06-01
+
+### Fixed
+
+- **Mobile/Android audio extraction (`music/parser.py` -- `parse_snd`)**:
+  the parser assumed `snd.dat` was a stream of *gzip-wrapped* melodies and
+  scanned for the `1f 8b` magic, so on the real (uncompressed) files it
+  returned **zero** tracks -- audio extraction silently produced nothing.
+  `parse_snd` now decodes the actual container: three big-endian sound
+  banks, each a `u16` count followed by a `u32` offset table, yielding one
+  entry per non-empty melody. Verified against all five Mobile chapter
+  `snd.dat` files (111-118 melodies each) and the Android `proper_obb`
+  copy; every blob is MFi (`melo...`) and every raw `.mld` slice
+  round-trips byte-exact.
+
+### Added
+
+- **`SndEntry` / `BANK_ROLES` (`music/parser.py`)**: `parse_snd` now returns
+  a list of `SndEntry(bank, bank_role, index, fmt, ext, data)` namedtuples.
+  Each entry keeps its *original* slot index within the bank (empty slots
+  counted) so it matches the engine's sound id, and detects the blob format
+  from its magic (MFi `.mld` / SMF `.mid` / SMAF `.mmf`). Re-exported from
+  `ffd.music` and `ffd_toolkit`.
+- **Music tab -- full melody extraction + batch export**: lists every
+  `snd.dat` melody across all loaded Mobile chapters and (for Android) the
+  melodies inside the `.obb`'s `snd.dat` *plus* any loose streamed audio
+  (`ogg`/`mp3`/...). Adds an **Export all...** button (dumps every listed
+  track with a `chapter__role_index.mld` name) alongside per-track
+  **Save**/**Open**.
+- **Deferred `.mid` hook**: an **Export .mid** button is present but disabled
+  -- these melodies are MFi **v5**, whose per-`trac` event stream is not yet
+  decoded, so no fake MIDI is emitted. The container/header/`trac` layout is
+  documented in `music/parser.py` for the future converter.
+
+### Changed
+
+- **Extract tab audio dump (`files_io/extract_tab.py`)**: the *audio
+  (snd.dat)* extractor now names files `role_index.ext` (e.g. `bgm_024.mld`,
+  `sfx_012.mld`) per bank instead of a single running `track_NNN.mld`,
+  matching the new bank-aware parser.
+
 ## [0.3.0] - 2026-05-31
 
 ### Added
