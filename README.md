@@ -1,6 +1,6 @@
 # FFL / FFD Toolkit
 
-[![version](https://img.shields.io/badge/version-0.4.0-blue.svg)](CHANGELOG.md)
+[![version](https://img.shields.io/badge/version-0.4.1-blue.svg)](CHANGELOG.md)
 
 Reverse-engineering toolkit for **Final Fantasy Legends** (DoCoMo FOMA feature-phone, 2010 — Japan-only mobile release) and its 2013 Android remaster **Final Fantasy Dimensions**. The two builds share roughly 80% of their asset format DNA — the Android port re-encoded the mobile data files almost field-for-field, mostly flipping big-endian to little-endian and stuffing the obfuscated payloads inside an XOR-wrapped OBB. This codebase parses both.
 

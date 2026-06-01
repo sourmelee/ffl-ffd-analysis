@@ -89,7 +89,7 @@ EXTRACT_OPTIONS = [
     ("maps_and_mob",  False, "Android maps rendered with MOBILE tilesets (cross-port preview)", True, True, "maps/android_mobile_tilesets"),
 
     # --- Audio ------------------------------------------------------------
-    ("audio_snd",     True,  "Audio: extract MFi/MLD from snd.dat",       True,  False, "audio/mobile"),
+    ("audio_snd",     True,  "Audio: MFi/MLD from snd.dat (Mobile + Android)", True, True, "audio"),
 
     # --- Text (Mobile sources) -------------------------------------------
     ("text_dialog",   True,  "Story text from message.dat (TXT)",         True,  False, "text/dialogue/mobile"),
@@ -491,7 +491,18 @@ class ExtractTab(TabBase):
                     (d / f"{e.bank_role}_{e.index:03d}{e.ext}").write_bytes(e.data)
                 self._log(f"  {slot}: {len(tracks)} tracks → {d}")
                 total += len(tracks)
-            self._log(f"  audio total across all chapters: {total}")
+            # Android: the .obb ships the same MFi container at snd.dat
+            # (identical bank layout), so reuse the same parser + naming.
+            snd_and = self.data.in_obb("snd.dat")
+            if snd_and:
+                d = sub("audio_snd") / "android"
+                d.mkdir(parents=True, exist_ok=True)
+                tracks = parse_snd(snd_and)
+                for e in tracks:
+                    (d / f"{e.bank_role}_{e.index:03d}{e.ext}").write_bytes(e.data)
+                self._log(f"  android: {len(tracks)} tracks → {d}")
+                total += len(tracks)
+            self._log(f"  audio total across all sources: {total}")
 
         # ---- Text — Mobile sources -----------------------------------------
         if v("text_dialog"):

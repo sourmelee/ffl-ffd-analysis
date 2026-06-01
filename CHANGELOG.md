@@ -17,6 +17,21 @@ commit as the changelog entry.
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-06-01
+
+### Changed
+
+- **Extract tab -- *Audio: MFi/MLD from snd.dat* now covers Android too**:
+  the `audio_snd` extractor previously walked only the Mobile chapter
+  scratchpads (`find_in_sp_any_chapter`). It now also extracts the Android
+  `.obb`'s `snd.dat` -- the identical MFi container -- into an
+  `audio/android/` subfolder, using the same bank-aware `role_index.ext`
+  naming. The option label becomes "Audio: MFi/MLD from snd.dat
+  (Mobile + Android)" and its output subfolder moves from
+  `audio/mobile/<chapter>` to `audio/<chapter>` (+ `audio/android`).
+  Verified headless: 576 Mobile (5 chapters) + 111 Android melodies, every
+  `.mld` byte-exact.
+
 ## [0.4.0] - 2026-06-01
 
 ### Fixed
