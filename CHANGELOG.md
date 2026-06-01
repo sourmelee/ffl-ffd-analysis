@@ -17,6 +17,21 @@ commit as the changelog entry.
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-06-01
+
+### Added
+
+- **Chip-attribute collision (`capk.dat`) + passability baking.** New
+  `ffd/maps/capk.py` (`parse_capk`) decodes `capk.dat`, the per-tileset chip
+  attribute file: little-endian u32 TOC where `section(mc_id) = TOC[mc_id+1]`;
+  each section is a u16-BE count then 7-byte chip records (u32-BE `A` + u24-BE
+  `B`); `A & 0x0F` is the 4-direction passability mask (0 = solid). Decoded
+  from `FieldClass::LoadChipAttribute` + `CheckMovePass` in libjniproxy.so.
+  The `--bake-ffsmith` baker now emits map format **FFM1** with a per-cell
+  pass-nibble grid, giving the FFSmith engine real wall/object collision.
+  Verified on `g0_p0_m501`: solid cells overlay exactly on walls, furniture
+  and room dividers; floors and rugs stay walkable.
+
 ## [0.5.0] - 2026-06-01
 
 ### Added
@@ -411,24 +426,4 @@ project went up on GitHub.
 ### Parsers and formats
 
 - `.sp` DoCoMo scratchpad container (Mobile / feature-phone build).
-- `.obb` XOR-obfuscated FFD container (Android build), plus `.apk` /
-  `.jar` ZIP archives and `.jam` manifest sidecars.
-- IC image format (with BGR and RGB palette variants) and sprite
-  containers; hidden-GIF extraction helper for Mobile assets.
-- Mobile map parser (MPK chunks, MPKH index) and Android engine map
-  parser (`_RomReader`, streaming chunk reader).
-- `mc_overrides.json` and `cpk_to_mc.json` sidecar formats for the
-  Android tileset-id remapping work.
-- `boot_data.dat` 16-section TOC (BE for Mobile, LE for Android) with
-  per-section loaders for the namedesc tables (items, monsters,
-  abilities, jobs).
-- Tileset parsers for both platforms (`MobileTilesetResolver`,
-  `parse_android_tileset_lookup`).
-- Monster / item / job / ability tables for both platforms, including
-  Android magic, passive, and command-ability tables and the Mobile
-  `bem.dat` enemy index.
-- Character set (`chara_set.dat`) — Mobile big-endian/12-byte header
-  chapter-scoped, Android little-endian/16-byte header full-roster.
-- Message tables (`message.dat`, `.msd`), `snd.dat` audio, `resbin`
-  audio-name table, field animations (`field_anm`), and `form.bin`.
-- Event-script d
+- `.obb` XOR-obfuscated FFD container (Android build),

@@ -1,18 +1,15 @@
 """Bake FFSmith-ready asset bundles from the Android OBB.
 
 The FFSmith engine (``../Engine``) never re-solves raw on-disk formats; the
-toolkit is the single source of truth. This module emits a small, documented
-bundle the engine loads directly. See ``Engine/docs/ASSET_PIPELINE.md``.
+toolkit is the single source of truth. See ``Engine/docs/ASSET_PIPELINE.md``.
 
-Output layout (under ``out_dir``)::
-
+Output (under ``out_dir``):
     manifest.json
-    maps/g{G}_p{P}_m{M}.ffmap     # flat little-endian baked map (format below)
+    maps/g{G}_p{P}_m{M}.ffmap     # flat little-endian baked map (FFM1, format below)
     tex/mc{N}_{V}.tex             # raw RGBA tilesheet ("FTEX")
 
-``.ffmap`` v0 (little-endian)::
-
-    magic     "FFM0"      4 bytes
+``.ffmap`` (FFM1, little-endian):
+    magic     "FFM1"      4 bytes
     width     u16
     height    u16
     n_layers  u16
@@ -20,24 +17,14 @@ Output layout (under ``out_dir``)::
     var_slot0 u16
     mc_slot1  i16         secondary tileset id (-1 = none)
     var_slot1 u16
-    reserved  u32         (0; wrap flags etc. land at M2)
-    per layer:
-      width*height * u16  tile words (low byte = tile_num, high byte = slot 0/1)
-    event_len u32
-    event     [event_len] raw event-region bytes (consumed by the script VM later)
+    reserved  u32
+    per layer: width*height * u16   tile words (low = tile_num, high = slot 0/1)
+    event_len u32 + event bytes
+    has_pass  u8          1 if a passability grid follows
+    pass      width*height u8       per-cell 4-dir pass nibble (0 = solid; from capk.dat)
 
-``.tex`` v0 (little-endian)::
-
-    magic   "FTEX"  4 bytes
-    width   u32
-    height  u32
-    pixels  width*height*4   RGBA8, straight alpha, row-major top-to-bottom
-
-Maps come from :func:`ffd.maps.android.parse_android_map_chunk` +
-:func:`ffd.maps.android.parse_android_map_engine`; tilesheets are decoded from
-the OBB's ``mc*.png`` via Pillow. The engine's renderer mirrors
-``ExtractTab._render_android_map`` exactly (slot dispatch on the tile-word high
-byte, zero-skip on word ``0x0000``, ``TS = 32 if sheet width >= 512 else 16``).
+Maps: parse_android_map_chunk + parse_android_map_engine. Collision: capk.dat
+(see ffd/maps/capk.py). Tilesheets: decoded from the OBB's mc*.png via PIL.
 """
 
 from __future__ import annotations
@@ -50,16 +37,15 @@ from pathlib import Path
 from ..containers.obb import load_obb_as_dict
 from ..maps.android import parse_android_map_chunk, parse_android_map_engine
 from ..maps.mobile import parse_mpkh_index
+from ..maps.capk import parse_capk, pass_nibble
 
-FFMAP_MAGIC = b"FFM0"
+FFMAP_MAGIC = b"FFM1"
 FTEX_MAGIC = b"FTEX"
-BUNDLE_VERSION = 0
+BUNDLE_VERSION = 1
 
 
 class _FolderFiles:
-    """Lazy name->bytes mapping over a folder of already-extracted files
-    (e.g. ``Android/proper_obb``). Mirrors the dict interface the OBB loader
-    returns, but reads each file on demand so we never load all ~2500 assets."""
+    """Lazy name->bytes mapping over a folder of extracted files (proper_obb)."""
 
     def __init__(self, root):
         self.root = Path(root)
@@ -76,10 +62,7 @@ class _FolderFiles:
 
 
 def iter_android_maps(files):
-    """Yield ``(group, pack, map_id, raw_chunk)`` for every Android map.
-
-    Mirrors ``MapTab._collect_android_maps``: walk each ``mpkh{N}.dat`` index,
-    resolve ``mpk{N}_{pack}.dat``, slice each entry's chunk."""
+    """Yield (group, pack, map_id, raw_chunk) for every Android map."""
     mpkhs = sorted(k for k in files if Path(k).name.startswith("mpkh"))
     for mpkh_key in mpkhs:
         base_idx = "".join(c for c in Path(mpkh_key).stem if c.isdigit())
@@ -97,9 +80,6 @@ def iter_android_maps(files):
 
 
 def _load_tex_rgba(files, mc_id, variant):
-    """Decode ``mc{N}_{V}.png`` to ``(w, h, rgba_bytes)``. Engine fallback:
-    if the requested variant is missing, fall back to variant 0 (mirrors
-    ``GameClass::LoadMapChipImage``). Returns None if neither exists."""
     from PIL import Image
     for v in (variant, 0):
         name = f"mc{mc_id}_{v}.png"
@@ -110,6 +90,23 @@ def _load_tex_rgba(files, mc_id, variant):
     return None
 
 
+def _build_pass_grid(parsed, engine, capk):
+    """Per-cell 4-dir pass nibble from capk.dat (base layer 0). None if no data."""
+    if capk is None or engine is None or not parsed.get("layers"):
+        return None
+    w, h = parsed["w"], parsed["h"]
+    mc0, mc1 = engine["mc_id_slot0"], engine["mc_id_slot1"]
+    base = parsed["layers"][0]
+    grid = bytearray(w * h)
+    for i, cell in enumerate(base):
+        if i >= len(grid):
+            break
+        _mc_type, hb, lb = cell
+        mc = mc1 if (hb == 1 and mc1 >= 0) else mc0
+        grid[i] = pass_nibble(capk, mc, lb)
+    return bytes(grid)
+
+
 def _write_tex(path, w, h, rgba):
     with open(path, "wb") as f:
         f.write(FTEX_MAGIC)
@@ -117,7 +114,7 @@ def _write_tex(path, w, h, rgba):
         f.write(rgba)
 
 
-def _write_ffmap(path, parsed, engine):
+def _write_ffmap(path, parsed, engine, pass_grid):
     w, h = parsed["w"], parsed["h"]
     layers = parsed["layers"]
     mc0 = engine["mc_id_slot0"] if engine else -1
@@ -129,7 +126,7 @@ def _write_ffmap(path, parsed, engine):
         f.write(FFMAP_MAGIC)
         f.write(struct.pack("<HHH", w, h, len(layers)))
         f.write(struct.pack("<hHhH", mc0, v0 & 0xFFFF, mc1, v1 & 0xFFFF))
-        f.write(struct.pack("<I", 0))  # reserved
+        f.write(struct.pack("<I", 0))
         for layer in layers:
             buf = bytearray()
             for (_mc_type, hb, lb) in layer:
@@ -137,43 +134,34 @@ def _write_ffmap(path, parsed, engine):
             f.write(bytes(buf))
         f.write(struct.pack("<I", len(event)))
         f.write(event)
+        if pass_grid and len(pass_grid) == w * h:
+            f.write(struct.pack("<B", 1))
+            f.write(pass_grid)
+        else:
+            f.write(struct.pack("<B", 0))
 
 
 def bake(obb_path=None, out_dir=".", *, proper_dir=None, limit=None, only=None,
          src_files=None):
-    """Bake an FFSmith bundle. Provide one source:
-      - ``obb_path``    : path to ``main.obb`` (decrypted+indexed via the loader)
-      - ``proper_dir``  : a folder of already-extracted files (e.g. proper_obb)
-      - ``src_files``   : a pre-built name->bytes mapping (programmatic use)
-
-    ``limit`` caps the number of maps; ``only`` bakes a single ``gG_pP_mM`` key.
-    Returns the manifest dict.
-    """
     if src_files is not None:
-        files = src_files
-        source_name = "files"
+        files = src_files; source_name = "files"
     elif proper_dir is not None:
-        files = _FolderFiles(proper_dir)
-        source_name = Path(proper_dir).name
+        files = _FolderFiles(proper_dir); source_name = Path(proper_dir).name
     elif obb_path is not None:
-        files = load_obb_as_dict(obb_path, mode="proper")
-        source_name = Path(obb_path).name
+        files = load_obb_as_dict(obb_path, mode="proper"); source_name = Path(obb_path).name
     else:
         raise ValueError("bake() needs obb_path, proper_dir, or src_files")
+
+    capk = parse_capk(files["capk.dat"]) if "capk.dat" in files else None
 
     out = Path(out_dir)
     (out / "maps").mkdir(parents=True, exist_ok=True)
     (out / "tex").mkdir(parents=True, exist_ok=True)
 
-    manifest = {
-        "version": BUNDLE_VERSION,
-        "source": source_name,
-        "maps": [],
-        "tilesheets": [],
-    }
-    needed_tex = set()  # (mc_id, variant)
+    manifest = {"version": BUNDLE_VERSION, "source": source_name,
+                "collision": bool(capk), "maps": [], "tilesheets": []}
+    needed_tex = set()
     n = 0
-
     for (g, p, mid, raw) in iter_android_maps(files):
         key = f"g{g}_p{p}_m{mid}"
         if only and key != only:
@@ -181,13 +169,12 @@ def bake(obb_path=None, out_dir=".", *, proper_dir=None, limit=None, only=None,
         parsed = parse_android_map_chunk(raw)
         if not parsed:
             continue
-        # Carry the raw event region (bytes after the tile-data region) so the
-        # baked map is forward-compatible with the script VM milestone.
         end_field = parsed.get("end_field", 0)
         if 0 < end_field <= len(raw):
             parsed["_event"] = raw[end_field:]
         engine = parse_android_map_engine(raw) if len(raw) > 30 else None
-        _write_ffmap(out / "maps" / f"{key}.ffmap", parsed, engine)
+        pass_grid = _build_pass_grid(parsed, engine, capk)
+        _write_ffmap(out / "maps" / f"{key}.ffmap", parsed, engine, pass_grid)
 
         s0 = (engine["mc_id_slot0"], engine["variant_slot0"]) if engine else (-1, 0)
         s1 = (engine["mc_id_slot1"], engine["variant_slot1"]) if engine else (-1, 0)
@@ -197,9 +184,7 @@ def bake(obb_path=None, out_dir=".", *, proper_dir=None, limit=None, only=None,
         manifest["maps"].append({
             "id": key, "file": f"maps/{key}.ffmap",
             "w": parsed["w"], "h": parsed["h"], "n_layers": parsed["n_layers"],
-            "slot0": [int(s0[0]), int(s0[1])],
-            "slot1": [int(s1[0]), int(s1[1])],
-        })
+            "slot0": [int(s0[0]), int(s0[1])], "slot1": [int(s1[0]), int(s1[1])]})
         n += 1
         if limit and n >= limit:
             break
