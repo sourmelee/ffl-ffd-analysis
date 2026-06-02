@@ -187,10 +187,12 @@ def bake(obb_path=None, out_dir=".", *, proper_dir=None, limit=None, only=None,
     out = Path(out_dir)
     (out / "maps").mkdir(parents=True, exist_ok=True)
     (out / "tex").mkdir(parents=True, exist_ok=True)
+    (out / "sprites").mkdir(parents=True, exist_ok=True)
 
     manifest = {"version": BUNDLE_VERSION, "source": source_name,
-                "collision": bool(capk), "maps": [], "tilesheets": []}
+                "collision": bool(capk), "maps": [], "tilesheets": [], "sprites": []}
     needed_tex = set()
+    needed_sprites = set()
     n = 0
     for (g, p, mid, raw) in iter_android_maps(files):
         key = f"g{g}_p{p}_m{mid}"
@@ -205,6 +207,8 @@ def bake(obb_path=None, out_dir=".", *, proper_dir=None, limit=None, only=None,
         engine = parse_android_map_engine(raw) if len(raw) > 30 else None
         pass_grid = _build_pass_grid(parsed, engine, capk)
         events = _build_events(raw)
+        for ev in events:
+            if ev["img"] > 0: needed_sprites.add((ev["img"], ev["var"]))
         _write_ffmap(out / "maps" / f"{key}.ffmap", parsed, engine, pass_grid, events)
 
         s0 = (engine["mc_id_slot0"], engine["variant_slot0"]) if engine else (-1, 0)
@@ -233,6 +237,21 @@ def bake(obb_path=None, out_dir=".", *, proper_dir=None, limit=None, only=None,
         _write_tex(out / "tex" / f"{stem}.tex", w, h, rgba)
         baked_tex.add(stem)
         manifest["tilesheets"].append({"stem": stem, "w": w, "h": h})
+
+    baked_sprites = set()
+    for (img, var) in sorted(needed_sprites):
+        from PIL import Image as _Img
+        rgba = None; w = h = 0
+        for nm in (f"fldchr{img}_{var}.png", f"fldchr{img}_0.png", f"fldchr{img}.png"):
+            if nm in files:
+                im = _Img.open(io.BytesIO(files[nm])).convert("RGBA")
+                w, h, rgba = im.width, im.height, im.tobytes(); break
+        if rgba is None: continue
+        stem = f"fldchr{img}_{var}"
+        if stem in baked_sprites: continue
+        _write_tex(out / "sprites" / f"{stem}.tex", w, h, rgba)
+        baked_sprites.add(stem)
+        manifest["sprites"].append({"stem": stem, "img": img, "var": var, "w": w, "h": h})
 
     with open(out / "manifest.json", "w") as f:
         json.dump(manifest, f, indent=2)

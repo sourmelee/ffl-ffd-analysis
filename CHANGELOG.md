@@ -17,6 +17,17 @@ commit as the changelog entry.
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-06-02
+
+### Added
+
+- **Field-character sprite baking.** `--bake-ffsmith` now bakes the
+  `fldchr{img}_{var}.png` field-character sheets referenced by a map's NPC
+  events into `sprites/*.tex` (raw RGBA) -- so FFSmith draws real NPC/player
+  sprites instead of markers. `chara_img` maps directly to the `fldchr` id.
+  First cut renders the standing (top-left) frame feet-aligned; per-facing +
+  walk animation from `field_anm` is the next step.
+
 ## [0.7.0] - 2026-06-01
 
 ### Added
