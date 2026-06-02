@@ -246,6 +246,38 @@ def parse_field_anm(data: bytes):
     return entries
 
 
+
+# Canonical FFD field-character walk layout — confirmed against fldchr1 (the
+# "Masked Man" sheet) by visual inspection (see Engine/README, M3b).
+#   48x48 cells, origin (1,1), pitch 50.
+#   ROWS = facing : Down=y1, Up=y51, Left=y101   (Right = Left flipped)
+#   COLS = frame  : idle=x1, walkA=x51, walkB=x101
+# IMPORTANT: field_anm's decoded sub_anims (anm5/6/7 ...) do NOT correspond to
+# the cardinal walk cycles, so they must not be used for a field-walk preview.
+def field_walk_entries(cell=48, pitch=50, origin=1):
+    """Return playable AnimationTab entries for the real cardinal field walk
+    cycles + idles. Each frame is {tex_id,x,y,w,h,duration,flip_h}."""
+    def F(cx, cy, flip=False):
+        return {"tex_id": 0, "x": cx, "y": cy, "w": cell, "h": cell,
+                "duration": 6, "flip_h": flip}
+    def cx(c):
+        return origin + c * pitch
+    rows = [("Down", origin), ("Up", origin + pitch), ("Left", origin + 2 * pitch)]
+    out = []
+    for name, ry in rows:
+        out.append({"label": f"Walk {name}", "kind": "field_walk",
+                    "frames": [F(cx(0), ry), F(cx(1), ry), F(cx(0), ry), F(cx(2), ry)]})
+    ry = origin + 2 * pitch  # Right = Left row, flipped
+    out.append({"label": "Walk Right", "kind": "field_walk",
+                "frames": [F(cx(0), ry, True), F(cx(1), ry, True),
+                           F(cx(0), ry, True), F(cx(2), ry, True)]})
+    for name, ry, fl in (("Down", origin, False), ("Up", origin + pitch, False),
+                         ("Left", origin + 2 * pitch, False), ("Right", origin + 2 * pitch, True)):
+        out.append({"label": f"Idle {name}", "kind": "field_walk",
+                    "frames": [F(cx(0), ry, fl)]})
+    return out
+
+
 def parse_btl_anm(data: bytes):
     """Parse Android ``btlanm_sp.dat`` -- battle sprite animation table.
 

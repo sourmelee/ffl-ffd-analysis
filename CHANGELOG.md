@@ -17,6 +17,19 @@ commit as the changelog entry.
 
 ## [Unreleased]
 
+## [0.7.2] - 2026-06-02
+
+### Fixed
+
+- **Animation tab — correct field walk cycles.** The walk preview was driven
+  by `field_anm`'s decoded `sub_anims`, which do NOT map to the cardinal walk
+  directions (they mix part-composition frames). New `field_walk_entries()`
+  (`animation/parser.py`) defines the canonical field-character walk — 48×48
+  cells, origin (1,1), pitch 50; **rows = facing** (Down/Up/Left), **cols =
+  frame** (idle/walkA/walkB), **Right = Left flipped** — confirmed against
+  fldchr1. `AnimationTab` now lists Walk Down/Up/Left/Right (+ idles) first and
+  honors per-frame `flip_h`. Matches the FFSmith engine's sprite renderer.
+
 ## [0.7.1] - 2026-06-02
 
 ### Added

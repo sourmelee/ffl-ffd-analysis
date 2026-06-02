@@ -98,7 +98,7 @@ from ffd.text.parser import (
 from ffd.music.parser import (
     parse_snd, parse_resbin, parse_audio_names_resbin, SndEntry, BANK_ROLES,
 )
-from ffd.animation.parser import parse_field_anm
+from ffd.animation.parser import parse_field_anm, field_walk_entries
 from ffd.formats.form_bin import parse_form_bin
 from ffd.events.opcodes import (
     EVENT_SCRIPT_OPCODES, _decode_event_operands, disassemble_script_block,

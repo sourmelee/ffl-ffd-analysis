@@ -24,7 +24,7 @@ from ..images.ic import render_ic
 from ..sprites.container import (
     parse_sprite_container,
 )
-from ..animation.parser import parse_field_anm
+from ..animation.parser import parse_field_anm, field_walk_entries
 from ..gui_core.base   import TabBase
 
 
@@ -360,6 +360,10 @@ class AnimationTab(TabBase):
         plus a synthetic 'All frames (atlas)' entry that lists every unique
         frame in the entry — useful for inspecting the flat frame table."""
         self.entries = []
+        # Canonical cardinal field-walk cycles first — these are the REAL walks
+        # (rows=facing, cols=frame, Right=Left flipped). field_anm sub_anims do
+        # not map to the cardinal walk, so they follow only for inspection.
+        self.entries.extend(field_walk_entries())
         frames = fa_entry.get("frames", [])
         sub_anims = fa_entry.get("sub_anims", [])
 
@@ -762,6 +766,8 @@ class AnimationTab(TabBase):
                     self.current_frames.append(None)
                     continue
                 crop = sheet.crop((x, y, x + w, y + h))
+                if f.get("flip_h"):
+                    crop = crop.transpose(Image.FLIP_LEFT_RIGHT)
                 disp = crop.resize(
                     (max(1, crop.width * zoom),
                      max(1, crop.height * zoom)),
