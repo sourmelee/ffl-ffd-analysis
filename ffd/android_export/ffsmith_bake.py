@@ -38,10 +38,11 @@ from ..containers.obb import load_obb_as_dict
 from ..maps.android import parse_android_map_chunk, parse_android_map_engine
 from ..maps.mobile import parse_mpkh_index
 from ..maps.capk import parse_capk, pass_nibble
+from ..events.android import parse_android_event_pack
 
-FFMAP_MAGIC = b"FFM1"
+FFMAP_MAGIC = b"FFM2"
 FTEX_MAGIC = b"FTEX"
-BUNDLE_VERSION = 1
+BUNDLE_VERSION = 2
 
 
 class _FolderFiles:
@@ -107,6 +108,25 @@ def _build_pass_grid(parsed, engine, capk):
     return bytes(grid)
 
 
+def _build_events(raw):
+    """Structured events (NPCs/triggers/scripts) from the map chunk's event pack.
+    header[2]=tile_x, [3]=tile_y, [7]=type, [8]=boot; chara_img/var + scripts."""
+    res = parse_android_event_pack(raw)
+    if res.get("parse_error") or not res.get("events"):
+        return []
+    out = []
+    for ev in res["events"]:
+        h = ev["header"]
+        out.append({
+            "x": h[2] if len(h) > 2 else 0,
+            "y": h[3] if len(h) > 3 else 0,
+            "type": ev["type"], "boot": ev["boot"],
+            "img": ev["chara_img"], "var": ev["chara_var"],
+            "scripts": ev["scripts"],
+        })
+    return out
+
+
 def _write_tex(path, w, h, rgba):
     with open(path, "wb") as f:
         f.write(FTEX_MAGIC)
@@ -114,7 +134,7 @@ def _write_tex(path, w, h, rgba):
         f.write(rgba)
 
 
-def _write_ffmap(path, parsed, engine, pass_grid):
+def _write_ffmap(path, parsed, engine, pass_grid, events):
     w, h = parsed["w"], parsed["h"]
     layers = parsed["layers"]
     mc0 = engine["mc_id_slot0"] if engine else -1
@@ -139,6 +159,16 @@ def _write_ffmap(path, parsed, engine, pass_grid):
             f.write(pass_grid)
         else:
             f.write(struct.pack("<B", 0))
+        # FFM2 events block
+        f.write(struct.pack("<H", len(events)))
+        for ev in events:
+            img = ev["img"] if -32768 <= ev["img"] <= 32767 else -1
+            f.write(struct.pack("<BBBBhBH", ev["x"] & 0xFF, ev["y"] & 0xFF,
+                                ev["type"] & 0xFF, ev["boot"] & 0xFF, img,
+                                ev["var"] & 0xFF, len(ev["scripts"])))
+            for sc in ev["scripts"]:
+                f.write(struct.pack("<H", len(sc)))
+                f.write(bytes(sc))
 
 
 def bake(obb_path=None, out_dir=".", *, proper_dir=None, limit=None, only=None,
@@ -174,7 +204,8 @@ def bake(obb_path=None, out_dir=".", *, proper_dir=None, limit=None, only=None,
             parsed["_event"] = raw[end_field:]
         engine = parse_android_map_engine(raw) if len(raw) > 30 else None
         pass_grid = _build_pass_grid(parsed, engine, capk)
-        _write_ffmap(out / "maps" / f"{key}.ffmap", parsed, engine, pass_grid)
+        events = _build_events(raw)
+        _write_ffmap(out / "maps" / f"{key}.ffmap", parsed, engine, pass_grid, events)
 
         s0 = (engine["mc_id_slot0"], engine["variant_slot0"]) if engine else (-1, 0)
         s1 = (engine["mc_id_slot1"], engine["variant_slot1"]) if engine else (-1, 0)
@@ -184,7 +215,8 @@ def bake(obb_path=None, out_dir=".", *, proper_dir=None, limit=None, only=None,
         manifest["maps"].append({
             "id": key, "file": f"maps/{key}.ffmap",
             "w": parsed["w"], "h": parsed["h"], "n_layers": parsed["n_layers"],
-            "slot0": [int(s0[0]), int(s0[1])], "slot1": [int(s1[0]), int(s1[1])]})
+            "slot0": [int(s0[0]), int(s0[1])], "slot1": [int(s1[0]), int(s1[1])],
+            "events": len(events)})
         n += 1
         if limit and n >= limit:
             break

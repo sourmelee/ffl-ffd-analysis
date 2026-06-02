@@ -17,6 +17,19 @@ commit as the changelog entry.
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-06-01
+
+### Added
+
+- **Event data baking (NPCs / triggers / scripts) -- map format FFM2.** The
+  `--bake-ffsmith` baker now parses each map chunk's event pack
+  (`parse_android_event_pack`) and bakes structured events into the map: per
+  event the tile position (header[2]/[3]), type (header[7]), boot condition
+  (header[8]), chara sprite id/variant, and the length-split bytecode script
+  blocks. This drives FFSmith's event-script VM (talk-to-NPC + dialogue now;
+  step-on triggers + warps next). Verified on `g0_p0_m501`: 7 events; the NPC
+  at (4,6) yields dialogue messages 170-175.
+
 ## [0.6.0] - 2026-06-01
 
 ### Added
