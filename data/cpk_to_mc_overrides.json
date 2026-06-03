@@ -158,6 +158,18 @@
             "variant": 0
           }
         }
+      },
+      "13": {
+        "by_palette": {
+          "0": {
+            "mc_id": 13,
+            "variant": 0
+          },
+          "1": {
+            "mc_id": 13,
+            "variant": 1
+          }
+        }
       }
     },
     "Chapter4": {
