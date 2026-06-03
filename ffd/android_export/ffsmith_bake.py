@@ -171,6 +171,92 @@ def _write_ffmap(path, parsed, engine, pass_grid, events):
                 f.write(bytes(sc))
 
 
+# --- Field dialogue text + font atlas (M3b font/text) ---------------------
+# Field scenario messages live in system_message.msd; SetMessage msg_id indexes
+# the active language's strings directly (engine GetMessageData -> array[id]).
+# Strings are stored 6-languages-interleaved per record (ja,en,fr,zh_cn,zh_tw,ko);
+# English = slot 1.  Section 4 is the scenario/cutscene bank used by the early
+# maps (m500/m501).  Per-map bank selection for other chapters is a follow-up.
+FIELD_MSG_SECTION = 4
+_FONT_FIRST, _FONT_LAST, _FONT_COLS, _FONT_CW, _FONT_CH = 32, 127, 16, 8, 14
+
+
+def _clean_message(s: str) -> str:
+    import re
+    return re.sub(r"<cha\d>", "Hero", s)   # party-name placeholders -> generic
+
+
+def _field_messages_en(files, section=FIELD_MSG_SECTION):
+    """Return {msg_id: english_string} from system_message.msd section `section`."""
+    blob = files.get("system_message.msd") if hasattr(files, "get") else None
+    if blob is None and "system_message.msd" in files:
+        blob = files["system_message.msd"]
+    if not blob:
+        return {}
+    from ..text.system_message import _read_toc
+    toc = _read_toc(blob)
+    if section + 1 >= len(toc):
+        return {}
+    start, end = toc[section], toc[section + 1]
+    if not (0 <= start < end <= len(blob)) or start + 2 > end:
+        return {}
+    count = struct.unpack_from(">H", blob, start)[0]
+    p = start + 2
+    out = {}
+    for rec in range(count):
+        slots = []
+        for _ in range(6):                         # 6 languages per record
+            if p + 2 > end:
+                slots.append(""); continue
+            L = struct.unpack_from(">H", blob, p)[0]; p += 2
+            if p + L > end:
+                slots.append(""); break
+            slots.append(blob[p:p + L].decode("utf-8", "replace") if L else ""); p += L
+            if p < end:
+                p += 1                              # NUL terminator
+        en = slots[1] if len(slots) > 1 else ""
+        if en:
+            out[rec] = _clean_message(en)
+    return out
+
+
+def _bake_messages(files, out_dir):
+    msgs = _field_messages_en(files)
+    path = Path(out_dir) / "text" / "messages.bin"
+    with open(path, "wb") as f:
+        f.write(b"FMSG"); f.write(struct.pack("<I", len(msgs)))
+        for mid, text in sorted(msgs.items()):
+            b = text.encode("utf-8")
+            f.write(struct.pack("<II", mid, len(b))); f.write(b)
+    return len(msgs)
+
+
+def _bake_font(out_dir):
+    try:
+        from PIL import Image, ImageFont, ImageDraw
+        import glob as _glob
+        cands = (_glob.glob("/usr/share/fonts/**/DejaVuSansMono.ttf", recursive=True)
+                 or _glob.glob("/usr/share/fonts/**/*Mono*.ttf", recursive=True))
+        font = ImageFont.truetype(cands[0], 12) if cands else ImageFont.load_default()
+        cols, cw, ch = _FONT_COLS, _FONT_CW, _FONT_CH
+        n = _FONT_LAST - _FONT_FIRST
+        rows = (n + cols - 1) // cols
+        atlas = Image.new("RGBA", (cols * cw, rows * ch), (0, 0, 0, 0))
+        d = ImageDraw.Draw(atlas)
+        for c in range(_FONT_FIRST, _FONT_LAST):
+            gx = ((c - _FONT_FIRST) % cols) * cw
+            gy = ((c - _FONT_FIRST) // cols) * ch
+            d.text((gx, gy - 1), chr(c), font=font, fill=(255, 255, 255, 255))
+        _write_tex(Path(out_dir) / "text" / "font.tex", atlas.width, atlas.height, atlas.tobytes())
+        with open(Path(out_dir) / "text" / "font.meta", "wb") as f:
+            f.write(b"FMET")
+            f.write(struct.pack("<HHHHH", cw, ch, cols, _FONT_FIRST, n))
+        return True
+    except Exception as e:
+        print("[bake] font skipped:", e); return False
+
+
+
 def bake(obb_path=None, out_dir=".", *, proper_dir=None, limit=None, only=None,
          src_files=None):
     if src_files is not None:
@@ -188,6 +274,7 @@ def bake(obb_path=None, out_dir=".", *, proper_dir=None, limit=None, only=None,
     (out / "maps").mkdir(parents=True, exist_ok=True)
     (out / "tex").mkdir(parents=True, exist_ok=True)
     (out / "sprites").mkdir(parents=True, exist_ok=True)
+    (out / "text").mkdir(parents=True, exist_ok=True)
 
     manifest = {"version": BUNDLE_VERSION, "source": source_name,
                 "collision": bool(capk), "maps": [], "tilesheets": [], "sprites": []}
@@ -252,6 +339,11 @@ def bake(obb_path=None, out_dir=".", *, proper_dir=None, limit=None, only=None,
         _write_tex(out / "sprites" / f"{stem}.tex", w, h, rgba)
         baked_sprites.add(stem)
         manifest["sprites"].append({"stem": stem, "img": img, "var": var, "w": w, "h": h})
+
+    n_msgs = _bake_messages(files, out)
+    has_font = _bake_font(out)
+    manifest["text"] = {"messages": n_msgs, "font": has_font,
+                        "msg_section": FIELD_MSG_SECTION}
 
     with open(out / "manifest.json", "w") as f:
         json.dump(manifest, f, indent=2)

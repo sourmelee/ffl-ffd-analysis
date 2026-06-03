@@ -17,6 +17,19 @@ commit as the changelog entry.
 
 ## [Unreleased]
 
+## [0.7.4] - 2026-06-03
+
+### Added
+
+- **Field dialogue text + font baking for FFSmith (`android_export/ffsmith_bake.py`).**
+  The baker now emits `text/messages.bin` (msg_id -> English string) and a bitmap-font
+  atlas (`text/font.tex` + `text/font.meta`). Field scenario text is decoded from
+  `system_message.msd` — 6-language-interleaved records, **English = slot 1** — matching
+  the engine's `GetMessageData`, which indexes the active language's array directly by
+  msg_id. `<chaN>` party-name placeholders normalize to "Hero". Font atlas is
+  DejaVuSansMono (ASCII 32-126, 8x14 cells). Section 4 is the scenario bank for the
+  early maps (m500/m501); per-chapter bank selection is a follow-up.
+
 ## [0.7.3] - 2026-06-03
 
 ### Added
