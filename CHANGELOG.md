@@ -17,6 +17,25 @@ commit as the changelog entry.
 
 ## [Unreleased]
 
+## [0.7.3] - 2026-06-03
+
+### Added
+
+- **Event warp extraction (`events/android.py` `event_warp()`).** Decodes a
+  field event's door / map-edge warp destination from its scripts: `0x6B`
+  BulkSetVars with `sub==2` sets the script-variable bank (var0 = dest map,
+  var2 = x, var3 = y, var4 = facing) and `0x66` SetEntityAction with action
+  byte `0x04` executes the move-map (action `0x03` = NPC spawn); `0x41`
+  MapChange is the direct form used by connection maps. Validated across the
+  Android data — 4507/4514 such records resolve to an in-bounds destination
+  map. The multi-event disassembler now annotates each warp event with
+  `>> WARP -> map M @(x,y) dir d`. (Shared decode with the FFSmith engine.)
+
+### Changed
+
+- **Opcode descriptions** for `0x66` SetEntityAction (action-byte semantics) and
+  `0x6b` BulkSetVars (sub-bank + warp idiom) sharpened to match the decode.
+
 ## [0.7.2] - 2026-06-02
 
 ### Fixed

@@ -106,6 +106,43 @@ def parse_android_event_pack(buf: bytes) -> dict:
                 "parse_error": f"parse exception: {e}"}
 
 
+def event_warp(ev: dict):
+    """Return a door / map-edge warp destination for a parsed event, or None.
+
+    Warps are encoded in the event's scripts (FieldClass::MoveScript):
+      * ``0x6B`` BulkSetVars with ``sub==2`` writes the script-variable bank;
+        a warp sets ``var0``=dest map, ``var2``=x, ``var3``=y, ``var4``=facing.
+      * ``0x66`` SetEntityAction with action byte ``0x04`` executes the move-map
+        using those vars (action ``0x03`` spawns an NPC/object instead).
+      * ``0x41`` MapChange is the direct (rare) form used by connection maps.
+
+    Returns ``{"map","x","y","dir","via"}`` or ``None``.
+    """
+    vars_ = {}
+    warp_action = False
+    for s in ev.get("scripts", []):
+        if not s:
+            continue
+        op = s[0]
+        if op == 0x41 and len(s) >= 7:
+            return {"map": (s[2] << 8) | s[3], "x": s[4], "y": s[5],
+                    "dir": s[6], "via": "MapChange"}
+        if op == 0x6b and len(s) >= 3 and s[1] == 2:
+            cnt = s[2]; q = 3
+            for _ in range(cnt):
+                if q + 6 > len(s):
+                    break
+                key = (s[q] << 8) | s[q + 1]
+                val = (s[q + 2] << 24) | (s[q + 3] << 16) | (s[q + 4] << 8) | s[q + 5]
+                vars_[key] = val; q += 6
+        elif op == 0x66 and len(s) > 4 and s[4] == 0x04:
+            warp_action = True
+    if warp_action and vars_.get(0, 0) > 0:
+        return {"map": vars_.get(0, 0), "x": vars_.get(2, 0), "y": vars_.get(3, 0),
+                "dir": vars_.get(4, 0), "via": "vars"}
+    return None
+
+
 def disassemble_android_event_pack(buf: bytes) -> str:
     """
     Multi-event disassembly of a whole Android event pack (as found inside
@@ -124,6 +161,10 @@ def disassemble_android_event_pack(buf: bytes) -> str:
             f"boot=0x{ev['boot']:02x}  chara_img={ev['chara_img']}/"
             f"{ev['chara_var']}  scripts={len(ev['scripts'])} ==="
         )
+        w = event_warp(ev)
+        if w:
+            lines.append(f"    >> WARP -> map {w['map']} @({w['x']},{w['y']}) "
+                         f"dir {w['dir']} [{w['via']}]")
         for j, s in enumerate(ev["scripts"]):
             if not s:
                 lines.append(f"    [{j}] (empty)")

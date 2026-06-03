@@ -25,7 +25,7 @@ from __future__ import annotations
 # - MINOR: backward-compatible new features (new tab, new parser, new menu)
 # - PATCH: bug fixes only
 # Keep CHANGELOG.md in sync.
-__version__ = "0.7.2"
+__version__ = "0.7.3"
 
 # Constants and binary helpers are foundational - re-exported so older
 # parser-only callers can keep doing ``from ffd_toolkit import be_u32``.
