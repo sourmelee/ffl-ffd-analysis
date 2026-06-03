@@ -172,12 +172,14 @@ def _write_ffmap(path, parsed, engine, pass_grid, events):
 
 
 # --- Field dialogue text + font atlas (M3b font/text) ---------------------
-# Field scenario messages live in system_message.msd; SetMessage msg_id indexes
-# the active language's strings directly (engine GetMessageData -> array[id]).
-# Strings are stored 6-languages-interleaved per record (ja,en,fr,zh_cn,zh_tw,ko);
-# English = slot 1.  Section 4 is the scenario/cutscene bank used by the early
-# maps (m500/m501).  Per-map bank selection for other chapters is a follow-up.
-FIELD_MSG_SECTION = 4
+# Field dialogue is PER-AREA: the engine loads msg{N}.msd (FieldClass+0x380, set by
+# GameClass::ReadStoryMessageData -> SetMessageList), where N is the area/story bank
+# (GameClass+0x19fe0).  N is story-state, but maps cluster 1:1 with the 16 banks by
+# map GROUP, so we bake bank = group.  msg{N}.msd: u16-BE message count, then count
+# messages x 6 languages x 2 slots (dialogue text, speaker name); each string =
+# u16-BE len + UTF-8 + NUL.  English text = language 1, slot 0  =>  index msg*12 + 2.
+# (Verified vs FieldClass::MoveScript/GetMessageData + GameClass::LoadMessageData_UTF8;
+# the earlier system_message.msd section-4 source was a wrong-but-coherent guess.)
 _FONT_FIRST, _FONT_LAST, _FONT_COLS, _FONT_CW, _FONT_CH = 32, 127, 16, 8, 14
 
 
@@ -186,49 +188,48 @@ def _clean_message(s: str) -> str:
     return re.sub(r"<cha\d>", "Hero", s)   # party-name placeholders -> generic
 
 
-def _field_messages_en(files, section=FIELD_MSG_SECTION):
-    """Return {msg_id: english_string} from system_message.msd section `section`."""
-    blob = files.get("system_message.msd") if hasattr(files, "get") else None
-    if blob is None and "system_message.msd" in files:
-        blob = files["system_message.msd"]
-    if not blob:
+def _read_msg_bank(files, bank):
+    """{msg_id: english_text} from msg{bank}.msd (per-area dialogue bank)."""
+    name = f"msg{bank}.msd"
+    blob = files.get(name) if hasattr(files, "get") else None
+    if blob is None and name in files:
+        blob = files[name]
+    if not blob or len(blob) < 2:
         return {}
-    from ..text.system_message import _read_toc
-    toc = _read_toc(blob)
-    if section + 1 >= len(toc):
-        return {}
-    start, end = toc[section], toc[section + 1]
-    if not (0 <= start < end <= len(blob)) or start + 2 > end:
-        return {}
-    count = struct.unpack_from(">H", blob, start)[0]
-    p = start + 2
+    count = (blob[0] << 8) | blob[1]
+    p = 2
+    strs = []
+    for _ in range(count * 12):                 # 6 languages x 2 slots (text, name)
+        if p + 2 > len(blob):
+            break
+        L = (blob[p] << 8) | blob[p + 1]; p += 2
+        if p + L > len(blob):
+            break
+        strs.append(blob[p:p + L].decode("utf-8", "replace") if L else ""); p += L
+        if p < len(blob):
+            p += 1                              # NUL terminator
     out = {}
-    for rec in range(count):
-        slots = []
-        for _ in range(6):                         # 6 languages per record
-            if p + 2 > end:
-                slots.append(""); continue
-            L = struct.unpack_from(">H", blob, p)[0]; p += 2
-            if p + L > end:
-                slots.append(""); break
-            slots.append(blob[p:p + L].decode("utf-8", "replace") if L else ""); p += L
-            if p < end:
-                p += 1                              # NUL terminator
-        en = slots[1] if len(slots) > 1 else ""
-        if en:
-            out[rec] = _clean_message(en)
+    for m in range(count):
+        i = m * 12 + 2                          # English (lang 1) dialogue-text slot
+        if i < len(strs) and strs[i]:
+            out[m] = _clean_message(strs[i])
     return out
 
 
-def _bake_messages(files, out_dir):
-    msgs = _field_messages_en(files)
-    path = Path(out_dir) / "text" / "messages.bin"
-    with open(path, "wb") as f:
-        f.write(b"FMSG"); f.write(struct.pack("<I", len(msgs)))
-        for mid, text in sorted(msgs.items()):
-            b = text.encode("utf-8")
-            f.write(struct.pack("<II", mid, len(b))); f.write(b)
-    return len(msgs)
+def _bake_messages(files, out_dir, banks):
+    """Bake text/msg{N}.bin for each area bank N (= map group)."""
+    total = 0
+    for bank in sorted(set(banks)):
+        msgs = _read_msg_bank(files, bank)
+        if not msgs:
+            continue
+        with open(Path(out_dir) / "text" / f"msg{bank}.bin", "wb") as f:
+            f.write(b"FMSG"); f.write(struct.pack("<I", len(msgs)))
+            for mid, text in sorted(msgs.items()):
+                b = text.encode("utf-8")
+                f.write(struct.pack("<II", mid, len(b))); f.write(b)
+        total += len(msgs)
+    return total
 
 
 def _bake_font(out_dir):
@@ -279,6 +280,7 @@ def bake(obb_path=None, out_dir=".", *, proper_dir=None, limit=None, only=None,
     manifest = {"version": BUNDLE_VERSION, "source": source_name,
                 "collision": bool(capk), "maps": [], "tilesheets": [], "sprites": []}
     needed_tex = set()
+    groups_seen = set()
     needed_sprites = set()
     n = 0
     for (g, p, mid, raw) in iter_android_maps(files):
@@ -297,6 +299,7 @@ def bake(obb_path=None, out_dir=".", *, proper_dir=None, limit=None, only=None,
         for ev in events:
             if ev["img"] > 0: needed_sprites.add((ev["img"], ev["var"]))
         _write_ffmap(out / "maps" / f"{key}.ffmap", parsed, engine, pass_grid, events)
+        groups_seen.add(g)
 
         s0 = (engine["mc_id_slot0"], engine["variant_slot0"]) if engine else (-1, 0)
         s1 = (engine["mc_id_slot1"], engine["variant_slot1"]) if engine else (-1, 0)
@@ -340,10 +343,10 @@ def bake(obb_path=None, out_dir=".", *, proper_dir=None, limit=None, only=None,
         baked_sprites.add(stem)
         manifest["sprites"].append({"stem": stem, "img": img, "var": var, "w": w, "h": h})
 
-    n_msgs = _bake_messages(files, out)
+    n_msgs = _bake_messages(files, out, groups_seen)
     has_font = _bake_font(out)
     manifest["text"] = {"messages": n_msgs, "font": has_font,
-                        "msg_section": FIELD_MSG_SECTION}
+                        "banks": sorted(groups_seen)}
 
     with open(out / "manifest.json", "w") as f:
         json.dump(manifest, f, indent=2)

@@ -17,6 +17,22 @@ commit as the changelog entry.
 
 ## [Unreleased]
 
+## [0.7.5] - 2026-06-03
+
+### Fixed
+
+- **Correct field-dialogue source — per-area `msg{N}.msd` banks.** 0.7.4 baked text
+  from `system_message.msd` section 4, a coincidentally-coherent but **wrong** source.
+  Field dialogue is per-area: the engine loads `msg{N}.msd` (`GameClass::ReadStoryMessageData`
+  -> `SetMessageList` -> `FieldClass+0x380`), N = the area bank. Maps map 1:1 to the 16
+  banks by **group**, so the baker now emits `text/msg{group}.bin` per group and the engine
+  picks the bank by map group. msg-file format corrected: `u16-BE count`, then messages x
+  6 languages x 2 slots (dialogue text + speaker name), each `u16-BE len + UTF-8 + NUL`;
+  **English text = index `msg*12 + 2`**. Verified: m501 NPC msg 170 = "Hey, ..." (was the
+  wrong "...Barbara!"); msg 847 (out of §4's range) now resolves. Bank = group is a static
+  stand-in for the engine's story-state bank (`GameClass+0x19fe0`); light/dark story-variant
+  banks may need the M4 state machine.
+
 ## [0.7.4] - 2026-06-03
 
 ### Added
