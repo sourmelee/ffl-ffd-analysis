@@ -233,6 +233,53 @@ def _bake_ui(files, out_dir):
     return baked
 
 
+def _bake_menu_data(files, out_dir):
+    """Bake item + character tables for the M5 menu pages (data/items.bin, data/chars.bin).
+    Item: id -> English name + desc (desc already embeds stats, e.g. "ATK 7").
+    Char: id -> English name + 6 equipment item-ids (resolved to item names by the engine)."""
+    counts = {"items": 0, "chars": 0}
+    def _get(nm):
+        return files.get(nm) if hasattr(files, "get") else (files[nm] if nm in files else None)
+    try:
+        from ..items.parser import parse_items_android
+        from ..characters.parser import parse_chara_set_android
+        from ..text.system_message import SystemMessageLookup
+        sm = SystemMessageLookup(_get("system_message.msd") or b"")
+        boot = _get("boot_data.dat")
+        items = parse_items_android(boot) if boot else []
+        recs = []
+        for iid, it in enumerate(items):
+            if not it:
+                continue
+            name = sm.name("Item", iid, "en") or it.get("name", "")
+            desc = sm.desc("Item", iid, "en") or it.get("desc", "")
+            if not name:
+                continue
+            recs.append((iid, name, desc))
+        with open(Path(out_dir) / "data" / "items.bin", "wb") as f:
+            f.write(b"FITM"); f.write(struct.pack("<I", len(recs)))
+            for iid, name, desc in recs:
+                nb = name.encode("utf-8"); db = desc.encode("utf-8")
+                f.write(struct.pack("<IH", iid, len(nb))); f.write(nb)
+                f.write(struct.pack("<H", len(db))); f.write(db)
+        counts["items"] = len(recs)
+        cs = _get("chara_set.dat")
+        chars = parse_chara_set_android(cs) if cs else []
+        with open(Path(out_dir) / "data" / "chars.bin", "wb") as f:
+            f.write(b"FCHR"); f.write(struct.pack("<I", len(chars)))
+            for c in chars:
+                en = sm.name("Character", c["id"], "en") or c.get("name", "")
+                nb = en.encode("utf-8")
+                f.write(struct.pack("<IH", c["id"], len(nb))); f.write(nb)
+                eq = (list(c.get("equipment", [])) + [0]*6)[:6]
+                for e in eq:
+                    f.write(struct.pack("<H", e & 0xffff))
+        counts["chars"] = len(chars)
+    except Exception as e:
+        print("[bake] menu data skipped:", e)
+    return counts
+
+
 def _bake_messages(files, out_dir, banks):
     """Bake text/msg{N}.bin for each area bank N (= map group)."""
     total = 0
@@ -294,6 +341,7 @@ def bake(obb_path=None, out_dir=".", *, proper_dir=None, limit=None, only=None,
     (out / "sprites").mkdir(parents=True, exist_ok=True)
     (out / "text").mkdir(parents=True, exist_ok=True)
     (out / "ui").mkdir(parents=True, exist_ok=True)
+    (out / "data").mkdir(parents=True, exist_ok=True)
 
     manifest = {"version": BUNDLE_VERSION, "source": source_name,
                 "collision": bool(capk), "maps": [], "tilesheets": [], "sprites": []}
@@ -364,9 +412,11 @@ def bake(obb_path=None, out_dir=".", *, proper_dir=None, limit=None, only=None,
     n_msgs = _bake_messages(files, out, groups_seen)
     has_font = _bake_font(out)
     ui_imgs = _bake_ui(files, out)
+    menu_counts = _bake_menu_data(files, out)
     manifest["text"] = {"messages": n_msgs, "font": has_font,
                         "banks": sorted(groups_seen)}
     manifest["ui"] = ui_imgs
+    manifest["menu_data"] = menu_counts
 
     with open(out / "manifest.json", "w") as f:
         json.dump(manifest, f, indent=2)

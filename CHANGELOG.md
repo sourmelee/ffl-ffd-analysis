@@ -17,6 +17,17 @@ commit as the changelog entry.
 
 ## [Unreleased]
 
+## [0.7.7] - 2026-06-03
+
+### Added
+
+- **Bake menu data for FFSmith (`_bake_menu_data`).** Emits `data/items.bin` (item id
+  -> English name + description, from `system_message.msd` Item section + `boot_data` §5
+  `parse_items_android`) and `data/chars.bin` (character id -> English name + 6 equipment
+  item-ids, from `chara_set.dat` `parse_chara_set_android`). Item descriptions already
+  embed stats ("ATK 7", "Restores 100 HP"). Powers the engine's M5 Item / Equip / Status
+  menu pages. Manifest gains `menu_data` counts.
+
 ## [0.7.6] - 2026-06-03
 
 ### Added
