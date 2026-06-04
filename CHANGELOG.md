@@ -17,6 +17,15 @@ commit as the changelog entry.
 
 ## [Unreleased]
 
+## [0.7.8] - 2026-06-03
+
+### Added
+
+- **Bake battle data for FFSmith.** `_bake_menu_data` now also emits `data/monsters.bin`
+  (monster id -> English name + HP / attack / defense / level, from `boot_data` §9
+  `parse_monsters_android` + `decode_monster_body`; 571 monsters), and `_bake_ui` bakes
+  `ui/btlbg.tex` (battle background from `btlbg0_0.png`). Powers FFSmith's M6 battle.
+
 ## [0.7.7] - 2026-06-03
 
 ### Added

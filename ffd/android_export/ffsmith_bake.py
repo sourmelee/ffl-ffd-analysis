@@ -221,7 +221,7 @@ def _bake_ui(files, out_dir):
     baked = []
     try:
         from PIL import Image
-        for src, dst in [("TitleLogo.png", "title.tex")]:
+        for src, dst in [("TitleLogo.png", "title.tex"), ("btlbg0_0.png", "btlbg.tex")]:
             blob = files.get(src) if hasattr(files, "get") else (files[src] if src in files else None)
             if not blob:
                 continue
@@ -275,6 +275,28 @@ def _bake_menu_data(files, out_dir):
                 for e in eq:
                     f.write(struct.pack("<H", e & 0xffff))
         counts["chars"] = len(chars)
+        from ..monsters.parser import parse_monsters_android, decode_monster_body
+        mons = parse_monsters_android(boot) if boot else []
+        mrecs = []
+        for mid, m in enumerate(mons):
+            if not m:
+                continue
+            en = sm.name("Monster", mid, "en") or m.get("name", "")
+            if not en or en.startswith("DBG"):
+                continue
+            b = decode_monster_body(m["body"])
+            hp = b.get("max_hp", 0)
+            if hp <= 0 or hp > 60000:
+                continue
+            mrecs.append((mid, en, min(hp, 65535), min(b.get("stat_b", 0), 65535),
+                          min(b.get("stat_c", 0), 65535), min(b.get("field14", 1), 255)))
+        with open(Path(out_dir) / "data" / "monsters.bin", "wb") as f:
+            f.write(b"FMON"); f.write(struct.pack("<I", len(mrecs)))
+            for mid, en, hp, atk, df, lvl in mrecs:
+                nb = en.encode("utf-8")
+                f.write(struct.pack("<IH", mid, len(nb))); f.write(nb)
+                f.write(struct.pack("<HHHB", hp, atk, df, lvl))
+        counts["monsters"] = len(mrecs)
     except Exception as e:
         print("[bake] menu data skipped:", e)
     return counts
