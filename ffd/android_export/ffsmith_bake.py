@@ -274,6 +274,9 @@ def _bake_menu_data(files, out_dir):
                 eq = (list(c.get("equipment", [])) + [0]*6)[:6]
                 for e in eq:
                     f.write(struct.pack("<H", e & 0xffff))
+                f.write(struct.pack("<BB", c.get("job", 0) & 0xff, c.get("level", 1) & 0xff))
+                for k in ("str", "spd", "vit", "int", "mnd"):
+                    f.write(struct.pack("<H", c.get(k, 0) & 0xffff))
         counts["chars"] = len(chars)
         from ..monsters.parser import parse_monsters_android, decode_monster_body
         mons = parse_monsters_android(boot) if boot else []

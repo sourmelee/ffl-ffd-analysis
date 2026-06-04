@@ -44,7 +44,11 @@ def _parse_chara_set_records(data: bytes, start: int):
                 break
             f173 = data[p]; p += 1
             f174 = data[p]; p += 1
-            p += 10                                     # skip
+            # engine ReadStartData order: JOB, LEVEL, then 7 attribute bytes
+            # (MEMBER_STATUS +0x34 job, +0x38 exp->level, +0x40.. STR/SPD/VIT/INT/MND).
+            job = data[p]; level = data[p + 1]
+            attrs = [data[p + 2 + k] for k in range(7)]
+            p += 10                                     # job+level+7attrs(+1 pad)
             f181 = []
             for _ in range(5):
                 if p + 2 > len(data): break
@@ -64,6 +68,10 @@ def _parse_chara_set_records(data: bytes, start: int):
             f191 = data[p]; p += 1
             out.append({
                 "id": i, "name": name,
+                "job": job, "level": level,
+                "str": attrs[0], "spd": attrs[1], "vit": attrs[2],
+                "int": attrs[3], "mnd": attrs[4],
+                "attrs": attrs,
                 "f173": f173, "f174": f174,
                 "f182": f182,
                 "f186": f186, "f187": f187, "f188": f188,

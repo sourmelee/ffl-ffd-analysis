@@ -17,6 +17,20 @@ commit as the changelog entry.
 
 ## [Unreleased]
 
+## [0.7.9] - 2026-06-03
+
+### Added
+
+- **Decoded character base stats (`chara_set.dat`).** Reverse-engineered the per-character
+  record layout from the engine's `GameClass::ReadStartData` + `MEMBER_STATUS` (job @+0x34,
+  exp @+0x38 -> level via a 98-entry table, attributes @+0x40..): each record stores **JOB,
+  LEVEL, and 7 attribute bytes** after the name. The 5 named attributes (labels from
+  `system_message` §3) are **STR, SPD, VIT, INT, MND**; archetype correlation confirms the
+  mapping (fighters Sol/Glaive STR 20/30 & SPD 0-5; agile Sarah/Alba STR ~0-2 & SPD 14-15).
+  `parse_chara_set_*` now exposes `job/level/str/spd/vit/int/mnd` and `_bake_menu_data` writes
+  them to `data/chars.bin` for FFSmith's Status page + STR-based battle damage. (HP/MP remain
+  engine-computed via `SetJobStatus` — not yet replicated.)
+
 ## [0.7.8] - 2026-06-03
 
 ### Added
