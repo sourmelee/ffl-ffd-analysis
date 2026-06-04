@@ -216,6 +216,23 @@ def _read_msg_bank(files, bank):
     return out
 
 
+def _bake_ui(files, out_dir):
+    """Bake UI images (title logo) the engine needs, as FTEX."""
+    baked = []
+    try:
+        from PIL import Image
+        for src, dst in [("TitleLogo.png", "title.tex")]:
+            blob = files.get(src) if hasattr(files, "get") else (files[src] if src in files else None)
+            if not blob:
+                continue
+            im = Image.open(io.BytesIO(blob)).convert("RGBA")
+            _write_tex(Path(out_dir) / "ui" / dst, im.width, im.height, im.tobytes())
+            baked.append(dst)
+    except Exception as e:
+        print("[bake] ui skipped:", e)
+    return baked
+
+
 def _bake_messages(files, out_dir, banks):
     """Bake text/msg{N}.bin for each area bank N (= map group)."""
     total = 0
@@ -276,6 +293,7 @@ def bake(obb_path=None, out_dir=".", *, proper_dir=None, limit=None, only=None,
     (out / "tex").mkdir(parents=True, exist_ok=True)
     (out / "sprites").mkdir(parents=True, exist_ok=True)
     (out / "text").mkdir(parents=True, exist_ok=True)
+    (out / "ui").mkdir(parents=True, exist_ok=True)
 
     manifest = {"version": BUNDLE_VERSION, "source": source_name,
                 "collision": bool(capk), "maps": [], "tilesheets": [], "sprites": []}
@@ -345,8 +363,10 @@ def bake(obb_path=None, out_dir=".", *, proper_dir=None, limit=None, only=None,
 
     n_msgs = _bake_messages(files, out, groups_seen)
     has_font = _bake_font(out)
+    ui_imgs = _bake_ui(files, out)
     manifest["text"] = {"messages": n_msgs, "font": has_font,
                         "banks": sorted(groups_seen)}
+    manifest["ui"] = ui_imgs
 
     with open(out / "manifest.json", "w") as f:
         json.dump(manifest, f, indent=2)

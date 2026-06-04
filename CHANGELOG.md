@@ -17,6 +17,14 @@ commit as the changelog entry.
 
 ## [Unreleased]
 
+## [0.7.6] - 2026-06-03
+
+### Added
+
+- **Bake UI images for FFSmith (`_bake_ui`).** The baker emits `ui/title.tex` (from
+  `TitleLogo.png`) so the engine can render a real title screen for the M4 state
+  machine. Manifest gains a `ui` list.
+
 ## [0.7.5] - 2026-06-03
 
 ### Fixed
