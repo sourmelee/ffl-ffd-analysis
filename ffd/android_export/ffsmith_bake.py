@@ -265,6 +265,18 @@ def _bake_menu_data(files, out_dir):
         counts["items"] = len(recs)
         cs = _get("chara_set.dat")
         chars = parse_chara_set_android(cs) if cs else []
+        # level-growth table = boot_data section 8 (engine memcpy boot[TOC[8]:TOC[9]] -> +0x213f8;
+        # 9-byte/level entries: HPbase u16-BE @+2, MPbase u16-BE @+4).  maxHP/MP ~= base[level]
+        # (per-job HP%/MP% multiplier defaulted to 100%).
+        hpb, mpb = [], []
+        if boot and len(boot) >= 68:
+            t = [struct.unpack_from("<I", boot, i * 4)[0] for i in range(17)]
+            s8 = boot[t[8]:t[9]]
+            for L in range(len(s8) // 9):
+                e = s8[L*9:L*9+9]
+                hpb.append((e[2] << 8) | e[3]); mpb.append((e[4] << 8) | e[5])
+        def _growth(tbl, lvl):
+            return tbl[max(0, min(lvl, len(tbl) - 1))] if tbl else 0
         with open(Path(out_dir) / "data" / "chars.bin", "wb") as f:
             f.write(b"FCHR"); f.write(struct.pack("<I", len(chars)))
             for c in chars:
@@ -274,9 +286,11 @@ def _bake_menu_data(files, out_dir):
                 eq = (list(c.get("equipment", [])) + [0]*6)[:6]
                 for e in eq:
                     f.write(struct.pack("<H", e & 0xffff))
-                f.write(struct.pack("<BB", c.get("job", 0) & 0xff, c.get("level", 1) & 0xff))
+                lvl = c.get("level", 1)
+                f.write(struct.pack("<BB", c.get("job", 0) & 0xff, lvl & 0xff))
                 for k in ("str", "spd", "vit", "int", "mnd"):
                     f.write(struct.pack("<H", c.get(k, 0) & 0xffff))
+                f.write(struct.pack("<HH", _growth(hpb, lvl) & 0xffff, _growth(mpb, lvl) & 0xffff))
         counts["chars"] = len(chars)
         from ..monsters.parser import parse_monsters_android, decode_monster_body
         mons = parse_monsters_android(boot) if boot else []
@@ -300,6 +314,18 @@ def _bake_menu_data(files, out_dir):
                 f.write(struct.pack("<IH", mid, len(nb))); f.write(nb)
                 f.write(struct.pack("<HHHB", hp, atk, df, lvl))
         counts["monsters"] = len(mrecs)
+        # Castable spell set (ids from the system_message Magic table; names are real, effects
+        # from the descriptions).  MP/power are tier approximations (boot has no clean magic-body
+        # section).  type: 0 = damage, 1 = heal.
+        CAST = [(1,1,4,24),(7,1,10,64),(13,1,18,150),
+                (25,0,5,16),(26,0,5,16),(27,0,5,16),
+                (31,0,14,38),(32,0,14,38),(33,0,14,38),(23,0,30,70),(36,0,18,45)]
+        with open(Path(out_dir) / "data" / "spells.bin", "wb") as f:
+            f.write(b"FSPL"); f.write(struct.pack("<I", len(CAST)))
+            for sid, typ, mp, pw in CAST:
+                nm = (sm.name("Magic", sid, "en") or "").encode("utf-8")
+                f.write(struct.pack("<HBHHH", sid, typ, mp, pw, len(nm))); f.write(nm)
+        counts["spells"] = len(CAST)
     except Exception as e:
         print("[bake] menu data skipped:", e)
     return counts

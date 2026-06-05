@@ -17,6 +17,27 @@ commit as the changelog entry.
 
 ## [Unreleased]
 
+## [0.7.11] - 2026-06-03
+
+### Added
+
+- **Bake a castable spell table for FFSmith (`data/spells.bin`).** 11 real spells from the
+  `system_message` Magic table — heals (Cure / Cura / Curaja) and damage (Fire / Blizzard /
+  Thunder / Fira / Holy / Bio) — with effect type read from the descriptions. MP cost + power
+  are tier approximations (boot has no clean magic-body section). Powers FFSmith's battle
+  Magic command (INT-scaled damage / MND-scaled heals, gated by MP).
+
+## [0.7.10] - 2026-06-03
+
+### Added
+
+- **Decoded HP/MP growth table + baked real maxHP/maxMP.** Located the level-growth table
+  (boot_data §8 -> engine `GameClass+0x213f8`; 9-byte/level entries, HPbase u16-BE @+2,
+  MPbase @+4) by tracing `GameClass::SetJobStatus` (maxHP = base[level] x jobHP%/100 + attr).
+  `_bake_menu_data` computes per-character `maxHP/maxMP = base[level]` (job% defaulted to 100 -
+  the level curve dominates) into `data/chars.bin`. E.g. Sol L3 -> HP 70 / MP 23; Aigis L10 ->
+  HP 199 / MP 51.
+
 ## [0.7.9] - 2026-06-03
 
 ### Added
