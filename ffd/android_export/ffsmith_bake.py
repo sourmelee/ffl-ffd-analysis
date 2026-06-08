@@ -37,7 +37,7 @@ from pathlib import Path
 from ..containers.obb import load_obb_as_dict
 from ..maps.android import parse_android_map_chunk, parse_android_map_engine
 from ..maps.mobile import parse_mpkh_index
-from ..maps.capk import parse_capk, pass_nibble, parse_capk_anim
+from ..maps.capk import parse_capk, pass_nibble, parse_capk_anim, parse_capk_floor
 from ..events.android import parse_android_event_pack
 
 FFMAP_MAGIC = b"FFM2"
@@ -435,6 +435,16 @@ def bake(obb_path=None, out_dir=".", *, proper_dir=None, limit=None, only=None,
             for _inner, _typ, _frames, _speed in _lst:
                 f.write(struct.pack("<HBBB", _inner, _typ, _frames, _speed))
     manifest["chipanim"] = sum(len(v) for v in chipanim.values())
+    # chip floor-attribute table (damage floors etc.; FieldClass::GetFloorAttributeOfChara).
+    chipfloor = parse_capk_floor(files["capk.dat"]) if "capk.dat" in files else {}
+    with open(out / "data" / "chipfloor.bin", "wb") as f:
+        f.write(b"FCFL"); f.write(struct.pack("<I", len(chipfloor)))
+        for _mc in sorted(chipfloor):
+            _rows = chipfloor[_mc]
+            f.write(struct.pack("<HH", _mc, len(_rows)))
+            for _inner, _fl in _rows:
+                f.write(struct.pack("<HB", _inner, _fl & 0xff))
+    manifest["chipfloor"] = sum(len(v) for v in chipfloor.values())
     needed_tex = set()
     groups_seen = set()
     needed_sprites = set()

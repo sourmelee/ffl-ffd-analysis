@@ -89,3 +89,41 @@ def parse_capk_anim(data: bytes):
             out[mc] = anim
         mc += 1
     return out
+
+
+def parse_capk_floor(data: bytes):
+    """Return {mc_id: [(inner_idx, floor_attr), ...]} for chips with a non-zero
+    floor attribute. From FieldClass::GetFloorAttributeOfChara / IsDamagedFloor:
+    the 6-bit field (A >> 18) & 0x3f is the floor-attribute enum; bit 0x10 of it
+    is tested by IsAttributeEffect(.,0x10) = DAMAGE FLOOR. Verified 2026-06-08:
+    value 0x12 (damage) on 47 chips, all in tileset mc63 (a single dungeon
+    tileset) -- the lava/poison pattern.
+    """
+    def leu32(o): return int.from_bytes(data[o:o + 4], "little")
+    def beu16(o): return (data[o] << 8) | data[o + 1]
+    def beu32(o): return int.from_bytes(data[o:o + 4], "big")
+    n = len(data)
+    out = {}
+    mc = 0
+    while mc < 4096:
+        toc_pos = (mc + 1) * 4
+        if toc_pos + 4 > n:
+            break
+        sec = leu32(toc_pos)
+        if sec <= 0 or sec + 2 > n or sec >= n:
+            break
+        count = beu16(sec)
+        off = sec + 2
+        rows = []
+        for idx in range(count):
+            if off + 7 > n:
+                break
+            A = beu32(off)
+            off += 7
+            fl = (A >> 18) & 0x3F
+            if fl:
+                rows.append((idx, fl))
+        if rows:
+            out[mc] = rows
+        mc += 1
+    return out

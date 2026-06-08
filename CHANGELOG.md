@@ -17,7 +17,15 @@ commit as the changelog entry.
 
 ## [Unreleased]
 
-## [0.7.14] - 2026-06-08
+## [0.7.15] - 2026-06-08
+
+### Added
+
+- **Bake chip floor-attribute table (`data/chipfloor.bin`).** `ffd/maps/capk.py::parse_capk_floor`
+  decodes the 6-bit floor-attribute enum `(A >> 18) & 0x3f` from each chip record; bit `0x10`
+  = **damage floor** (`FieldClass::GetFloorAttributeOfChara`/`IsDamagedFloor`). Baked as `FCFL`
+  (mc -> [(inner, floor_attr)]). Verified: the damage value 0x12 appears on 47 chips, all in
+  tileset mc63. Lets FFSmith hurt the (persistent) party on lava/poison floors.
 
 ### Added
 
