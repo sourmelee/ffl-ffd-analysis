@@ -101,11 +101,27 @@ def parse_android_map_engine(chunk: bytes):
         mc0 = r.i8(); v0 = r.u8()
         mc1 = r.i8(); v1 = r.u8()
 
+        # Overhead-layer threshold (FieldClass+0xdc2c): layers with index > this are
+        # drawn ABOVE characters (overhead).  It sits 10 bytes after slot1's variant:
+        # has_far(u8) + 2 far params + has_BG(u8) + 2 BG params + 2 i16BE BG shorts;
+        # LoadFar/LoadBGLayerAnime consume nothing from the stream.  Default 0.
+        overhead_threshold = 0
+        try:
+            r.u8()                       # has_far
+            r.u8(); r.u8()               # far params (always read)
+            r.u8()                       # has_BG
+            r.u8(); r.u8()               # BG params
+            r.i16be(); r.i16be()         # BG shorts
+            overhead_threshold = r.u8()  # 0xdc2c
+        except (IndexError, struct.error):
+            overhead_threshold = 0
+
         return {
             "w": w, "h": h, "n_layers": n_layers, "color": color,
             "layer_flags": layer_flags,
             "mc_id_slot0": mc0, "variant_slot0": v0,
             "mc_id_slot1": mc1, "variant_slot1": v1,
+            "overhead_threshold": overhead_threshold,
         }
     except (IndexError, struct.error):
         return None

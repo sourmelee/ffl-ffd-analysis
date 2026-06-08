@@ -167,7 +167,8 @@ def _write_ffmap(path, parsed, engine, pass_grid, events):
         f.write(FFMAP_MAGIC)
         f.write(struct.pack("<HHH", w, h, len(layers)))
         f.write(struct.pack("<hHhH", mc0, v0 & 0xFFFF, mc1, v1 & 0xFFFF))
-        f.write(struct.pack("<I", 0))
+        thr = (engine or {}).get("overhead_threshold", 0) or 0
+        f.write(struct.pack("<I", thr & 0xFFFFFFFF))   # reserved u32 -> overhead-layer threshold
         for layer in layers:
             buf = bytearray()
             for (_mc_type, hb, lb) in layer:

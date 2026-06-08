@@ -17,7 +17,17 @@ commit as the changelog entry.
 
 ## [Unreleased]
 
-## [0.7.15] - 2026-06-08
+## [0.7.16] - 2026-06-08
+
+### Added
+
+- **Bake the overhead-layer threshold (`FieldClass+0xdc2c`) into each `.ffmap`.**
+  `parse_android_map_engine` now reads the threshold byte (10 bytes after slot1's
+  mc/variant: has_far + far params + has_BG + BG params + BG shorts, none of which
+  consume the stream), stored in the previously-reserved FFM2 u32. Layers with index
+  > threshold are overhead (drawn above characters). FFSmith uses it for exact
+  ground/overhead split instead of assuming threshold 0. Distribution across 1679
+  maps: 1456 at 0, 220 at 1, 3 at 2.
 
 ### Added
 
