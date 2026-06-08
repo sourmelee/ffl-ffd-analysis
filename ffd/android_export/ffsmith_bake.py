@@ -80,14 +80,35 @@ def iter_android_maps(files):
                 yield int(base_idx), pi, mid, pk[off:off + sz]
 
 
+_WARNED_TEX = set()
+
+
 def _load_tex_rgba(files, mc_id, variant):
-    from PIL import Image
+    from PIL import Image, ImageFile
     for v in (variant, 0):
         name = f"mc{mc_id}_{v}.png"
         key = next((k for k in files if Path(k).name == name), None)
-        if key:
+        if not key:
+            continue
+        try:
             im = Image.open(io.BytesIO(files[key])).convert("RGBA")
-            return im.width, im.height, v, im.tobytes()
+        except OSError:
+            # Truncated/corrupt source asset (e.g. an incomplete OBB extraction).
+            # Recover what PIL can rather than aborting the entire bake.
+            ImageFile.LOAD_TRUNCATED_IMAGES = True
+            try:
+                im = Image.open(io.BytesIO(files[key])).convert("RGBA")
+            except Exception:
+                if name not in _WARNED_TEX:
+                    print(f"[bake] WARNING: tileset {name} is unreadable (truncated source); skipping")
+                    _WARNED_TEX.add(name)
+                continue
+            finally:
+                ImageFile.LOAD_TRUNCATED_IMAGES = False
+            if name not in _WARNED_TEX:
+                print(f"[bake] WARNING: tileset {name} is truncated; loaded partial image")
+                _WARNED_TEX.add(name)
+        return im.width, im.height, v, im.tobytes()
     return None
 
 
@@ -241,7 +262,7 @@ def _bake_menu_data(files, out_dir):
     def _get(nm):
         return files.get(nm) if hasattr(files, "get") else (files[nm] if nm in files else None)
     try:
-        from ..items.parser import parse_items_android
+        from ..items.parser import parse_items_android, decode_item_body
         from ..characters.parser import parse_chara_set_android
         from ..text.system_message import SystemMessageLookup
         sm = SystemMessageLookup(_get("system_message.msd") or b"")
@@ -259,14 +280,17 @@ def _bake_menu_data(files, out_dir):
             ma = _re.search(r"ATK\s*(\d+)", desc); md = _re.search(r"DEF\s*(\d+)", desc)
             atk = int(ma.group(1)) if ma else 0
             dfn = int(md.group(1)) if md else 0
-            recs.append((iid, name, desc, atk, dfn))
+            # item_type (body offset 0) = category: 0 consumable/key, 1-15 weapon classes,
+            # 16 shield, 17-19 head, 20-22 body, 23 hands/accessory (equip_type @off1 is always 0).
+            itype = decode_item_body(it["body"])["item_type"] if it.get("body") else 0
+            recs.append((iid, name, desc, atk, dfn, itype))
         with open(Path(out_dir) / "data" / "items.bin", "wb") as f:
             f.write(b"FITM"); f.write(struct.pack("<I", len(recs)))
-            for iid, name, desc, atk, dfn in recs:
+            for iid, name, desc, atk, dfn, itype in recs:
                 nb = name.encode("utf-8"); db = desc.encode("utf-8")
                 f.write(struct.pack("<IH", iid, len(nb))); f.write(nb)
                 f.write(struct.pack("<H", len(db))); f.write(db)
-                f.write(struct.pack("<HH", atk & 0xffff, dfn & 0xffff))   # weapon ATK / armor DEF
+                f.write(struct.pack("<HHB", atk & 0xffff, dfn & 0xffff, itype & 0xff))  # weapon ATK / armor DEF / item_type
         counts["items"] = len(recs)
         cs = _get("chara_set.dat")
         chars = parse_chara_set_android(cs) if cs else []

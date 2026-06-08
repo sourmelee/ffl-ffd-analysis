@@ -17,6 +17,25 @@ commit as the changelog entry.
 
 ## [Unreleased]
 
+## [0.7.13] - 2026-06-08
+
+### Added
+
+- **Bake item category (`item_type`) into `data/items.bin`.** Each item record now carries a
+  trailing `u8` item_type (body offset 0): 0 = consumable/key item, 1-15 = weapon classes
+  (knife/sword/katana/spear/axe/claw/staff/rod/bow/harp/whip/throwing/shuriken), 16 = shield,
+  17-19 = head, 20-22 = body, 23 = hands/accessory. This lets FFSmith match equipment to the
+  correct slot by category (shield → off-hand, hat → head, def-less accessories now equippable)
+  instead of the prior atk/def heuristic. Note: `equip_type` (body offset 1) is always 0 and is
+  NOT the slot discriminator. `data/items.bin` format is now `... atk:u16 def:u16 item_type:u8`.
+
+### Fixed
+
+- **Baker no longer aborts on a truncated source tileset.** `_load_tex_rgba` now tolerates a
+  corrupt/incomplete `mc*.png` (loads the partial image and warns, e.g. `mc34_0.png`,
+  `mc60_0.png` in the current extraction) instead of raising `OSError` and killing the whole
+  `--bake-ffsmith` run.
+
 ## [0.7.12] - 2026-06-03
 
 ### Added
