@@ -17,6 +17,15 @@ commit as the changelog entry.
 
 ## [Unreleased]
 
+## [0.7.12] - 2026-06-03
+
+### Added
+
+- **Bake weapon ATK / armor DEF (`data/items.bin`).** Parsed from the item descriptions
+  ("ATK 7", "DEF 2") so FFSmith's damage formula has real weapon power (Knife 7, Orichalcum
+  23, Graham's Sword 47, Masamune 100) and armor defense. Feeds the exact `CalcPhysicAttackDmg`
+  core (W=weapon, A=STR, L=level, D=defense).
+
 ## [0.7.11] - 2026-06-03
 
 ### Added

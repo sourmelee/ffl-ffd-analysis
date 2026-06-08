@@ -247,6 +247,7 @@ def _bake_menu_data(files, out_dir):
         sm = SystemMessageLookup(_get("system_message.msd") or b"")
         boot = _get("boot_data.dat")
         items = parse_items_android(boot) if boot else []
+        import re as _re
         recs = []
         for iid, it in enumerate(items):
             if not it:
@@ -255,13 +256,17 @@ def _bake_menu_data(files, out_dir):
             desc = sm.desc("Item", iid, "en") or it.get("desc", "")
             if not name:
                 continue
-            recs.append((iid, name, desc))
+            ma = _re.search(r"ATK\s*(\d+)", desc); md = _re.search(r"DEF\s*(\d+)", desc)
+            atk = int(ma.group(1)) if ma else 0
+            dfn = int(md.group(1)) if md else 0
+            recs.append((iid, name, desc, atk, dfn))
         with open(Path(out_dir) / "data" / "items.bin", "wb") as f:
             f.write(b"FITM"); f.write(struct.pack("<I", len(recs)))
-            for iid, name, desc in recs:
+            for iid, name, desc, atk, dfn in recs:
                 nb = name.encode("utf-8"); db = desc.encode("utf-8")
                 f.write(struct.pack("<IH", iid, len(nb))); f.write(nb)
                 f.write(struct.pack("<H", len(db))); f.write(db)
+                f.write(struct.pack("<HH", atk & 0xffff, dfn & 0xffff))   # weapon ATK / armor DEF
         counts["items"] = len(recs)
         cs = _get("chara_set.dat")
         chars = parse_chara_set_android(cs) if cs else []
