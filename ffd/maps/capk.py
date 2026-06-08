@@ -51,3 +51,41 @@ def pass_nibble(capk, mc_id, tile_num):
     if not nibs or tile_num >= len(nibs):
         return 0x0F
     return nibs[tile_num]
+
+
+def parse_capk_anim(data: bytes):
+    """Return {mc_id: [(inner_idx, type, frames, speed), ...]} for animated chips.
+
+    From FieldClass::LoadChipAttribute + GetUpdateChipIDOfPosition: in the 7-byte
+    chip record's u32-BE word A, bit 8 = animated, bits 9-10 = type (0 loop,
+    1 ping-pong), bits 11-14 = frame count, bits 15-17 = speed index. Animated
+    chip cycles consecutive inner ids base..base+frames-1. Verified 2026-06-08:
+    1136 animated chips, all 3-frame, speed 1-2 (water/torch pattern).
+    """
+    def leu32(o): return int.from_bytes(data[o:o + 4], "little")
+    def beu16(o): return (data[o] << 8) | data[o + 1]
+    def beu32(o): return int.from_bytes(data[o:o + 4], "big")
+    n = len(data)
+    out = {}
+    mc = 0
+    while mc < 4096:
+        toc_pos = (mc + 1) * 4
+        if toc_pos + 4 > n:
+            break
+        sec = leu32(toc_pos)
+        if sec <= 0 or sec + 2 > n or sec >= n:
+            break
+        count = beu16(sec)
+        off = sec + 2
+        anim = []
+        for idx in range(count):
+            if off + 7 > n:
+                break
+            A = beu32(off)
+            off += 7
+            if (A >> 8) & 1:
+                anim.append((idx, (A >> 9) & 3, (A >> 11) & 0xF, (A >> 15) & 7))
+        if anim:
+            out[mc] = anim
+        mc += 1
+    return out

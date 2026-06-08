@@ -17,7 +17,16 @@ commit as the changelog entry.
 
 ## [Unreleased]
 
-## [0.7.13] - 2026-06-08
+## [0.7.14] - 2026-06-08
+
+### Added
+
+- **Bake chip-animation table (`data/chipanim.bin`).** New `ffd/maps/capk.py::parse_capk_anim`
+  decodes per-tileset animated chips from `capk.dat` (in the 7-byte record's u32-BE word A:
+  bit 8 = animated, bits 9-10 = type [0 loop / 1 ping-pong], bits 11-14 = frame count,
+  bits 15-17 = speed). The baker writes `FCAN` (mc -> animated inner chips); FFSmith cycles
+  `base..base+frames-1` to animate water/torches. Verified: 1136 animated chips (all 3-frame),
+  22,307 animated cells on the overworld.
 
 ### Added
 

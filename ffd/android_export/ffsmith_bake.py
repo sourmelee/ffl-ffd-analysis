@@ -37,7 +37,7 @@ from pathlib import Path
 from ..containers.obb import load_obb_as_dict
 from ..maps.android import parse_android_map_chunk, parse_android_map_engine
 from ..maps.mobile import parse_mpkh_index
-from ..maps.capk import parse_capk, pass_nibble
+from ..maps.capk import parse_capk, pass_nibble, parse_capk_anim
 from ..events.android import parse_android_event_pack
 
 FFMAP_MAGIC = b"FFM2"
@@ -425,6 +425,16 @@ def bake(obb_path=None, out_dir=".", *, proper_dir=None, limit=None, only=None,
 
     manifest = {"version": BUNDLE_VERSION, "source": source_name,
                 "collision": bool(capk), "maps": [], "tilesheets": [], "sprites": []}
+    # chip-animation table (per-tileset animated chips; FieldClass::GetUpdateChipID).
+    chipanim = parse_capk_anim(files["capk.dat"]) if "capk.dat" in files else {}
+    with open(out / "data" / "chipanim.bin", "wb") as f:
+        f.write(b"FCAN"); f.write(struct.pack("<I", len(chipanim)))
+        for _mc in sorted(chipanim):
+            _lst = chipanim[_mc]
+            f.write(struct.pack("<HH", _mc, len(_lst)))
+            for _inner, _typ, _frames, _speed in _lst:
+                f.write(struct.pack("<HBBB", _inner, _typ, _frames, _speed))
+    manifest["chipanim"] = sum(len(v) for v in chipanim.values())
     needed_tex = set()
     groups_seen = set()
     needed_sprites = set()
