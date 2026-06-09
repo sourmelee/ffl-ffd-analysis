@@ -298,13 +298,17 @@ def _bake_menu_data(files, out_dir):
         # level-growth table = boot_data section 8 (engine memcpy boot[TOC[8]:TOC[9]] -> +0x213f8;
         # 9-byte/level entries: HPbase u16-BE @+2, MPbase u16-BE @+4).  maxHP/MP ~= base[level]
         # (per-job HP%/MP% multiplier defaulted to 100%).
-        hpb, mpb = [], []
+        hpb, mpb, thr = [], [], []
         if boot and len(boot) >= 68:
             t = [struct.unpack_from("<I", boot, i * 4)[0] for i in range(17)]
             s8 = boot[t[8]:t[9]]
             for L in range(len(s8) // 9):
                 e = s8[L*9:L*9+9]
                 hpb.append((e[2] << 8) | e[3]); mpb.append((e[4] << 8) | e[5])
+            # EXP thresholds (LevelUp reads BE u32 @ s8[0x10 + 9*i]); level = #thresholds passed.
+            for i in range(98):
+                o = 0x10 + 9 * i
+                thr.append(int.from_bytes(s8[o:o+4], "big") if o + 4 <= len(s8) else (thr[-1] if thr else 0))
         def _growth(tbl, lvl):
             return tbl[max(0, min(lvl, len(tbl) - 1))] if tbl else 0
         with open(Path(out_dir) / "data" / "chars.bin", "wb") as f:
@@ -322,6 +326,16 @@ def _bake_menu_data(files, out_dir):
                     f.write(struct.pack("<H", c.get(k, 0) & 0xffff))
                 f.write(struct.pack("<HH", _growth(hpb, lvl) & 0xffff, _growth(mpb, lvl) & 0xffff))
         counts["chars"] = len(chars)
+        # level table: EXP thresholds + per-level HP/MP growth (boot section 8).
+        with open(Path(out_dir) / "data" / "levels.bin", "wb") as f:
+            f.write(b"FLVL")
+            f.write(struct.pack("<H", len(thr)))
+            for v in thr:
+                f.write(struct.pack("<I", v & 0xFFFFFFFF))
+            f.write(struct.pack("<H", len(hpb)))
+            for L in range(len(hpb)):
+                f.write(struct.pack("<HH", hpb[L] & 0xFFFF, mpb[L] & 0xFFFF))
+        counts["levels"] = len(thr)
         from ..monsters.parser import parse_monsters_android, decode_monster_body
         mons = parse_monsters_android(boot) if boot else []
         mrecs = []
@@ -335,14 +349,17 @@ def _bake_menu_data(files, out_dir):
             hp = b.get("max_hp", 0)
             if hp <= 0 or hp > 60000:
                 continue
+            bd = m["body"]
+            exp = int.from_bytes(bd[6:10], "big") if len(bd) >= 10 else 0
+            gil = int.from_bytes(bd[10:14], "big") if len(bd) >= 14 else 0
             mrecs.append((mid, en, min(hp, 65535), min(b.get("stat_b", 0), 65535),
-                          min(b.get("stat_c", 0), 65535), min(b.get("field14", 1), 255)))
+                          min(b.get("stat_c", 0), 65535), min(b.get("field14", 1), 255), exp, gil))
         with open(Path(out_dir) / "data" / "monsters.bin", "wb") as f:
             f.write(b"FMON"); f.write(struct.pack("<I", len(mrecs)))
-            for mid, en, hp, atk, df, lvl in mrecs:
+            for mid, en, hp, atk, df, lvl, exp, gil in mrecs:
                 nb = en.encode("utf-8")
                 f.write(struct.pack("<IH", mid, len(nb))); f.write(nb)
-                f.write(struct.pack("<HHHB", hp, atk, df, lvl))
+                f.write(struct.pack("<HHHBII", hp, atk, df, lvl, exp & 0xFFFFFFFF, gil & 0xFFFFFFFF))
         counts["monsters"] = len(mrecs)
         # Castable spell set (ids from the system_message Magic table; names are real, effects
         # from the descriptions).  MP/power are tier approximations (boot has no clean magic-body

@@ -17,7 +17,16 @@ commit as the changelog entry.
 
 ## [Unreleased]
 
-## [0.7.16] - 2026-06-08
+## [0.7.17] - 2026-06-08
+
+### Added
+
+- **Bake monster EXP/gil rewards + a level table for FFSmith's battle loop.** `monsters.bin`
+  records gain `exp` + `gil` (u32 each), decoded as BE u32 at monster body[6]/body[10] (verified:
+  Goblin 10/3, Hornet 9/2 -- the prior "13367" was a wrong offset; AP at body[14] left for later).
+  New `data/levels.bin` (`FLVL`): the EXP-threshold curve (`LevelUp` reads BE u32 @ section-8
+  `[0x10 + 9*i]` -> 45/97/173/261...) plus per-level HP/MP growth (section-8 `[L*9+2]`/`[+4]`),
+  so the engine can map EXP->level and recompute max HP/MP on level-up.
 
 ### Added
 
