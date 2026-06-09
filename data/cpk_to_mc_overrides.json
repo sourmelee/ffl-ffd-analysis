@@ -170,6 +170,22 @@
             "variant": 1
           }
         }
+      },
+      "49": {
+        "by_palette": {
+          "2": {
+            "mc_id": 8,
+            "variant": 2
+          }
+        }
+      },
+      "41": {
+        "by_palette": {
+          "0": {
+            "mc_id": 41,
+            "variant": 0
+          }
+        }
       }
     },
     "Chapter4": {
@@ -189,6 +205,96 @@
         "by_palette": {
           "0": {
             "mc_id": 18,
+            "variant": 0
+          }
+        }
+      },
+      "43": {
+        "by_palette": {
+          "0": {
+            "mc_id": 43,
+            "variant": 0
+          }
+        }
+      }
+    },
+    "Postgame": {
+      "63": {
+        "by_palette": {
+          "0": {
+            "mc_id": 63,
+            "variant": 0
+          },
+          "1": {
+            "mc_id": 63,
+            "variant": 1
+          }
+        }
+      },
+      "56": {
+        "by_palette": {
+          "0": {
+            "mc_id": 56,
+            "variant": 0
+          },
+          "1": {
+            "mc_id": 56,
+            "variant": 1
+          }
+        }
+      },
+      "55": {
+        "by_palette": {
+          "0": {
+            "mc_id": 55,
+            "variant": 0
+          },
+          "1": {
+            "mc_id": 55,
+            "variant": 1
+          }
+        }
+      },
+      "52": {
+        "by_palette": {
+          "0": {
+            "mc_id": 52,
+            "variant": 0
+          }
+        }
+      },
+      "51": {
+        "by_palette": {
+          "0": {
+            "mc_id": 51,
+            "variant": 0
+          }
+        }
+      },
+      "20": {
+        "by_palette": {
+          "0": {
+            "mc_id": 20,
+            "variant": 0
+          }
+        }
+      },
+      "19": {
+        "by_palette": {
+          "0": {
+            "mc_id": 19,
+            "variant": 0
+          },
+          "1": {
+            "mc_id": 19,
+            "variant": 1
+          }
+        }
+      },
+      "8": {
+        "by_palette": {
+          "0": {
+            "mc_id": 8,
             "variant": 0
           }
         }

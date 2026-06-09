@@ -452,6 +452,50 @@ def _bake_intro(files, out_dir):
     return 1 if prologue else 0
 
 
+
+def _bake_sprite_geo(files, out_dir):
+    """Bake per-sprite field-animation geometry (data/spritegeo.bin) so FFSmith can draw
+    object sprites (doors/crystals/chests) with their REAL frame rect + anchor instead of the
+    hardcoded 48x48 character grid. Each entry = the default (sub0 static) frame {x,y,w,h} + the
+    part offset (px,py) + an isObject flag (max frame height < 40). An optional override file
+    `sprite_grid.json` (authored in the toolkit's Animation tab) is merged over the field_anm seed.
+    """
+    from ..animation.parser import parse_field_anm
+    blob = files["field_anm.dat"] if "field_anm.dat" in files else b""
+    ents = parse_field_anm(blob) if blob else []
+    geo = {}
+    for idx, e in enumerate(ents):
+        frs = e.get("frames", [])
+        if not frs:
+            continue
+        subs = e.get("sub_anims", [])
+        kf = subs[0]["keyframes"][0] if subs and subs[0].get("keyframes") else None
+        fr = (kf.get("frame") if kf else None) or frs[0]
+        px = kf.get("part_x", 0) if kf else 0
+        py = kf.get("part_y", 0) if kf else 0
+        has_cycle = any(sa.get("kind") == "cycle" for sa in subs)
+        geo[idx] = {"isObject": 0 if has_cycle else 1,
+                    "fx": fr["x"], "fy": fr["y"], "fw": fr["w"], "fh": fr["h"],
+                    "px": px, "py": py}
+    # merge manual overrides (Animation tab authoring)
+    if "sprite_grid.json" in files:
+        try:
+            import json as _json
+            ov = _json.loads(files["sprite_grid.json"].decode("utf-8"))
+            for k, v in ov.items():
+                geo.setdefault(int(k), {}).update(v)
+        except Exception:
+            pass
+    with open(Path(out_dir) / "data" / "spritegeo.bin", "wb") as f:
+        f.write(b"FSGE"); f.write(struct.pack("<H", len(geo)))
+        for img in sorted(geo):
+            g = geo[img]
+            f.write(struct.pack("<HBhhHHhh", img, g.get("isObject", 0),
+                                g.get("fx", 0), g.get("fy", 0), g.get("fw", 0), g.get("fh", 0),
+                                g.get("px", 0), g.get("py", 0)))
+    return len(geo)
+
+
 def bake(obb_path=None, out_dir=".", *, proper_dir=None, limit=None, only=None,
          src_files=None):
     if src_files is not None:
@@ -564,6 +608,7 @@ def bake(obb_path=None, out_dir=".", *, proper_dir=None, limit=None, only=None,
     ui_imgs = _bake_ui(files, out)
     menu_counts = _bake_menu_data(files, out)
     _bake_intro(files, out)
+    _bake_sprite_geo(files, out)
     manifest["text"] = {"messages": n_msgs, "font": has_font,
                         "banks": sorted(groups_seen)}
     manifest["ui"] = ui_imgs

@@ -17,7 +17,15 @@ commit as the changelog entry.
 
 ## [Unreleased]
 
-## [0.7.19] - 2026-06-08
+## [0.7.20] - 2026-06-08
+
+### Added
+
+- **Bake per-sprite field-anim geometry (`data/spritegeo.bin`).** From `field_anm.dat`: each sprite's
+  default frame rect {x,y,w,h} + part offset (anchor) + an isObject flag. Lets FFSmith draw object
+  sprites (doors/crystals/chests) with their REAL frame/anchor instead of the hardcoded 48x48
+  character grid (each field_anm entry has its own size: chars 48x48/32x48, objects 16x16/20x24/32x16).
+  An optional `sprite_grid.json` override (to be authored in the Animation tab) is merged over the seed.
 
 ### Added
 
