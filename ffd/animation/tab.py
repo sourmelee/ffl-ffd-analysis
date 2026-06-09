@@ -15,7 +15,7 @@ from pathlib import Path
 from PIL import Image
 
 from ..gui_stub import (
-    tk, ttk,
+    tk, ttk, filedialog, messagebox,
 )
 from ..constants import (
     CHARA_TABLE,
@@ -25,6 +25,7 @@ from ..sprites.container import (
     parse_sprite_container,
 )
 from ..animation.parser import parse_field_anm, field_walk_entries
+from ..animation import sprite_grid as _sg
 from ..gui_core.base   import TabBase
 
 
@@ -150,6 +151,76 @@ class AnimationTab(TabBase):
         self.frame_info_lbl = ttk.Label(self, text="", font=("Courier", 8))
         self.frame_info_lbl.pack(anchor="w", padx=6)
 
+        # ---- Object-override panel (FFSmith sprite_grid.json authoring) -----
+        # Android-only.  Marks a field_anm sprite as an OBJECT (door/chest/
+        # crystal) so FFSmith draws its real frame rect at a tile-relative
+        # anchor instead of the hardcoded 48x48 character grid, and lets the
+        # frame + anchor be hand-tuned with a live tile-aligned preview.  Writes
+        # the override the baker merges (ffsmith_bake:_bake_sprite_geo).
+        self.ovr_frame = ttk.LabelFrame(
+            self, text="FFSmith object override — sprite_grid.json")
+        body = ttk.Frame(self.ovr_frame); body.pack(fill="x", padx=4, pady=2)
+        left = ttk.Frame(body); left.pack(side="left", fill="x", expand=True)
+
+        r1 = ttk.Frame(left); r1.pack(fill="x", pady=1)
+        self.ovr_is_object = tk.BooleanVar(value=False)
+        ttk.Checkbutton(
+            r1, text="Treat as object (draw real frame, not the 48×48 grid)",
+            variable=self.ovr_is_object,
+            command=self._ovr_on_change).pack(side="left")
+        self.ovr_img_lbl = ttk.Label(r1, text="img —", width=10)
+        self.ovr_img_lbl.pack(side="right")
+
+        self.ovr_fx = tk.IntVar(value=0); self.ovr_fy = tk.IntVar(value=0)
+        self.ovr_fw = tk.IntVar(value=0); self.ovr_fh = tk.IntVar(value=0)
+        self.ovr_px = tk.IntVar(value=0); self.ovr_py = tk.IntVar(value=0)
+        r2 = ttk.Frame(left); r2.pack(fill="x", pady=1)
+        ttk.Label(r2, text="Frame:").pack(side="left")
+        for lbl, var in (("x", self.ovr_fx), ("y", self.ovr_fy),
+                         ("w", self.ovr_fw), ("h", self.ovr_fh)):
+            ttk.Label(r2, text=f" {lbl}").pack(side="left")
+            ttk.Spinbox(r2, from_=-512, to=4096, width=5, textvariable=var,
+                        command=self._ovr_on_change).pack(side="left")
+        r3 = ttk.Frame(left); r3.pack(fill="x", pady=1)
+        ttk.Label(r3, text="Anchor (px,py):").pack(side="left")
+        for lbl, var in (("px", self.ovr_px), ("py", self.ovr_py)):
+            ttk.Label(r3, text=f" {lbl}").pack(side="left")
+            ttk.Spinbox(r3, from_=-512, to=512, width=5, textvariable=var,
+                        command=self._ovr_on_change).pack(side="left")
+        ttk.Label(r3, text="  (px=−w/2, py=−h centres a prop on the tile)",
+                  foreground="#888").pack(side="left")
+        # Live preview on any value change.
+        for v in (self.ovr_fx, self.ovr_fy, self.ovr_fw, self.ovr_fh,
+                  self.ovr_px, self.ovr_py):
+            v.trace_add("write", lambda *a: self._ovr_on_change())
+
+        r4 = ttk.Frame(left); r4.pack(fill="x", pady=2)
+        ttk.Button(r4, text="Seed from field_anm",
+                   command=self._ovr_seed).pack(side="left", padx=2)
+        ttk.Button(r4, text="Use selected frame",
+                   command=self._ovr_use_frame).pack(side="left", padx=2)
+        ttk.Button(r4, text="Save",
+                   command=self._ovr_save).pack(side="left", padx=8)
+        ttk.Button(r4, text="Remove",
+                   command=self._ovr_remove).pack(side="left", padx=2)
+
+        r5 = ttk.Frame(left); r5.pack(fill="x", pady=1)
+        ttk.Label(r5, text="File:").pack(side="left")
+        self.ovr_path_var = tk.StringVar(value="")
+        ttk.Entry(r5, textvariable=self.ovr_path_var).pack(
+            side="left", fill="x", expand=True, padx=2)
+        ttk.Button(r5, text="Browse…",
+                   command=self._ovr_browse).pack(side="left")
+        self.ovr_status = ttk.Label(left, text="", foreground="#080")
+        self.ovr_status.pack(anchor="w")
+
+        # Tile-aligned preview to the right of the controls.
+        prev = ttk.Frame(body); prev.pack(side="right", padx=4)
+        ttk.Label(prev, text="tile preview").pack()
+        self.ovr_canvas = tk.Canvas(prev, width=384, height=384,
+                                    background="#222", highlightthickness=0)
+        self.ovr_canvas.pack()
+
         # State
         self.sheets = []          # list of (key, label, PIL.Image)
         # For Android: the 63 field_anm entries (each with sub_anims).
@@ -167,6 +238,12 @@ class AnimationTab(TabBase):
         self._after_id = None
         self.frame_idx = 0
         self._sheet_photo = None
+        # Override-panel state
+        self._cur_fa_entry = None      # the picked field_anm entry dict
+        self._cur_fa_index = -1        # its index == FFSmith sprite/img id
+        self._ovr_path = None          # resolved sprite_grid.json path
+        self._ovr_photo = None         # keep a ref so the preview isn't GC'd
+        self._ovr_loading = False      # guard trace storms while setting vars
 
     # ---- public hook -------------------------------------------------------
     def on_data_change(self):
@@ -219,6 +296,10 @@ class AnimationTab(TabBase):
                     0)
                 self.fa_entry_combo.set(fa_labels[default_idx])
                 self._populate_entries_from_fa(self.fa_entries[default_idx])
+                self._cur_fa_entry = self.fa_entries[default_idx]
+                self._cur_fa_index = self.fa_entries[default_idx].get("index", -1)
+                self._ovr_sync_path()
+                self._ovr_refresh_from_entry()
 
         # Populate animation combobox
         entry_labels = [e.get("label", f"Entry {i}")
@@ -261,8 +342,17 @@ class AnimationTab(TabBase):
                 self.cell_row.pack_forget()
             except Exception:
                 pass
+            # Object-override panel is Android-only (objects come from field_anm).
+            try:
+                self.ovr_frame.pack_info()
+            except Exception:
+                self.ovr_frame.pack(fill="x", padx=6, pady=4)
         else:
             # Hide Entry picker, show cell-size row
+            try:
+                self.ovr_frame.pack_forget()
+            except Exception:
+                pass
             try:
                 self.entry_lbl.pack_forget()
             except Exception:
@@ -640,6 +730,9 @@ class AnimationTab(TabBase):
         fe = next((f for f in self.fa_entries if f["label"] == sel), None)
         if fe is None:
             return
+        self._cur_fa_entry = fe
+        self._cur_fa_index = fe.get("index", -1)
+        self._ovr_refresh_from_entry()
         self._populate_entries_from_fa(fe)
         labels = [e["label"] for e in self.entries]
         self.entry_combo["values"] = labels
@@ -851,6 +944,163 @@ class AnimationTab(TabBase):
         frames_data = self.current_entry.get("frames", []) if self.current_entry else []
         if not frames_data: return
         self.frame_idx = (self.frame_idx + 1) % len(frames_data); self._show_frame()
+
+    # ---- object-override panel (sprite_grid.json authoring) ----------------
+    def _ovr_get_geo(self):
+        """Read the panel widgets into a geo dict, or None while a field holds
+        a partial value mid-type (IntVar.get() raises -> skip redraw)."""
+        try:
+            return {
+                "isObject": 1 if self.ovr_is_object.get() else 0,
+                "fx": int(self.ovr_fx.get()), "fy": int(self.ovr_fy.get()),
+                "fw": int(self.ovr_fw.get()), "fh": int(self.ovr_fh.get()),
+                "px": int(self.ovr_px.get()), "py": int(self.ovr_py.get()),
+            }
+        except Exception:
+            return None
+
+    def _ovr_set_geo(self, geo):
+        """Push a geo dict into the panel widgets without triggering a redraw
+        storm from the IntVar traces."""
+        self._ovr_loading = True
+        try:
+            self.ovr_is_object.set(bool(geo.get("isObject", 0)))
+            self.ovr_fx.set(int(geo.get("fx", 0))); self.ovr_fy.set(int(geo.get("fy", 0)))
+            self.ovr_fw.set(int(geo.get("fw", 0))); self.ovr_fh.set(int(geo.get("fh", 0)))
+            self.ovr_px.set(int(geo.get("px", 0))); self.ovr_py.set(int(geo.get("py", 0)))
+        finally:
+            self._ovr_loading = False
+        self._ovr_redraw()
+
+    def _ovr_on_change(self):
+        if not self._ovr_loading:
+            self._ovr_redraw()
+
+    def _ovr_redraw(self):
+        geo = self._ovr_get_geo()
+        if geo is None:
+            return
+        sheet = self._current_sheet_image()
+        try:
+            img = _sg.render_tile_preview(sheet, geo, tile=48, pad=24, zoom=4)
+            from PIL import ImageTk as _ITk
+            self._ovr_photo = _ITk.PhotoImage(img)
+            self.ovr_canvas.configure(width=img.width, height=img.height)
+            self.ovr_canvas.delete("all")
+            self.ovr_canvas.create_image(0, 0, anchor="nw", image=self._ovr_photo)
+        except Exception:
+            pass
+        dx, dy, w, h = _sg.object_dest_rect(geo, 48)
+        kind = "object → real frame" if geo["isObject"] else "character → 48×48 grid (geo ignored)"
+        self.frame_info_lbl.config(
+            text=f"  override: {kind}   dest(tile-local)=({dx},{dy}) {w}×{h}")
+
+    def _ovr_refresh_from_entry(self):
+        """Seed the panel from the picked field_anm entry, or from an existing
+        saved override for this img id if one is present."""
+        idx = self._cur_fa_index
+        self.ovr_img_lbl.config(text=f"img {idx}" if idx >= 0 else "img —")
+        seed = (_sg.seed_geo_from_fa_entry(self._cur_fa_entry)
+                if self._cur_fa_entry else None) or {
+                    "isObject": 0, "fx": 0, "fy": 0, "fw": 0, "fh": 0, "px": 0, "py": 0}
+        ov = _sg.load_overrides(self._ovr_path) if self._ovr_path else {}
+        geo = ov.get(idx, seed)
+        self._ovr_set_geo(geo)
+        if idx in ov:
+            self.ovr_status.config(text=f"loaded existing override for img {idx}",
+                                   foreground="#06c")
+        else:
+            self.ovr_status.config(text="")
+
+    def _ovr_seed(self):
+        """Reset frame+anchor to the field_anm seed (keeps the isObject flag)."""
+        seed = _sg.seed_geo_from_fa_entry(self._cur_fa_entry) if self._cur_fa_entry else None
+        if not seed:
+            self.ovr_status.config(text="no field_anm frames to seed from",
+                                   foreground="#a00")
+            return
+        seed["isObject"] = 1 if self.ovr_is_object.get() else 0
+        self._ovr_set_geo(seed)
+        self.ovr_status.config(text="seeded frame/anchor from field_anm",
+                               foreground="#080")
+
+    def _ovr_use_frame(self):
+        """Copy the frame rect currently selected in the Animation preview into
+        the override (keeps anchor + isObject)."""
+        ent = self.current_entry
+        frames = ent.get("frames", []) if ent else []
+        if not frames:
+            self.ovr_status.config(text="no frame selected", foreground="#a00")
+            return
+        f = frames[max(0, min(self.frame_idx, len(frames) - 1))]
+        self._ovr_loading = True
+        try:
+            self.ovr_fx.set(int(f.get("x", 0))); self.ovr_fy.set(int(f.get("y", 0)))
+            self.ovr_fw.set(int(f.get("w", 0))); self.ovr_fh.set(int(f.get("h", 0)))
+        finally:
+            self._ovr_loading = False
+        self._ovr_redraw()
+        self.ovr_status.config(
+            text=f"frame ({f.get('x',0)},{f.get('y',0)}) "
+                 f"{f.get('w',0)}×{f.get('h',0)} copied", foreground="#080")
+
+    def _ovr_save(self):
+        geo = self._ovr_get_geo()
+        if geo is None or self._cur_fa_index < 0:
+            self.ovr_status.config(text="nothing to save", foreground="#a00")
+            return
+        path = self.ovr_path_var.get().strip() or self._ovr_path
+        if not path:
+            self._ovr_browse()
+            path = self.ovr_path_var.get().strip()
+            if not path:
+                return
+        self._ovr_path = path
+        try:
+            ov = _sg.save_override(path, self._cur_fa_index, geo)
+        except Exception as exc:
+            self.ovr_status.config(text=f"save failed: {exc}", foreground="#a00")
+            return
+        self.ovr_status.config(
+            text=f"saved img {self._cur_fa_index} → {len(ov)} override(s); "
+                 f"re-bake to apply", foreground="#080")
+
+    def _ovr_remove(self):
+        path = self.ovr_path_var.get().strip() or self._ovr_path
+        if not path or self._cur_fa_index < 0:
+            self.ovr_status.config(text="no override file", foreground="#a00")
+            return
+        try:
+            ov = _sg.remove_override(path, self._cur_fa_index)
+        except Exception as exc:
+            self.ovr_status.config(text=f"remove failed: {exc}", foreground="#a00")
+            return
+        self._ovr_refresh_from_entry()
+        self.ovr_status.config(
+            text=f"removed img {self._cur_fa_index}; {len(ov)} override(s) left",
+            foreground="#080")
+
+    def _ovr_browse(self):
+        init = self._ovr_path or _sg.default_override_path(self.data.obb_path) or ""
+        try:
+            from pathlib import Path as _P
+            initdir = str(_P(init).parent) if init else ""
+            path = filedialog.asksaveasfilename(
+                title="sprite_grid.json", defaultextension=".json",
+                initialdir=initdir or None, initialfile="sprite_grid.json",
+                filetypes=[("JSON", "*.json"), ("All", "*.*")])
+        except Exception:
+            path = ""
+        if path:
+            self._ovr_path = path
+            self.ovr_path_var.set(path)
+
+    def _ovr_sync_path(self):
+        """Resolve the default sprite_grid.json path from the loaded obb."""
+        if not self._ovr_path:
+            self._ovr_path = _sg.default_override_path(self.data.obb_path)
+        if self._ovr_path and not self.ovr_path_var.get().strip():
+            self.ovr_path_var.set(self._ovr_path)
 
 
 # =============================================================================

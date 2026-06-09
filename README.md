@@ -1,6 +1,6 @@
 # FFL / FFD Toolkit
 
-[![version](https://img.shields.io/badge/version-0.7.21-blue.svg)](CHANGELOG.md)
+[![version](https://img.shields.io/badge/version-0.7.22-blue.svg)](CHANGELOG.md)
 
 Reverse-engineering toolkit for **Final Fantasy Legends** (DoCoMo FOMA feature-phone, 2010 — Japan-only mobile release) and its 2013 Android remaster **Final Fantasy Dimensions**. The two builds share roughly 80% of their asset format DNA — the Android port re-encoded the mobile data files almost field-for-field, mostly flipping big-endian to little-endian and stuffing the obfuscated payloads inside an XOR-wrapped OBB. This codebase parses both.
 
@@ -90,6 +90,7 @@ The notebook displays 18 tabs in this order, every one defined by a `TabBase` su
 **Animation** — sprite animation playback.
 - *Android*: `field_anm.dat` has 63 generic field animations (idle, walk N/S/E/W, sit, talk, …). Every frame stores `tex_id=0` because the engine binds whichever `fldchr*_*.png` sheet the active character needs at runtime, then plays the universal animation against it. So the tab has **two** pickers: sheet first, then animation.
 - *Mobile*: `chpk.dat` is an ic-container of character atlases. The engine hardcodes cell layout (typically 16×16, with rows per facing × walk frames per row). Tab slices using a user-adjustable cell size and plays the chosen sequence (full sheet / single row / ping-pong / etc.).
+- *Object override (Android)*: mark a sprite as an **object** (door / chest / crystal) so FFSmith draws its real frame rect at a tile-relative anchor instead of the 48×48 character grid. The panel exposes `isObject` + frame `x/y/w/h` + anchor `px/py` with a live tile-aligned preview (`dst = tile/2+px, tile+py`), and Save/Remove write the `sprite_grid.json` the FFSmith baker merges (`--bake-ffsmith`). Use *Seed from field_anm* for the decoded default or *Use selected frame* to grab the frame shown in the player above.
 
 **Tilesets** — browser for the mobile `mpk*.dat`/`cpk*.dat` pack contents and the Android tileset lookup table.
 

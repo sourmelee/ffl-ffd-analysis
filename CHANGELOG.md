@@ -17,6 +17,22 @@ commit as the changelog entry.
 
 ## [Unreleased]
 
+## [0.7.22] - 2026-06-09
+
+### Added
+
+- **Animation tab: object-override authoring panel** (Android source). Marks a field_anm sprite as
+  an OBJECT so FFSmith draws its real frame rect at a tile-relative anchor instead of the 48x48
+  character grid, with a live **tile-aligned preview** (shows exactly where FFSmith lands the frame:
+  `dst = tile/2+px, tile+py`). Controls: `isObject` toggle, frame `x/y/w/h`, anchor `px/py`,
+  *Seed from field_anm*, *Use selected frame*, *Save*, *Remove*, and a file picker. Writes the
+  `sprite_grid.json` the FFSmith baker already merges (`_bake_sprite_geo`) — the manual-annotation
+  path for the chest/door/crystal sprites that 0.7.21 stopped auto-classifying.
+- **`ffd/animation/sprite_grid.py`** — GUI-free helpers shared by the panel and (mirrored in) the
+  baker: `seed_geo_from_fa_entry`, `object_dest_rect`, `default_override_path`,
+  `load/save/remove_overrides`, `render_tile_preview`. Unit-tested headlessly (seed parity with the
+  baker, FFSmith placement math, JSON round-trip, preview compose).
+
 ## [0.7.21] - 2026-06-08
 
 ### Fixed
