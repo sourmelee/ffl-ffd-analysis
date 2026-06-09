@@ -17,7 +17,16 @@ commit as the changelog entry.
 
 ## [Unreleased]
 
-## [0.7.20] - 2026-06-08
+## [0.7.21] - 2026-06-08
+
+### Fixed
+
+- **spritegeo.bin no longer auto-classifies sprites as objects.** The 0.7.20 heuristics (frame
+  size, then walk-cycle presence) misclassified **static NPCs** (villagers/guards who don't walk)
+  as objects, so FFSmith drew them with a partial frame (squashed). Now every sprite defaults to
+  `isObject=0` (the known-good 48x48 character grid); object marking is purely the manual
+  `sprite_grid.json` override. The field_anm frame/anchor is still seeded so an override that sets
+  `isObject:1` reuses the decoded geometry.
 
 ### Added
 

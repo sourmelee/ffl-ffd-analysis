@@ -1,0 +1,562 @@
+{
+  "name": "char5_7",
+  "mobile_source": {
+    "chpk_entry": 7,
+    "palette": 0,
+    "cell_w": 16,
+    "cell_h": 24,
+    "cols": 7,
+    "rows": 3
+  },
+  "android_target": {
+    "fldchr_id": 70,
+    "field_anm_entry": 1,
+    "output_size": [
+      512,
+      512
+    ],
+    "scale": 2,
+    "h_align": "center",
+    "v_align": "bottom",
+    "mode": "battle",
+    "grid": {
+      "cell_w": 32,
+      "cell_h": 48,
+      "pitch_x": 0,
+      "pitch_y": 0,
+      "cols": 2,
+      "rows": 1,
+      "origin_x": 2,
+      "origin_y": 2
+    }
+  },
+  "frame_map": {
+    "0": {
+      "mobile_col": null,
+      "mobile_row": null,
+      "mobile_cells_w": 1,
+      "mobile_cells_h": 1,
+      "flip_h": false,
+      "comment": "battle attack B",
+      "x_offset": 0,
+      "y_offset": 0
+    },
+    "1": {
+      "mobile_col": null,
+      "mobile_row": null,
+      "mobile_cells_w": 1,
+      "mobile_cells_h": 1,
+      "flip_h": false,
+      "comment": "battle walk C",
+      "x_offset": 0,
+      "y_offset": 0
+    },
+    "2": {
+      "mobile_col": null,
+      "mobile_row": null,
+      "mobile_cells_w": 1,
+      "mobile_cells_h": 1,
+      "flip_h": false,
+      "comment": "south walk B",
+      "x_offset": 0,
+      "y_offset": 0
+    },
+    "3": {
+      "mobile_col": 6,
+      "mobile_row": 2,
+      "mobile_cells_w": 1,
+      "mobile_cells_h": 1,
+      "flip_h": false,
+      "comment": "north idle",
+      "x_offset": 0,
+      "y_offset": 0
+    },
+    "4": {
+      "mobile_col": null,
+      "mobile_row": null,
+      "mobile_cells_w": 1,
+      "mobile_cells_h": 1,
+      "flip_h": false,
+      "comment": "north walk A",
+      "x_offset": 0,
+      "y_offset": 0
+    },
+    "5": {
+      "mobile_col": 4,
+      "mobile_row": 0,
+      "mobile_cells_w": 1,
+      "mobile_cells_h": 1,
+      "flip_h": false,
+      "comment": "battle fanfare A",
+      "x_offset": 0,
+      "y_offset": 0
+    },
+    "6": {
+      "mobile_col": null,
+      "mobile_row": null,
+      "mobile_cells_w": 1,
+      "mobile_cells_h": 1,
+      "flip_h": false,
+      "comment": "east idle",
+      "x_offset": 0,
+      "y_offset": 0
+    },
+    "7": {
+      "mobile_col": 6,
+      "mobile_row": 2,
+      "mobile_cells_w": 1,
+      "mobile_cells_h": 1,
+      "flip_h": false,
+      "comment": "east walk A",
+      "x_offset": 0,
+      "y_offset": 0
+    },
+    "8": {
+      "mobile_col": 2,
+      "mobile_row": 2,
+      "mobile_cells_w": 1,
+      "mobile_cells_h": 1,
+      "flip_h": false,
+      "comment": "east walk B"
+    },
+    "9": {
+      "mobile_col": 6,
+      "mobile_row": 2,
+      "mobile_cells_w": 1,
+      "mobile_cells_h": 1,
+      "flip_h": false,
+      "comment": "TODO: annotate manually",
+      "x_offset": 0,
+      "y_offset": 0
+    },
+    "10": {
+      "mobile_col": 5,
+      "mobile_row": 0,
+      "mobile_cells_w": 1,
+      "mobile_cells_h": 1,
+      "flip_h": false,
+      "comment": "battle attack C",
+      "x_offset": 0,
+      "y_offset": 0
+    },
+    "11": {
+      "mobile_col": null,
+      "mobile_row": null,
+      "mobile_cells_w": 1,
+      "mobile_cells_h": 1,
+      "flip_h": false,
+      "comment": "TODO: annotate manually",
+      "x_offset": 0,
+      "y_offset": 0
+    },
+    "12": {
+      "mobile_col": null,
+      "mobile_row": null,
+      "mobile_cells_w": 1,
+      "mobile_cells_h": 1,
+      "flip_h": false,
+      "comment": "battle attack A",
+      "x_offset": 0,
+      "y_offset": 0
+    },
+    "13": {
+      "mobile_col": 5,
+      "mobile_row": 1,
+      "mobile_cells_w": 1,
+      "mobile_cells_h": 1,
+      "flip_h": false,
+      "comment": "battle walk B",
+      "x_offset": 0,
+      "y_offset": 0
+    },
+    "14": {
+      "mobile_col": 6,
+      "mobile_row": 2,
+      "mobile_cells_w": 1,
+      "mobile_cells_h": 1,
+      "flip_h": false,
+      "comment": "TODO: annotate manually",
+      "x_offset": 0,
+      "y_offset": 0
+    },
+    "15": {
+      "mobile_col": 0,
+      "mobile_row": 0,
+      "mobile_cells_w": 1,
+      "mobile_cells_h": 1,
+      "flip_h": false,
+      "comment": "battle idle",
+      "x_offset": 0,
+      "y_offset": 0
+    },
+    "16": {
+      "mobile_col": 6,
+      "mobile_row": 2,
+      "mobile_cells_w": 1,
+      "mobile_cells_h": 1,
+      "flip_h": false,
+      "comment": "TODO: annotate manually",
+      "x_offset": 0,
+      "y_offset": 0
+    },
+    "17": {
+      "mobile_col": 6,
+      "mobile_row": 2,
+      "mobile_cells_w": 1,
+      "mobile_cells_h": 1,
+      "flip_h": false,
+      "comment": "TODO: annotate manually"
+    },
+    "18": {
+      "mobile_col": 6,
+      "mobile_row": 2,
+      "mobile_cells_w": 1,
+      "mobile_cells_h": 1,
+      "flip_h": false,
+      "comment": "TODO: annotate manually",
+      "x_offset": 0,
+      "y_offset": 0
+    },
+    "19": {
+      "mobile_col": null,
+      "mobile_row": null,
+      "mobile_cells_w": 1,
+      "mobile_cells_h": 1,
+      "flip_h": false,
+      "comment": "TODO: annotate manually"
+    },
+    "20": {
+      "mobile_col": null,
+      "mobile_row": null,
+      "mobile_cells_w": 1,
+      "mobile_cells_h": 1,
+      "flip_h": false,
+      "comment": "TODO: annotate manually"
+    },
+    "21": {
+      "mobile_col": null,
+      "mobile_row": null,
+      "mobile_cells_w": 1,
+      "mobile_cells_h": 1,
+      "flip_h": false,
+      "comment": "TODO: annotate manually"
+    },
+    "22": {
+      "mobile_col": null,
+      "mobile_row": null,
+      "mobile_cells_w": 1,
+      "mobile_cells_h": 1,
+      "flip_h": false,
+      "comment": "TODO: annotate manually"
+    },
+    "23": {
+      "mobile_col": 4,
+      "mobile_row": 0,
+      "mobile_cells_w": 1,
+      "mobile_cells_h": 1,
+      "flip_h": false,
+      "comment": "TODO: annotate manually",
+      "x_offset": 0,
+      "y_offset": 0
+    },
+    "24": {
+      "mobile_col": null,
+      "mobile_row": null,
+      "mobile_cells_w": 1,
+      "mobile_cells_h": 1,
+      "flip_h": false,
+      "comment": "TODO: annotate manually"
+    }
+  },
+  "extra_frames": [
+    {
+      "name": "grid_51_151_unused",
+      "android_rect": [
+        51,
+        151,
+        48,
+        48
+      ],
+      "mobile_col": null,
+      "mobile_row": null,
+      "mobile_cells_w": 1,
+      "mobile_cells_h": 1,
+      "flip_h": false,
+      "comment": "TODO: between Android frames 11 and 9 (col x=51 row 4)",
+      "x_offset": 0,
+      "y_offset": 0
+    },
+    {
+      "name": "grid_101_201_unused",
+      "android_rect": [
+        101,
+        201,
+        48,
+        48
+      ],
+      "mobile_col": null,
+      "mobile_row": null,
+      "mobile_cells_w": 1,
+      "mobile_cells_h": 1,
+      "flip_h": false,
+      "comment": "TODO: between Android frames 10 and 17 (col x=101 row 5)",
+      "x_offset": 0,
+      "y_offset": 0
+    },
+    {
+      "name": "grid_251_101",
+      "android_rect": [
+        251,
+        101,
+        48,
+        48
+      ],
+      "mobile_col": null,
+      "mobile_row": null,
+      "mobile_cells_w": 1,
+      "mobile_cells_h": 1,
+      "flip_h": false,
+      "comment": "TODO: col x=251 row 3",
+      "x_offset": 0,
+      "y_offset": 0
+    },
+    {
+      "name": "grid_251_151",
+      "android_rect": [
+        251,
+        151,
+        48,
+        48
+      ],
+      "mobile_col": null,
+      "mobile_row": null,
+      "mobile_cells_w": 1,
+      "mobile_cells_h": 1,
+      "flip_h": false,
+      "comment": "TODO: col x=251 row 4",
+      "x_offset": 0,
+      "y_offset": 0
+    },
+    {
+      "name": "grid_251_201",
+      "android_rect": [
+        251,
+        201,
+        48,
+        48
+      ],
+      "mobile_col": null,
+      "mobile_row": null,
+      "mobile_cells_w": 1,
+      "mobile_cells_h": 1,
+      "flip_h": false,
+      "comment": "TODO: col x=251 row 5",
+      "x_offset": 0,
+      "y_offset": 0
+    },
+    {
+      "name": "ko_lying_a",
+      "android_rect": [
+        1,
+        252,
+        48,
+        48
+      ],
+      "mobile_col": null,
+      "mobile_row": null,
+      "mobile_cells_w": 1,
+      "mobile_cells_h": 1,
+      "flip_h": false,
+      "comment": "TODO: KO/dead lying pose A (often Mobile 0,5 + 1,5 wide span)",
+      "x_offset": 0,
+      "y_offset": 0
+    },
+    {
+      "name": "ko_lying_b",
+      "android_rect": [
+        51,
+        252,
+        48,
+        48
+      ],
+      "mobile_col": null,
+      "mobile_row": null,
+      "mobile_cells_w": 1,
+      "mobile_cells_h": 1,
+      "flip_h": false,
+      "comment": "TODO: KO/dead lying pose B",
+      "x_offset": 0,
+      "y_offset": 0
+    },
+    {
+      "name": "grid_301_1",
+      "android_rect": [
+        301,
+        1,
+        48,
+        48
+      ],
+      "mobile_col": null,
+      "mobile_row": null,
+      "mobile_cells_w": 1,
+      "mobile_cells_h": 1,
+      "flip_h": false,
+      "x_offset": 0,
+      "y_offset": 0,
+      "comment": "battle ground"
+    },
+    {
+      "name": "grid_351_1",
+      "android_rect": [
+        351,
+        1,
+        48,
+        48
+      ],
+      "mobile_col": 0,
+      "mobile_row": 1,
+      "mobile_cells_w": 1,
+      "mobile_cells_h": 1,
+      "flip_h": false,
+      "x_offset": 0,
+      "y_offset": 0,
+      "comment": "battle hit"
+    },
+    {
+      "name": "grid_401_1",
+      "android_rect": [
+        401,
+        1,
+        48,
+        48
+      ],
+      "mobile_col": 1,
+      "mobile_row": 1,
+      "mobile_cells_w": 1,
+      "mobile_cells_h": 1,
+      "flip_h": false,
+      "x_offset": 0,
+      "y_offset": 0,
+      "comment": "battle casting A"
+    },
+    {
+      "name": "grid_451_1",
+      "android_rect": [
+        451,
+        1,
+        48,
+        48
+      ],
+      "mobile_col": 2,
+      "mobile_row": 1,
+      "mobile_cells_w": 1,
+      "mobile_cells_h": 1,
+      "flip_h": false,
+      "x_offset": 0,
+      "y_offset": 0,
+      "comment": "battle casting B"
+    },
+    {
+      "name": "grid_51_1",
+      "android_rect": [
+        51,
+        1,
+        48,
+        48
+      ],
+      "mobile_col": null,
+      "mobile_row": null,
+      "mobile_cells_w": 1,
+      "mobile_cells_h": 1,
+      "flip_h": false,
+      "x_offset": 0,
+      "y_offset": 0,
+      "comment": "battle ready"
+    },
+    {
+      "name": "grid_1_51",
+      "android_rect": [
+        1,
+        51,
+        48,
+        48
+      ],
+      "mobile_col": null,
+      "mobile_row": null,
+      "mobile_cells_w": 1,
+      "mobile_cells_h": 1,
+      "flip_h": false,
+      "x_offset": 0,
+      "y_offset": 0,
+      "comment": "battle fanfare B"
+    },
+    {
+      "name": "grid_51_51",
+      "android_rect": [
+        51,
+        51,
+        48,
+        48
+      ],
+      "mobile_col": null,
+      "mobile_row": null,
+      "mobile_cells_w": 1,
+      "mobile_cells_h": 1,
+      "flip_h": false,
+      "x_offset": 0,
+      "y_offset": 0,
+      "comment": "battle walk A"
+    },
+    {
+      "name": "grid_1_1",
+      "android_rect": [
+        1,
+        1,
+        32,
+        48
+      ],
+      "mobile_col": 0,
+      "mobile_row": 0,
+      "mobile_cells_w": 1,
+      "mobile_cells_h": 1,
+      "flip_h": false,
+      "x_offset": 0,
+      "y_offset": 1,
+      "comment": "added via Android grid click"
+    },
+    {
+      "name": "grid_2_2",
+      "android_rect": [
+        2,
+        2,
+        32,
+        48
+      ],
+      "mobile_col": null,
+      "mobile_row": null,
+      "mobile_cells_w": 1,
+      "mobile_cells_h": 1,
+      "flip_h": false,
+      "x_offset": 0,
+      "y_offset": 0,
+      "comment": "added via Android grid click"
+    },
+    {
+      "name": "grid_34_2",
+      "android_rect": [
+        34,
+        2,
+        32,
+        48
+      ],
+      "mobile_col": 1,
+      "mobile_row": 0,
+      "mobile_cells_w": 1,
+      "mobile_cells_h": 1,
+      "flip_h": false,
+      "x_offset": 0,
+      "y_offset": 0,
+      "comment": "added via Android grid click"
+    }
+  ]
+}

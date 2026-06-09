@@ -473,8 +473,11 @@ def _bake_sprite_geo(files, out_dir):
         fr = (kf.get("frame") if kf else None) or frs[0]
         px = kf.get("part_x", 0) if kf else 0
         py = kf.get("part_y", 0) if kf else 0
-        has_cycle = any(sa.get("kind") == "cycle" for sa in subs)
-        geo[idx] = {"isObject": 0 if has_cycle else 1,
+        # isObject defaults to 0 (character -> 48x48 grid, no regression). Heuristics (size,
+        # walk-cycle) misclassify static NPCs as objects, so objects are marked ONLY via the
+        # manual sprite_grid.json override. The field_anm frame/anchor is still seeded here so an
+        # override can flip isObject=1 and reuse the decoded geometry.
+        geo[idx] = {"isObject": 0,
                     "fx": fr["x"], "fy": fr["y"], "fw": fr["w"], "fh": fr["h"],
                     "px": px, "py": py}
     # merge manual overrides (Animation tab authoring)
