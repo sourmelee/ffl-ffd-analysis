@@ -17,7 +17,20 @@ commit as the changelog entry.
 
 ## [Unreleased]
 
-## [0.7.17] - 2026-06-08
+## [0.7.19] - 2026-06-08
+
+### Added
+
+- **Bake each character's field-sprite (CHPK) id into `data/chars.bin`.** From `chara_set` f186
+  (the CHPK entry, e.g. Sol = 13). Lets FFSmith pick the lead character's real field sprite for
+  New Game instead of auto-detecting the first map event (which could be a door).
+
+### Added
+
+- **Bake the New Game intro strings (`data/intro.bin`).** The prologue text crawl ("In an age
+  long past... the Avalonian Empire...") and the "Prologue" chapter label, extracted by content
+  from `msg0.msd` (the per-message slot index drifts, so we match on text rather than offset).
+  Feeds FFSmith's New Game intro cinematics.
 
 ### Added
 

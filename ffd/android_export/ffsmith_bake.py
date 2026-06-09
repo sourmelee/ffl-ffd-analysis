@@ -325,6 +325,7 @@ def _bake_menu_data(files, out_dir):
                 for k in ("str", "spd", "vit", "int", "mnd"):
                     f.write(struct.pack("<H", c.get(k, 0) & 0xffff))
                 f.write(struct.pack("<HH", _growth(hpb, lvl) & 0xffff, _growth(mpb, lvl) & 0xffff))
+                f.write(struct.pack("<H", c.get("f186", 0) & 0xffff))   # CHPK field-sprite id
         counts["chars"] = len(chars)
         # level table: EXP thresholds + per-level HP/MP growth (boot section 8).
         with open(Path(out_dir) / "data" / "levels.bin", "wb") as f:
@@ -418,6 +419,37 @@ def _bake_font(out_dir):
     except Exception as e:
         print("[bake] font skipped:", e); return False
 
+
+
+
+def _pstr_at_content(data, needle):
+    """Extract the length-prefixed (u8) string in `data` that STARTS with `needle`."""
+    nb = needle.encode("utf-8"); idx = data.find(nb)
+    if idx < 1:
+        return None
+    L = data[idx - 1]
+    if 0 < L <= 255 and idx + L <= len(data):
+        try:
+            st = data[idx:idx + L].decode("utf-8")
+            if st.startswith(needle):
+                return st
+        except Exception:
+            return None
+    return None
+
+
+def _bake_intro(files, out_dir):
+    """Bake the New Game intro strings (data/intro.bin): the prologue crawl + chapter label,
+    extracted by content from msg0.msd (slot indices drift, so we match on text)."""
+    msd = files["msg0.msd"] if "msg0.msd" in files else b""
+    prologue = (_pstr_at_content(msd, "In an age long past") or "") if msd else ""
+    chapter = (_pstr_at_content(msd, "Prologue") or "Prologue") if msd else "Prologue"
+    pb = prologue.encode("utf-8"); cb = chapter.encode("utf-8")
+    with open(Path(out_dir) / "data" / "intro.bin", "wb") as f:
+        f.write(b"FINT")
+        f.write(struct.pack("<H", len(pb))); f.write(pb)
+        f.write(struct.pack("<H", len(cb))); f.write(cb)
+    return 1 if prologue else 0
 
 
 def bake(obb_path=None, out_dir=".", *, proper_dir=None, limit=None, only=None,
@@ -531,6 +563,7 @@ def bake(obb_path=None, out_dir=".", *, proper_dir=None, limit=None, only=None,
     has_font = _bake_font(out)
     ui_imgs = _bake_ui(files, out)
     menu_counts = _bake_menu_data(files, out)
+    _bake_intro(files, out)
     manifest["text"] = {"messages": n_msgs, "font": has_font,
                         "banks": sorted(groups_seen)}
     manifest["ui"] = ui_imgs
