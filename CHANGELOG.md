@@ -17,6 +17,34 @@ commit as the changelog entry.
 
 ## [Unreleased]
 
+## [0.7.25] - 2026-06-10
+
+### Added
+
+- **FFM4 map format.** The map header now bakes the **default spawn**
+  (`FieldClass+0xdc48..54` — used when `SetMapChange` gets layer −1, i.e. the
+  New Game path; verified m0→(1,1), m500→(33,33), m501→(6,10)), and each event
+  carries its **event id** (u16) and **trigger rect** w/h (header bytes 4/5 —
+  `CheckRangeEvent`: boots 6/7/8 fire while the player is inside
+  [x,x+w)×[y,y+h)).
+- **Common-event pool baked** (`data/common_events.ffmap`). Map 10000 (named by
+  `field_constant.dat` @0x8d, `FieldClass::LoadCommonEvent`; byte-identical in
+  all 15 groups) holds the 26 shared routines: 0x104 move-map, 0x103 spawn,
+  0x101 chapter change → prologue battle, 0x107 system-flag reset, 0x114-0x116
+  party management, 0x117 full heal…
+- `parse_android_map_engine` now returns `spawn_layer/x/y/dir`.
+
+### Changed
+
+- **`0x66` is `CallEvent(id, start block)`** — not "SetEntityAction". The old
+  "action byte 0x04 = warp" empiric worked because id 0x104 *is* the common
+  move-map routine. The disassembler now names and decodes it.
+- **`0x41 MapChange` operands corrected**: the five BE words are
+  map, **layer**, x, y, dir (`SetMapChangeSelect`) — x/y were previously
+  off by one slot.
+- `0x01 ScriptSentence` (cinematic positioned text) annotated with its msg id —
+  the opening narration ("In an age long past…") uses it.
+
 ## [0.7.24] - 2026-06-10
 
 ### Added

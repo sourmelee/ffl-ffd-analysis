@@ -101,11 +101,13 @@ def parse_android_map_engine(chunk: bytes):
                 if fa: r.pos += w * h
                 if fb: r.pos += w * h
 
-        # Tail: u8 / i16BE / i16BE / u8 / then mc_id/variant pairs
-        r.u8()
-        r.i16be()
-        r.i16be()
-        r.u8()
+        # Default spawn (FieldClass+0xdc48..0xdc54, libjniproxy @118922): used
+        # by InitPlayer when SetMapChange is called with layer == -1 (e.g. the
+        # New Game FieldMapStart) — u8 layer, BE i16 x, BE i16 y, u8 dir.
+        spawn_layer = r.u8()
+        spawn_x = r.i16be()
+        spawn_y = r.i16be()
+        spawn_dir = r.u8()
         mc0 = r.i8(); v0 = r.u8()
         mc1 = r.i8(); v1 = r.u8()
 
@@ -130,6 +132,8 @@ def parse_android_map_engine(chunk: bytes):
             "mc_id_slot0": mc0, "variant_slot0": v0,
             "mc_id_slot1": mc1, "variant_slot1": v1,
             "overhead_threshold": overhead_threshold,
+            "spawn_layer": spawn_layer, "spawn_x": spawn_x,
+            "spawn_y": spawn_y, "spawn_dir": spawn_dir,
             "field_bgm": field_bgm, "battle_bgm": battle_bgm,
             "battle_bg": battle_bg, "battle_bg_water": battle_bg_water,
             "encount_ratio": encount_ratio,

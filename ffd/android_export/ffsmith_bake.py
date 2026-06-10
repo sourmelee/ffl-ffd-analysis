@@ -40,7 +40,7 @@ from ..maps.mobile import parse_mpkh_index
 from ..maps.capk import parse_capk, pass_nibble, parse_capk_anim, parse_capk_floor
 from ..events.android import parse_android_event_pack
 
-FFMAP_MAGIC = b"FFM3"
+FFMAP_MAGIC = b"FFM4"
 FTEX_MAGIC = b"FTEX"
 BUNDLE_VERSION = 3
 
@@ -139,8 +139,13 @@ def _build_events(raw):
     for ev in res["events"]:
         h = ev["header"]
         out.append({
+            "id": ev.get("event_id", 0),
             "x": h[2] if len(h) > 2 else 0,
             "y": h[3] if len(h) > 3 else 0,
+            # trigger-rect size (FieldClass::CheckRangeEvent: boots 6/7/8 fire
+            # while the player is inside [x, x+w) x [y, y+h))
+            "w": max(1, h[4]) if len(h) > 4 else 1,
+            "hgt": max(1, h[5]) if len(h) > 5 else 1,
             "type": ev["type"], "boot": ev["boot"],
             "img": ev["chara_img"], "var": ev["chara_var"],
             # appear-condition block (FieldClass::CheckEventAppear): 6 slots at
@@ -180,6 +185,15 @@ def _write_ffmap(path, parsed, engine, pass_grid, events):
         bbgm = (engine or {}).get("battle_bgm", 255)
         resv = (thr & 0xFF) | ((fbgm & 0xFF) << 8) | ((bbgm & 0xFF) << 16)
         f.write(struct.pack("<I", resv & 0xFFFFFFFF))
+        # FFM4: map default spawn (FieldClass+0xdc48..54; used when SetMapChange
+        # layer == -1, e.g. New Game).  255 = none.
+        sx = (engine or {}).get("spawn_x", -1)
+        sy = (engine or {}).get("spawn_y", -1)
+        sd = (engine or {}).get("spawn_dir", 0)
+        f.write(struct.pack("<BBB",
+                            sx & 0xFF if 0 <= sx <= 254 else 255,
+                            sy & 0xFF if 0 <= sy <= 254 else 255,
+                            sd & 0xFF))
         for layer in layers:
             buf = bytearray()
             for (_mc_type, hb, lb) in layer:
@@ -192,11 +206,13 @@ def _write_ffmap(path, parsed, engine, pass_grid, events):
             f.write(pass_grid)
         else:
             f.write(struct.pack("<B", 0))
-        # FFM3 events block (FFM2 + 31 appear-condition bytes per event)
+        # FFM4 events block (+event id, rect w,h, 31 appear bytes per event)
         f.write(struct.pack("<H", len(events)))
         for ev in events:
             img = ev["img"] if -32768 <= ev["img"] <= 32767 else -1
-            f.write(struct.pack("<BBBBhB", ev["x"] & 0xFF, ev["y"] & 0xFF,
+            f.write(struct.pack("<HBBBBBBhB", ev.get("id", 0) & 0xFFFF,
+                                ev["x"] & 0xFF, ev["y"] & 0xFF,
+                                ev.get("w", 1) & 0xFF, ev.get("hgt", 1) & 0xFF,
                                 ev["type"] & 0xFF, ev["boot"] & 0xFF, img,
                                 ev["var"] & 0xFF))
             ap = ev.get("appear", b"\x00" * 31)
@@ -513,6 +529,22 @@ def _bake_sprite_geo(files, out_dir):
     return len(geo)
 
 
+def _bake_common_events(files, out_dir):
+    """data/common_events.ffmap: the shared CallEvent pool (map 10000, named by
+    field_constant.dat @0x8d; FieldClass::LoadCommonEvent).  Identical in every
+    group, event-only (no tile layers) — baked once as a 1x1 FFM4 shell."""
+    for (g, p, mid, raw) in iter_android_maps(files):
+        if mid != 10000:
+            continue
+        events = _build_events(raw)
+        if not events:
+            return 0
+        shell = {"w": 1, "h": 1, "layers": [], "_event": b""}
+        _write_ffmap(Path(out_dir) / "data" / "common_events.ffmap", shell, None, None, events)
+        return len(events)
+    return 0
+
+
 def _bake_start(files, out_dir):
     """data/start.bin (FSTR): the New Game start table from boot_data scenario
     section 1 (GameClass::LoadScenarioData).  One record per story bank:
@@ -706,6 +738,7 @@ def bake(obb_path=None, out_dir=".", *, proper_dir=None, limit=None, only=None,
     menu_counts = _bake_menu_data(files, out)
     _bake_intro(files, out)
     manifest["start"] = _bake_start(files, out)
+    manifest["common_events"] = _bake_common_events(files, out)
     _bake_sprite_geo(files, out)
     manifest["audio"] = _bake_audio(files, out)
     manifest["text"] = {"messages": n_msgs, "font": has_font,

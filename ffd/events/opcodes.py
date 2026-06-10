@@ -80,7 +80,7 @@ EVENT_SCRIPT_OPCODES = {
     0x3d: {"name": "ScriptIf",            "fmt": "B*",     "desc": "If-NOT-goto: mask@1, left ref(b3,w4,w6,L8), right ref(b13,w14,w16,L18), op w@22, target block w@24; jumps when condition FAILS"},
     0x3f: {"name": "Jump",                "fmt": "W",      "desc": "Unconditional jump to script BLOCK index (BE word)"},
     0x40: {"name": "RandomJump",          "fmt": "B*",     "desc": "Jump to block w@(2+2*Rand(N)) of the N-entry list"},
-    0x41: {"name": "MapChange",           "fmt": "B*",     "desc": "Warp: mask@1 then 5 BE words map,x,y,dir,sub (mask bit=operand is var index)"},
+    0x41: {"name": "MapChange",           "fmt": "B*",     "desc": "Warp: mask@1 then 5 BE words map,layer,x,y,dir (mask bit=operand is var index; SetMapChangeSelect)"},
     0x42: {"name": "ChangeViewMode",      "fmt": "B*",     "desc": "Toggle field/cinematic camera"},
     0x43: {"name": "SetOblique",          "fmt": "BBBB",   "desc": "Set oblique / isometric camera angle"},
     0x4f: {"name": "OpenShop",            "fmt": "BB",     "desc": "Open shop menu"},
@@ -95,7 +95,7 @@ EVENT_SCRIPT_OPCODES = {
     0x5e: {"name": "DungeonReset",        "fmt": "B",      "desc": "Reset dungeon floor"},
     0x61: {"name": "SetConnect",          "fmt": "BBB*",   "desc": "Set network connect state [Android]"},
     0x64: {"name": "SetMapFlags",         "fmt": "BBB",    "desc": "Set/clear map environment flags"},
-    0x66: {"name": "SetEntityAction",     "fmt": "BB*",    "desc": "Set entity action (byte[4]: 0x04=move-map/warp, 0x03=spawn NPC)"},
+    0x66: {"name": "CallEvent",           "fmt": "BB*",    "desc": "Call event by id: mask@2, id=w@3, start block=w@5 (common pool = map 10000: 0x104 warp, 0x103 spawn, 0x101 story change)"},
     0x67: {"name": "WaitForEvent",        "fmt": "B",      "desc": "Wait for game event to complete"},
     0x68: {"name": "StartEntityAction",   "fmt": "BBBB*",  "desc": "Start NPC action sequence"},
     0x69: {"name": "WaitEntityAction",    "fmt": "B",      "desc": "Wait for NPC action to finish"},
@@ -195,6 +195,9 @@ def disassemble_script_block(data: bytes, version: str = "mobile") -> str:
         if opcode == 0x00 and len(args) >= 5:
             msg_id = (args[0] << 8) | args[1]
             detail += f"  ; msg_id={msg_id}"
+        elif opcode == 0x01 and len(args) >= 2:
+            msg_id = (args[0] << 8) | args[1]
+            detail += f"  ; msg_id={msg_id} (positioned/cinematic text)"
         elif opcode in (0x35, 0x36, 0x75) and len(args) >= 3:
             track_id = (args[1] << 8) | args[2]
             detail += f"  ; track={track_id}"
@@ -210,8 +213,8 @@ def disassemble_script_block(data: bytes, version: str = "mobile") -> str:
             mask = args[0]
             ws = [(args[1 + 2*i] << 8) | args[2 + 2*i] for i in range(5)]
             ind = ["var" if (mask >> i) & 1 else "" for i in range(5)]
-            detail += (f"  ; map={ind[0]}{ws[0]} x={ind[1]}{ws[1]} y={ind[2]}{ws[2]}"
-                       f" dir={ind[3]}{ws[3]} sub={ind[4]}{ws[4]}")
+            detail += (f"  ; map={ind[0]}{ws[0]} layer={ind[1]}{ws[1]} x={ind[2]}{ws[2]}"
+                       f" y={ind[3]}{ws[3]} dir={ind[4]}{ws[4]}")
         elif opcode == 0x3d and len(args) >= 0x19:
             # ScriptIf (FieldClass::ScriptIf): jump to target when cond FAILS.
             b = bytes([opcode]) + bytes(args)
