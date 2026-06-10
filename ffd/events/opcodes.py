@@ -29,8 +29,8 @@ EVENT_SCRIPT_OPCODES = {
     0x00: {"name": "SetMessage",          "fmt": "WBWBBB*", "desc": "Show dialogue text box (msg_id, flags, wait bit)"},
     0x01: {"name": "ScriptSentence",      "fmt": "B*",     "desc": "Advance/chain message sentence"},
     0x02: {"name": "SetScrollMode",       "fmt": "BW",     "desc": "Set message text scroll mode + delay (BE word)"},
-    0x03: {"name": "SetReferenceVariable","fmt": "BBWWWWWL","desc": "Assign script variable (6 args, BE words/long)"},
-    0x04: {"name": "SetReferenceFlag",    "fmt": "WWB",    "desc": "Set/clear game flag (var_id, value, op)"},
+    0x03: {"name": "SetReferenceVariable","fmt": "BBWWWWWL","desc": "var[w3][w5] = var OP ref(w7,w9,w11,L13); b1=calc op (0=set,1..8=+,-,*,/,%,&,|,^), b2=indirection mask"},
+    0x04: {"name": "SetReferenceFlag",    "fmt": "BWWW",   "desc": "Flag write: mask@1, then BE words type,bit,control (0=clear,1=set,2=toggle); types 0-4 field banks, 5=global"},
     0x05: {"name": "SetLightingMode",     "fmt": "B*",     "desc": "Map lighting toggle [Mobile]"},
     0x06: {"name": "SetDarkness",         "fmt": "BB",     "desc": "Fade darkness on/off with timer"},
     0x07: {"name": "AddMoney",            "fmt": "BL",     "desc": "Add/subtract money (BE long) [Android]"},
@@ -76,11 +76,11 @@ EVENT_SCRIPT_OPCODES = {
     0x39: {"name": "SetAudioField1",      "fmt": "B",      "desc": "Set audio control byte A"},
     0x3a: {"name": "SetAudioField2",      "fmt": "B",      "desc": "Set audio control byte B"},
     0x3b: {"name": "YesNoDialog",         "fmt": "WWBBBB", "desc": "Yes/no choice dialog"},
-    0x3c: {"name": "MultiChoiceDialog",   "fmt": "BB*",    "desc": "N-option choice menu (then N×u16 offsets)"},
-    0x3d: {"name": "ScriptIf",            "fmt": "B*",     "desc": "Conditional branch"},
-    0x3f: {"name": "Jump",                "fmt": "W",      "desc": "Unconditional jump to offset (BE word)"},
-    0x40: {"name": "RandomJump",          "fmt": "B*",     "desc": "Random jump to one of N offsets"},
-    0x41: {"name": "MapChange",           "fmt": "BWBBBB", "desc": "Warp to map (flag, map BE, x, y, dir, sub)"},
+    0x3c: {"name": "MultiChoiceDialog",   "fmt": "BB*",    "desc": "Choice select: flags, N, then N×(value BE16, target block BE16); cancel→next block"},
+    0x3d: {"name": "ScriptIf",            "fmt": "B*",     "desc": "If-NOT-goto: mask@1, left ref(b3,w4,w6,L8), right ref(b13,w14,w16,L18), op w@22, target block w@24; jumps when condition FAILS"},
+    0x3f: {"name": "Jump",                "fmt": "W",      "desc": "Unconditional jump to script BLOCK index (BE word)"},
+    0x40: {"name": "RandomJump",          "fmt": "B*",     "desc": "Jump to block w@(2+2*Rand(N)) of the N-entry list"},
+    0x41: {"name": "MapChange",           "fmt": "B*",     "desc": "Warp: mask@1 then 5 BE words map,x,y,dir,sub (mask bit=operand is var index)"},
     0x42: {"name": "ChangeViewMode",      "fmt": "B*",     "desc": "Toggle field/cinematic camera"},
     0x43: {"name": "SetOblique",          "fmt": "BBBB",   "desc": "Set oblique / isometric camera angle"},
     0x4f: {"name": "OpenShop",            "fmt": "BB",     "desc": "Open shop menu"},
@@ -200,15 +200,47 @@ def disassemble_script_block(data: bytes, version: str = "mobile") -> str:
             detail += f"  ; track={track_id}"
         elif opcode == 0x3f and len(args) >= 2:
             offset = (args[0] << 8) | args[1]
-            detail += f"  ; → offset {offset}"
-        elif opcode == 0x41 and len(args) >= 6:
-            map_id = (args[1] << 8) | args[2]
-            detail += f"  ; map={map_id}"
-        elif opcode == 0x3d:
-            detail += "  ; (conditional — see ScriptIf)"
+            detail += f"  ; -> block {offset}"
+        elif opcode == 0x40 and len(args) >= 3:
+            n = args[0]
+            tgts = [(args[1 + 2*i] << 8) | args[2 + 2*i]
+                    for i in range(n) if 2 + 2*i < len(args)]
+            detail += f"  ; random -> blocks {tgts}"
+        elif opcode == 0x41 and len(args) >= 11:
+            mask = args[0]
+            ws = [(args[1 + 2*i] << 8) | args[2 + 2*i] for i in range(5)]
+            ind = ["var" if (mask >> i) & 1 else "" for i in range(5)]
+            detail += (f"  ; map={ind[0]}{ws[0]} x={ind[1]}{ws[1]} y={ind[2]}{ws[2]}"
+                       f" dir={ind[3]}{ws[3]} sub={ind[4]}{ws[4]}")
+        elif opcode == 0x3d and len(args) >= 0x19:
+            # ScriptIf (FieldClass::ScriptIf): jump to target when cond FAILS.
+            b = bytes([opcode]) + bytes(args)
+            mask = b[1]
+            lt, lp, lk = b[3], (b[4] << 8) | b[5], (b[6] << 8) | b[7]
+            li = (b[8] << 24) | (b[9] << 16) | (b[10] << 8) | b[11]
+            rt, rp, rk = b[0xd], (b[0xe] << 8) | b[0xf], (b[0x10] << 8) | b[0x11]
+            ri = (b[0x12] << 24) | (b[0x13] << 16) | (b[0x14] << 8) | b[0x15]
+            op = (b[0x16] << 8) | b[0x17]
+            tgt = (b[0x18] << 8) | b[0x19]
+            OPS = {0: "==", 1: "!=", 2: ">", 3: "<", 4: ">=", 5: "<=",
+                   6: "&", 7: "!both", 8: "!="}
+            REF = {1: "flag", 2: "bool", 3: "var", 4: "chara", 5: "party",
+                   6: "event", 7: "item", 8: "battle", 9: "imm", 10: "imm",
+                   0xb: "etc", 0xe: "mappos", 0xf: "rand", 0x11: "map"}
+
+            def _ref(t, p2, k, i):
+                nm = REF.get(t, f"t{t}")
+                if t in (9, 10):
+                    return str(i)
+                return f"{nm}({p2},{k},{i})"
+            detail += (f"  ; ifnot {_ref(lt, lp, lk, li)} {OPS.get(op, '?')} "
+                       f"{_ref(rt, rp, rk, ri)} -> block {tgt}")
         elif opcode == 0x3c and len(args) >= 2:
             n = args[1]
-            detail += f"  ; {n} choices"
+            pairs = [((args[2 + 4*i] << 8) | args[3 + 4*i],
+                      (args[4 + 4*i] << 8) | args[5 + 4*i])
+                     for i in range(n) if 5 + 4*i < len(args)]
+            detail += f"  ; choices (value->block): {pairs}"
     except (IndexError, TypeError):
         pass
 

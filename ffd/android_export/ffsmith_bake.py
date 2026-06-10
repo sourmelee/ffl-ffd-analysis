@@ -40,9 +40,9 @@ from ..maps.mobile import parse_mpkh_index
 from ..maps.capk import parse_capk, pass_nibble, parse_capk_anim, parse_capk_floor
 from ..events.android import parse_android_event_pack
 
-FFMAP_MAGIC = b"FFM2"
+FFMAP_MAGIC = b"FFM3"
 FTEX_MAGIC = b"FTEX"
-BUNDLE_VERSION = 2
+BUNDLE_VERSION = 3
 
 
 class _FolderFiles:
@@ -143,6 +143,10 @@ def _build_events(raw):
             "y": h[3] if len(h) > 3 else 0,
             "type": ev["type"], "boot": ev["boot"],
             "img": ev["chara_img"], "var": ev["chara_var"],
+            # appear-condition block (FieldClass::CheckEventAppear): 6 slots at
+            # header[9..0x27] — flag(5) flag(5) variable(9) item(3) member(3)
+            # timer(6); slot present when its first byte != 0.
+            "appear": bytes(h[9:9 + 31]) if len(h) >= 40 else b"\x00" * 31,
             "scripts": ev["scripts"],
         })
     return out
@@ -188,13 +192,16 @@ def _write_ffmap(path, parsed, engine, pass_grid, events):
             f.write(pass_grid)
         else:
             f.write(struct.pack("<B", 0))
-        # FFM2 events block
+        # FFM3 events block (FFM2 + 31 appear-condition bytes per event)
         f.write(struct.pack("<H", len(events)))
         for ev in events:
             img = ev["img"] if -32768 <= ev["img"] <= 32767 else -1
-            f.write(struct.pack("<BBBBhBH", ev["x"] & 0xFF, ev["y"] & 0xFF,
+            f.write(struct.pack("<BBBBhB", ev["x"] & 0xFF, ev["y"] & 0xFF,
                                 ev["type"] & 0xFF, ev["boot"] & 0xFF, img,
-                                ev["var"] & 0xFF, len(ev["scripts"])))
+                                ev["var"] & 0xFF))
+            ap = ev.get("appear", b"\x00" * 31)
+            f.write(ap[:31].ljust(31, b"\x00"))
+            f.write(struct.pack("<H", len(ev["scripts"])))
             for sc in ev["scripts"]:
                 f.write(struct.pack("<H", len(sc)))
                 f.write(bytes(sc))
@@ -506,6 +513,25 @@ def _bake_sprite_geo(files, out_dir):
     return len(geo)
 
 
+def _bake_start(files, out_dir):
+    """data/start.bin (FSTR): the New Game start table from boot_data scenario
+    section 1 (GameClass::LoadScenarioData).  One record per story bank:
+    u16 map, u8 x, u8 y, u8 before_story.  New Game = record 0."""
+    if "boot_data.dat" not in files:
+        return 0
+    from ..boot.scenario import parse_scenario_android
+    recs = parse_scenario_android(files["boot_data.dat"])
+    if not recs:
+        return 0
+    with open(Path(out_dir) / "data" / "start.bin", "wb") as f:
+        f.write(b"FSTR")
+        f.write(struct.pack("<H", len(recs)))
+        for r in recs:
+            f.write(struct.pack("<HBBB", r["map"] & 0xFFFF, r["x"] & 0xFF,
+                                r["y"] & 0xFF, r["before_story"] & 0xFF))
+    return len(recs)
+
+
 def _bake_audio(files, out_dir):
     """Transcode the Android Ogg Vorbis BGM (bank 0) + SFX (bank 2) to IMA-ADPCM
     WAV into <out>/audio/, and bake the per-BGM loop-flag table into data/audio.bin.
@@ -679,6 +705,7 @@ def bake(obb_path=None, out_dir=".", *, proper_dir=None, limit=None, only=None,
     ui_imgs = _bake_ui(files, out)
     menu_counts = _bake_menu_data(files, out)
     _bake_intro(files, out)
+    manifest["start"] = _bake_start(files, out)
     _bake_sprite_geo(files, out)
     manifest["audio"] = _bake_audio(files, out)
     manifest["text"] = {"messages": n_msgs, "font": has_font,

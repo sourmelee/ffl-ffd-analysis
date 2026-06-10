@@ -17,6 +17,37 @@ commit as the changelog entry.
 
 ## [Unreleased]
 
+## [0.7.24] - 2026-06-10
+
+### Added
+
+- **Scenario/start table decoded** (`ffd/boot/scenario.py`). `boot_data.dat`
+  section 1 = `GameClass::LoadScenarioData`: 16 chapter records (Shift-JIS
+  titles 序章/暁の章…) each carrying the chapter's start map id + spawn x/y +
+  `BeforeStory` id. Retail New Game = record 0 → map 0 @(0,0); `e3_param.dat`
+  turned out to be the E3 trade-show demo start (`g_IsE3Mode`), not retail.
+  The baker now writes `data/start.bin` (`FSTR`) so FFSmith's New Game lands
+  on the real opening map.
+- **FFM3 map format: per-event appear conditions.** `--bake-ffsmith` now
+  bakes the 31-byte `CheckEventAppear` block (event header bytes 9..0x27):
+  6 slots — flag, flag, variable, item, member, timer. This is how the engine
+  decides which NPCs/doors exist for the current story state (verified on
+  m501's two stacked doors: global flag5 bit 10 clear → town map 500, set →
+  dark-world map 1700). Loader stays backward-compatible with FFM2.
+
+### Changed
+
+- **Event-script disassembler: real branch semantics** (`ffd/events/opcodes.py`),
+  RE'd from `FieldClass::MoveScript`/`ScriptIf`/`MoveEventScript`:
+  `0x3d ScriptIf` is an *if-NOT-goto* — operands are two GetReference refs
+  (flag/var/immediate/…), a comparison op and a target *script-block* index,
+  jumping when the condition fails; `0x3f`/`0x40` jump to block indices;
+  `0x41 MapChange` takes five BE *words* (map,x,y,dir,sub) with a per-operand
+  variable-indirection mask (all 15 real uses are fully indirect);
+  `0x3c MultiChoiceDialog` lists (value → target-block) choice pairs;
+  `0x03/0x04` descriptions now name the real calc-op/flag-bank semantics.
+  Disassembly annotates all of these inline (`ifnot flag(0,5,10) == 1 -> block 4`).
+
 ## [0.7.23] - 2026-06-09
 
 ### Added

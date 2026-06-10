@@ -1,6 +1,6 @@
 # FFL / FFD Toolkit
 
-[![version](https://img.shields.io/badge/version-0.7.23-blue.svg)](CHANGELOG.md)
+[![version](https://img.shields.io/badge/version-0.7.24-blue.svg)](CHANGELOG.md)
 
 Reverse-engineering toolkit for **Final Fantasy Legends** (DoCoMo FOMA feature-phone, 2010 — Japan-only mobile release) and its 2013 Android remaster **Final Fantasy Dimensions**. The two builds share roughly 80% of their asset format DNA — the Android port re-encoded the mobile data files almost field-for-field, mostly flipping big-endian to little-endian and stuffing the obfuscated payloads inside an XOR-wrapped OBB. This codebase parses both.
 
@@ -295,10 +295,13 @@ python ffd_toolkit.py --bake-ffsmith out_bundle --proper ../Android/proper_obb -
 python ffd_toolkit.py --bake-ffsmith out_bundle --obb ../Android/main.obb --only g0_p0_m501
 ```
 
-Output: `manifest.json`, `maps/*.ffmap` (flat little-endian maps), and
-`tex/mc*_*.tex` (raw-RGBA `FTEX` tilesheets). The engine's map renderer mirrors
-`ExtractTab._render_android_map` and is verified byte-identical to the toolkit
-render. Format spec: `../Engine/docs/ASSET_PIPELINE.md`.
+Output: `manifest.json`, `maps/*.ffmap` (flat little-endian maps, **FFM3** —
+events carry their 31-byte `CheckEventAppear` condition block), `tex/mc*_*.tex`
+(raw-RGBA `FTEX` tilesheets), and `data/start.bin` (`FSTR` — the New Game start
+table from boot_data scenario section 1; record 0 = the retail opening map).
+The engine's map renderer mirrors `ExtractTab._render_android_map` and is
+verified byte-identical to the toolkit render. Format spec:
+`../Engine/docs/ASSET_PIPELINE.md`.
 
 ---
 
