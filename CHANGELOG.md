@@ -17,6 +17,25 @@ commit as the changelog entry.
 
 ## [Unreleased]
 
+### Added
+
+- **Living documentation tree (`docs/`)** from the 2026-06-10 repository audit:
+  `architecture/` (toolkit status report, authoritative baked-bundle format
+  spec, repository relationships), `formats/` (maps, tilesets, sprites,
+  animations, events, text, audio, saves, battles, ai, jobs, items, effects —
+  each with HIGH/MEDIUM/LOW confidence labels and decompilation citations),
+  `reverse_engineering/` (discoveries log, unresolved questions, assumptions,
+  confidence matrix, contradiction report), `development/` (roadmap, technical
+  debt, refactoring candidates, testing strategy). A matching tree was added
+  under `Engine/docs/` (engine repo, versioned separately).
+
+### Fixed
+
+- README: GUI tab count corrected 18 → 20 (Android Export and Comparison tabs
+  were missing from the list); Monsters-tab description corrected from the
+  stale "Mobile §12 (fallback §16)" claim to the real §8 source; added a
+  pointer to the new `docs/` tree. Documentation-only — no version bump.
+
 ## [0.7.25] - 2026-06-10
 
 ### Added

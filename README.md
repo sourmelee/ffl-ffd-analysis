@@ -71,7 +71,7 @@ The legacy mega-module pattern is preserved: `from ffd_toolkit import parse_ic` 
 
 ## GUI tabs
 
-The notebook displays 18 tabs in this order, every one defined by a `TabBase` subclass with a `LABEL` constant.
+The notebook displays 20 tabs in this order, every one defined by a `TabBase` subclass with a `LABEL` constant. (Two tabs not detailed below: **Android Export** — batch Mobile→Android asset export + ICP re-encode, see `ffd/android_export/`; **Comparison** — side-by-side Mobile/Android record diffing, see `ffd/comparison/` and `--compare`.)
 
 **Files** — load `.sp` scratchpads into chapter slots and pick the Android container (`.obb` / `.apk` / `.jar` / `.jam`). Empty slots are flagged across every other viewer.
 
@@ -104,7 +104,7 @@ The four panes (Mobile | Android | Preview | Inspector) sit inside a `ttk.PanedW
 
 **Battle Effects** — animated battle-effect sprite viewer.
 
-**Monsters** — bestiary. Mobile uses big-endian boot_data section 12 (with section 16 as fallback); Android uses LE section 9 via the shared name+desc+body record layout.
+**Monsters** — bestiary. Mobile uses big-endian boot_data section 8 (the old §12 claim was wrong — §12 is the tileset preload pack table; see `ffd/monsters/parser.py`); Android uses LE section 9 via the shared name+desc+body record layout.
 
 **Music** — `snd.dat` and `res.bin`. `snd.dat` is an uncompressed 3-bank container of raw MFi (`melo…`) melodies exported as `.mld` (banks 0/1 = BGM, bank 2 = SFX); the Music tab pulls them from every loaded Mobile chapter and the Android `.obb` (single save or **Export all**). The audio-name list comes from `res.bin`. MFi v5 → `.mid` conversion is deferred.
 
@@ -346,6 +346,12 @@ The lookup pipeline when rendering an Android map:
 5. Last resort: `mc0_0`.
 
 To bulk-populate annotations from the engine parser, run `tools/seed_mc_overrides_from_engine.py --apply`. To hand-correct stragglers, use the **Map Annotations** tab.
+
+---
+
+## Living documentation (`docs/`)
+
+A 2026-06-10 repository audit produced an authoritative documentation tree under `Python/docs/` — toolkit status, the **baked-bundle format specification** (`docs/architecture/asset_pipeline.md`, supersedes the draft in `Engine/docs/ASSET_PIPELINE.md`), per-format specs with confidence ratings (`docs/formats/`), the reverse-engineering knowledge base (discoveries, unresolved questions, assumptions, confidence matrix, contradiction report — `docs/reverse_engineering/`), and development docs (`docs/development/`). The FFSmith engine has a matching tree in `Engine/docs/`. Start at `docs/architecture/toolkit_status.md`.
 
 ---
 
