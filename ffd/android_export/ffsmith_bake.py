@@ -167,8 +167,15 @@ def _write_ffmap(path, parsed, engine, pass_grid, events):
         f.write(FFMAP_MAGIC)
         f.write(struct.pack("<HHH", w, h, len(layers)))
         f.write(struct.pack("<hHhH", mc0, v0 & 0xFFFF, mc1, v1 & 0xFFFF))
+        # reserved u32 packs three small map-header bytes (all fit in a byte):
+        #   bits 0..7  overhead-layer threshold (layer index)
+        #   bits 8..15 field_bgm  (ReserveBGM id -> snd0_{id}.ogg; 255 = none)
+        #   bits 16..23 battle_bgm (Get*Bgm; 255 = none)
         thr = (engine or {}).get("overhead_threshold", 0) or 0
-        f.write(struct.pack("<I", thr & 0xFFFFFFFF))   # reserved u32 -> overhead-layer threshold
+        fbgm = (engine or {}).get("field_bgm", 255)
+        bbgm = (engine or {}).get("battle_bgm", 255)
+        resv = (thr & 0xFF) | ((fbgm & 0xFF) << 8) | ((bbgm & 0xFF) << 16)
+        f.write(struct.pack("<I", resv & 0xFFFFFFFF))
         for layer in layers:
             buf = bytearray()
             for (_mc_type, hb, lb) in layer:
@@ -499,6 +506,67 @@ def _bake_sprite_geo(files, out_dir):
     return len(geo)
 
 
+def _bake_audio(files, out_dir):
+    """Transcode the Android Ogg Vorbis BGM (bank 0) + SFX (bank 2) to IMA-ADPCM
+    WAV into <out>/audio/, and bake the per-BGM loop-flag table into data/audio.bin.
+
+    IMA-ADPCM WAV (~2x the OGG, vs ~9x for raw PCM) is decoded natively by SDL2's
+    SDL_LoadWAV, so FFSmith needs no OGG decoder and no new deps.  See
+    [[ffd_android_audio]]: ReserveBGM(id) -> audio/snd0_{id}.wav (looped per
+    bgm_loop.dat), ReserveSE(id) -> audio/snd2_{id}.wav.  bgm_loop.dat = BE u16
+    count + one loop-flag byte per BGM index (nonzero = loop the whole track).
+    audio.bin (FAUD): magic + u16 loop_count + loop_count flag bytes.
+
+    Requires ffmpeg on PATH at bake time; if absent, audio is skipped (warned).
+    """
+    import re as _re, shutil as _sh, subprocess as _sp, tempfile as _tf, os as _os
+    adir = Path(out_dir) / "audio"
+    adir.mkdir(parents=True, exist_ok=True)
+    ffmpeg = _sh.which("ffmpeg")
+    rx = _re.compile(r"^snd([02])_(\d+)\.ogg$", _re.IGNORECASE)
+    names = [n for n in files if rx.match(Path(n).name)]
+    n_bgm = n_sfx = 0
+    if ffmpeg:
+        root = getattr(files, "root", None)
+        for name in names:
+            base = Path(name).name
+            m = rx.match(base)
+            src = str(Path(root) / base) if root is not None else None
+            tmp = None
+            if not src or not _os.path.exists(src):
+                tmp = _tf.NamedTemporaryFile(suffix=".ogg", delete=False)
+                tmp.write(files[name]); tmp.close(); src = tmp.name
+            dst = str(adir / (base[:-4] + ".wav"))
+            try:
+                _sp.run([ffmpeg, "-y", "-v", "error", "-i", src,
+                         "-acodec", "adpcm_ima_wav", dst], check=True)
+                if m.group(1) == "0":
+                    n_bgm += 1
+                else:
+                    n_sfx += 1
+            except Exception:
+                pass
+            finally:
+                if tmp:
+                    _os.unlink(tmp.name)
+    else:
+        print("[bake] WARNING: ffmpeg not found on PATH; audio NOT baked. "
+              "Install ffmpeg and re-bake to enable music/SFX.")
+    loop = b""
+    if "bgm_loop.dat" in files:
+        raw = files["bgm_loop.dat"]
+        if len(raw) >= 2:
+            cnt = (raw[0] << 8) | raw[1]
+            loop = bytes(raw[2:2 + cnt])
+    with open(Path(out_dir) / "data" / "audio.bin", "wb") as f:
+        f.write(b"FAUD")
+        f.write(struct.pack("<H", len(loop)))
+        f.write(loop)
+    return {"bgm": n_bgm, "sfx": n_sfx, "bgm_loop": len(loop),
+            "format": "adpcm_ima_wav" if ffmpeg else "none",
+            "se": {"decide": 1, "success": 2, "error": 3}}
+
+
 def bake(obb_path=None, out_dir=".", *, proper_dir=None, limit=None, only=None,
          src_files=None):
     if src_files is not None:
@@ -612,6 +680,7 @@ def bake(obb_path=None, out_dir=".", *, proper_dir=None, limit=None, only=None,
     menu_counts = _bake_menu_data(files, out)
     _bake_intro(files, out)
     _bake_sprite_geo(files, out)
+    manifest["audio"] = _bake_audio(files, out)
     manifest["text"] = {"messages": n_msgs, "font": has_font,
                         "banks": sorted(groups_seen)}
     manifest["ui"] = ui_imgs

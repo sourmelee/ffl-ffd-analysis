@@ -73,8 +73,16 @@ def parse_android_map_engine(chunk: bytes):
         h = r.i16be()                          # offset 10..11: height
         r.i16be()                              # offset 12..13: i16BE
         color = r.i32be() & 0xFFFFFFFF         # offset 14..17: i32BE color
-        for _ in range(7):                     # offset 18..24: 7 u8 fields
-            r.u8()
+        # offset 18..24: 7 u8 fields. From FieldClass::LoadMapInfo (libjniproxy
+        # @118828-118848) these are, in order:
+        #   field_bgm(0xdc5c) battle_bgm(0xaec) battle_bg(0xad8)
+        #   battle_bg_water(0xae0) 0xadc 0xae4 encount_ratio(0xad4)
+        misc7 = [r.u8() for _ in range(7)]
+        field_bgm = misc7[0]                   # 0xdc5c -> active 0xdc58 (GetFieldBgm)
+        battle_bgm = misc7[1]                  # 0xaec  -> active 0xae8  (GetBattleBgm)
+        battle_bg = misc7[2]                   # 0xad8
+        battle_bg_water = misc7[3]             # 0xae0
+        encount_ratio = misc7[6]               # 0xad4  -> active 0xad0
         n_layers = r.u8()                      # offset 25: n_layers
 
         # Per-layer 7-byte header section
@@ -122,6 +130,9 @@ def parse_android_map_engine(chunk: bytes):
             "mc_id_slot0": mc0, "variant_slot0": v0,
             "mc_id_slot1": mc1, "variant_slot1": v1,
             "overhead_threshold": overhead_threshold,
+            "field_bgm": field_bgm, "battle_bgm": battle_bgm,
+            "battle_bg": battle_bg, "battle_bg_water": battle_bg_water,
+            "encount_ratio": encount_ratio,
         }
     except (IndexError, struct.error):
         return None
