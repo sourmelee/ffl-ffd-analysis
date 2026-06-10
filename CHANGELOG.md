@@ -17,6 +17,25 @@ commit as the changelog entry.
 
 ## [Unreleased]
 
+## [0.7.23] - 2026-06-09
+
+### Added
+
+- **Audio baking for FFSmith (M8).** `--bake-ffsmith` now bundles the Android
+  game's music + sound effects so the engine isn't silent. `_bake_audio`
+  transcodes the OGG banks (bank 0 = BGM, bank 2 = SFX) to **IMA-ADPCM WAV**
+  (~2x the OGG, vs ~9x for raw PCM) under `<bundle>/audio/snd{0,2}_{id}.wav` via
+  ffmpeg, and writes `data/audio.bin` (`FAUD`: the per-BGM loop-flag table from
+  `bgm_loop.dat`). IMA-ADPCM WAV is decoded natively by SDL2's `SDL_LoadWAV`, so
+  the engine needs no Ogg decoder and no new dependency. **Requires ffmpeg on
+  PATH at bake time**; without it audio is skipped with a warning (the rest of
+  the bake still succeeds).
+- **Per-map BGM in `.ffmap`.** `parse_android_map_engine` now also returns
+  `field_bgm` / `battle_bgm` / `battle_bg` / `encount_ratio` — the 7 u8 map-header
+  fields decoded from `FieldClass::LoadMapInfo` (the baker already read past
+  them). `field_bgm` + `battle_bgm` are packed into the `.ffmap` reserved u32
+  (with the overhead threshold) so the engine plays the right track per map.
+
 ## [0.7.22] - 2026-06-09
 
 ### Added
