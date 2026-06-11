@@ -33,6 +33,8 @@
 | 2026-06-10 | **Per-map random-encounter areas** in the LoadMapInfo tail: 3 bools + n×(set_id u16BE, rate, rect) | LoadEncountData c:119075; 901/1,679 maps, 8,154 areas; overworld = full-map sets {1,2,3} @5 | maps.md, FFM5 |
 | 2026-06-10 | **Monster body combat map**: level=b[0], HP=BE32@b[2] (MP=HP/8), wATK=b[15], DEF=b[18], MDEF=b[19], EVA=b[20], MEVA=b[21], atk-range=b[24..25]; enemy A=LEVEL | LoadMonsterData c:151254 + SetBtlEnemyParam c:88427; Goblin lvl1/hp21/watk10 | battles.md, FMN2 |
 
+| 2026-06-11 | **Cutscene direction decoded + implemented**: 0x68 command bytes (68-entry table from the real .so), 0x69/0x32 script suspension, 0x1b camera re-target, 0x20/0x21/0x55 position/visibility, 0x2a fades; call-stack suspension; **exact-tile story sequencing** (stacked boot-7 dispatchers) | SetCharaCommand/MoveCharaEvent/CheckRangeEvent/ScriptIf reads + DAT_00418d40 extraction; intro plays headless w/ full direction (`--cuttest` PASS) | events.md, Engine field.{h,cpp} |
+
 ## Negative results (worth not re-discovering)
 
 - snd.dat is **not** gzip-wrapped (the old scanner found nothing because there was nothing).
@@ -42,3 +44,4 @@
 - Monster "level" (`field14`) is **not** a difficulty proxy (Werewolf atk 205 at "level 1") — resolved 2026-06-10: that "atk" was `stat_b` = weapon-attack body[15]; level body[0] IS the level, and high-watk low-level monsters are simply hard-hitting.
 - Old `stat_c` was **not** the monster's DEF (real DEF = body[18]).
 - `e3_param.dat` is **not** the retail start party path.
+- Script warps do **not** auto walk-in a step — beats land exactly on dispatcher tiles (tried, reverted 2026-06-11); m200's off-by-one spawn expects a real player step.

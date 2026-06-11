@@ -14,7 +14,7 @@
 ## Medium
 
 7. (E) **Per-map wrap flags** — where in the chunk header; needed for world-map edge wrap (CheckMovePass modulo path is decoded, its trigger flags' storage isn't).
-8. (E) **Boot conditions 2/3** exact trigger types; common parallels 0x102/0x105/0x106 behavior; page register (`+0xe474`) full semantics; script timer ticking model; `0x32` wait timing.
+8. (E) **Boot conditions 2/3** exact trigger types; common parallels 0x102/0x105/0x106 behavior; page register (`+0xe474`) full semantics; script timer ticking model; `0x32` exact tick rate (frames assumed). NPC *autonomous* wander (`MoveCharaAuto` + the chara `pattern` field) — scripted movement is done 2026-06-11, idle townsfolk still stand still.
 9. (E) **Choice-line text source** (option value = msg id works empirically — confirm).
 10. (E) **Original save format** (`save.bin`, 15 KB/slot) — entirely undecoded (saves.md).
 11. (T) **Map layer attribute planes** (flag_a/flag_b payloads) — skipped, never decoded.

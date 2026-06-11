@@ -26,7 +26,8 @@
 | Boot/trigger conditions | HIGH (0/1/4–8), LOW (2/3) | HIGH | HIGH | CheckRangeEvent + walk traces |
 | ScriptEncount 0x50 + formations | HIGH (2026-06-10) | HIGH (FENC) | HIGH (pause→battle→resume) | `--enctest` PASS on real bank-0 data |
 | Random-encounter areas | HIGH | HIGH (FFM5) | MEDIUM (approx roll, `--encounters`) | 8,154 areas parse; roll formula open |
-| NPC-move / fades / waits | catalogued only | catalogued | log-skip | open |
+| Cutscene ops (0x68/69/1b/20/21/2a/32/55) + command table | HIGH (2026-06-11) | HIGH (disasm) | HIGH (actor system; `--cuttest`) | DAT_00418d40 extracted; intro plays with direction |
+| MoveCharaAuto (NPC wander) / poses / jump arcs | — / partial | — | static NPCs / approx | open |
 | message.dat / msd / system_message / msg banks | HIGH | HIGH | HIGH (baked EN) | record-count cross-checks; on-screen text |
 | field_anm | HIGH | HIGH | HIGH (geo baked) | MtxAnmCtrl cite + in-engine sprites |
 | btlanm_sp | MEDIUM | MEDIUM | — | structure parses; playback unverified |
