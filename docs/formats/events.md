@@ -33,6 +33,7 @@ Lives in the map-chunk tail after tile + attribute data; the true offset is **re
 - `0x6b BulkSetVars` sub2 writes (key,val) into var bank 2 — the door-warp preamble (var0=map, 2=x, 3=y, 4=dir consumed by 0x104's 0x41).
 - `0x03/0x04` set variable/flag with calc-op/bank semantics; `0x00` SetMessage, `0x01` ScriptSentence (cinematic text).
 - Boot conditions: 0 auto, 1 talk, 4/5 parallel-while-appear, 6 range-in step, 7 range-in always (fires on load), 8 confirm-in-rect; **2/3 hypothesized step variants, unconfirmed**.
+- **Spawn position can select story branches** (HIGH, found via a live bug 2026-06-10): m0 places adjacent 1-tile boot-7 dispatchers — (1,1) = light-side prologue (23 scripts → m101 chain), (2,1) = dark-side/Nacht intro (11 scripts → m1500 chain). Getting the map-default spawn wrong by one tile plays a different chapter's intro. Engines must apply the FFM header spawn *before* any center-fallback (FFSmith `loadInto` had this order swapped; fixed).
 
 ## Hypotheses / open
 
