@@ -16,14 +16,17 @@
 | Z-order layer threshold | HIGH | HIGH | HIGH | per-map splits verified (m500/cave/m2601) |
 | boot_data TOC + section maps | HIGH | HIGH | n/a | loader dispatch + empirical sections |
 | Items / Jobs / Monsters / Chara records | HIGH (structure) | HIGH | HIGH (baked) | cross-platform byte identity |
-| Item/job/monster/magic **body fields** | MEDIUM/partial | partial | heuristic consumers | offsets pinned only where listed in formats/ |
+| Monster body combat fields | HIGH (2026-06-10) | HIGH (FMN2) | HIGH | LoadMonsterData/SetBtlEnemyParam map; Goblin verified |
+| Item/job/magic **body fields** | MEDIUM/partial | partial | heuristic consumers | offsets pinned only where listed in formats/ |
 | §8 EXP thresholds + growth | HIGH | HIGH | HIGH | Sol/Aigis curves |
 | §1 scenario/start | HIGH | HIGH | HIGH | New Game boots real m0 |
 | Event packs + opcode table | HIGH | HIGH | n/a | disassembly vs MoveScript switch |
 | Script exec model (registry, 0x3d/3f/40/3c/41/57/66/6b) | HIGH | HIGH (disasm) | HIGH | `--vmtest` + retail intro chain plays |
 | Flag/var banks + appear blocks | HIGH | HIGH (baked) | HIGH | m501 doors, Barbara gate |
 | Boot/trigger conditions | HIGH (0/1/4–8), LOW (2/3) | HIGH | HIGH | CheckRangeEvent + walk traces |
-| ScriptEncount / NPC-move / fades / waits | — / catalogued only | catalogued | log-skip | open |
+| ScriptEncount 0x50 + formations | HIGH (2026-06-10) | HIGH (FENC) | HIGH (pause→battle→resume) | `--enctest` PASS on real bank-0 data |
+| Random-encounter areas | HIGH | HIGH (FFM5) | MEDIUM (approx roll, `--encounters`) | 8,154 areas parse; roll formula open |
+| NPC-move / fades / waits | catalogued only | catalogued | log-skip | open |
 | message.dat / msd / system_message / msg banks | HIGH | HIGH | HIGH (baked EN) | record-count cross-checks; on-screen text |
 | field_anm | HIGH | HIGH | HIGH (geo baked) | MtxAnmCtrl cite + in-engine sprites |
 | btlanm_sp | MEDIUM | MEDIUM | — | structure parses; playback unverified |

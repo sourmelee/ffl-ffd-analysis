@@ -29,6 +29,9 @@
 | 2026-06-10 | boot §1 = scenario/start table; `e3_param.dat` is the E3 demo, not retail New Game | LoadScenarioData c:151000 | `boot/scenario.py` |
 | 2026-06-10 | **`0x66` = CallEvent**; common pool = map 10000 (26 routines); `0x41` = map/layer/x/y/dir | retail intro chain plays end-to-end headlessly | events.md |
 | 2026-06-10 | Boot triggers: 6/7/8 rect semantics; boot 7 fires on load; map-default spawn @+0xdc48 (scenario x/y vestigial) | CheckRangeEvent c:113368; m0 prologue auto-runs | events.md / maps.md |
+| 2026-06-10 | **`0x50 ScriptEncount` + Android formations**: form.bin per-bank TOC, (enemy_id,x,y,flags) records, no_escape + bsc.dat battle-script id; result to scripts via GetReference target 8 | ScriptEncount c:120371, LoadFormation c:103535, GetReferenceBattle c:135841; 1,887 formations parse, all enemy ids < 645; FFSmith `--enctest` PASS | `formats/battles.md`, `form_bin.py`, FENC |
+| 2026-06-10 | **Per-map random-encounter areas** in the LoadMapInfo tail: 3 bools + n×(set_id u16BE, rate, rect) | LoadEncountData c:119075; 901/1,679 maps, 8,154 areas; overworld = full-map sets {1,2,3} @5 | maps.md, FFM5 |
+| 2026-06-10 | **Monster body combat map**: level=b[0], HP=BE32@b[2] (MP=HP/8), wATK=b[15], DEF=b[18], MDEF=b[19], EVA=b[20], MEVA=b[21], atk-range=b[24..25]; enemy A=LEVEL | LoadMonsterData c:151254 + SetBtlEnemyParam c:88427; Goblin lvl1/hp21/watk10 | battles.md, FMN2 |
 
 ## Negative results (worth not re-discovering)
 
@@ -36,5 +39,6 @@
 - Door warps are **not** map-header encoded (first assumption) — they're script-var idiom via common event 0x104.
 - The per-chip "overhead priority bit" does **not** exist — z-order is the layer-threshold sort.
 - `system_message.msd` §4 is **not** field dialogue (coincidentally coherent decoy).
-- Monster "level" (`field14`) is **not** a difficulty proxy (Werewolf atk 205 at "level 1").
+- Monster "level" (`field14`) is **not** a difficulty proxy (Werewolf atk 205 at "level 1") — resolved 2026-06-10: that "atk" was `stat_b` = weapon-attack body[15]; level body[0] IS the level, and high-watk low-level monsters are simply hard-hitting.
+- Old `stat_c` was **not** the monster's DEF (real DEF = body[18]).
 - `e3_param.dat` is **not** the retail start party path.

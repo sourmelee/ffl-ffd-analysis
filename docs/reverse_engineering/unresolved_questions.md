@@ -4,12 +4,12 @@
 
 ## High value
 
-1. (E) **`0x50 ScriptEncount` semantics** — formation id source, battle params, post-battle script resume. Blocks closing the retail intro into playable m150.
+1. ~~(E) `0x50 ScriptEncount` semantics~~ **RESOLVED 2026-06-10** (see discoveries log / formats/battles.md). Residue: `bsc.dat` battle-script VM, the battle-condition flag table values (DAT_00418f94), and per-formation loss handling.
 2. (E) **`SetJobStatus` stat derivation** — how base stats + job + level + equipment produce BTLACT A/W/D. Blocks damage exact-match.
 3. (E) **Original RNG + turn scheduler** — Mobile = `java.util.Random`; Android's own PRNG unidentified. Blocks any trace-level battle/encounter match.
-4. (T/E) **Random-encounter mechanics** — how `encount_ratio` + (suspected) floor-attr value 15 + step logic select formations; Android formation table location.
+4. (T/E) **Random-encounter roll** — areas/formations/ratio are now decoded+baked (FFM5/FENC); still open: the per-step roll formula combining rate × encount_ratio (× floor-attr 15?), and where it runs. FFSmith `--encounters` ships an approximation.
 5. (T) **Android map mc_id 27% tail** — which side is right where engine parse and overrides disagree; meaning of bucket bytes chunk[18]/chunk[5].
-6. (T/M) **Monster body full field map** (~50/64 bytes), incl. attack/defense/elements/AI hooks; job body 126-byte tail (per-job HP%/MP%); magic body 54-byte semantics; item use-effect encoding.
+6. (T/M) **Remaining body maps** — monster body is now ~70% mapped (battles.md; open: b[16/17/22/23/26/28], element groups b[29..32], the 0x2c..0x46 tail incl. suspected AI/drops); job body 126-byte tail (per-job HP%/MP%); magic body 54-byte semantics; item use-effect encoding.
 
 ## Medium
 

@@ -116,6 +116,7 @@ def parse_android_map_engine(chunk: bytes):
         # has_far(u8) + 2 far params + has_BG(u8) + 2 BG params + 2 i16BE BG shorts;
         # LoadFar/LoadBGLayerAnime consume nothing from the stream.  Default 0.
         overhead_threshold = 0
+        encount_areas = []
         try:
             r.u8()                       # has_far
             r.u8(); r.u8()               # far params (always read)
@@ -123,8 +124,21 @@ def parse_android_map_engine(chunk: bytes):
             r.u8(); r.u8()               # BG params
             r.i16be(); r.i16be()         # BG shorts
             overhead_threshold = r.u8()  # 0xdc2c
+            # Tail decoded 2026-06-10 (LoadMapInfo @118985..119000):
+            # 3 bool bytes (0xdc30/0xdc31/0xdc32), then u8 n_encount and
+            # n x 7-byte random-encounter areas read by LoadEncountData
+            # (c:119075): u16BE encounter-set id, u8 rate, u8 x, y, w, h
+            # (rect clamped to the map; ids feed BattleClass::LoadFormation).
+            r.u8(); r.u8(); r.u8()       # 0xdc30..0xdc32 bools
+            n_enc = r.u8()
+            for _ in range(n_enc):
+                set_id = r.i16be() & 0xFFFF
+                rate = r.u8()
+                ex, ey, ew, eh = r.u8(), r.u8(), r.u8(), r.u8()
+                encount_areas.append({"set_id": set_id, "rate": rate,
+                                      "x": ex, "y": ey, "w": ew, "h": eh})
         except (IndexError, struct.error):
-            overhead_threshold = 0
+            encount_areas = encount_areas or []
 
         return {
             "w": w, "h": h, "n_layers": n_layers, "color": color,
@@ -132,6 +146,7 @@ def parse_android_map_engine(chunk: bytes):
             "mc_id_slot0": mc0, "variant_slot0": v0,
             "mc_id_slot1": mc1, "variant_slot1": v1,
             "overhead_threshold": overhead_threshold,
+            "encount_areas": encount_areas,
             "spawn_layer": spawn_layer, "spawn_x": spawn_x,
             "spawn_y": spawn_y, "spawn_dir": spawn_dir,
             "field_bgm": field_bgm, "battle_bgm": battle_bgm,

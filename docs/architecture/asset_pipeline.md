@@ -1,6 +1,6 @@
 # Asset Pipeline — Authoritative Baked-Bundle Specification
 
-*Audit 2026-06-10, toolkit 0.7.25 / bundle map format **FFM4**. This supersedes the "Bundle layout (v0 draft)" in `Engine/docs/ASSET_PIPELINE.md` (kept there for its principles/symbiosis rules). Writer: `ffd/android_export/ffsmith_bake.py`. Reader: `Engine/src/data/bundle.cpp`. Any change must touch both and bump the relevant magic.*
+*Audit 2026-06-10 (rev. same day, toolkit 0.7.26 / map format **FFM5**). This supersedes the "Bundle layout (v0 draft)" in `Engine/docs/ASSET_PIPELINE.md` (kept there for its principles/symbiosis rules). Writer: `ffd/android_export/ffsmith_bake.py`. Reader: `Engine/src/data/bundle.cpp`. Any change must touch both and bump the relevant magic.*
 
 All baked integers are **little-endian** unless noted. `pstr16` = u16 length + bytes (UTF-8).
 
@@ -9,8 +9,8 @@ All baked integers are **little-endian** unless noted. `pstr16` = u16 length + b
 ```
 out_dir/
   manifest.json                 version, source, maps/tilesheets/sprites TOC, counts
-  maps/g{G}_p{P}_m{M}.ffmap     FFM4 baked maps
-  data/common_events.ffmap      map 10000 (CallEvent pool, 26 routines) as a 1×1 FFM4 shell
+  maps/g{G}_p{P}_m{M}.ffmap     FFM5 baked maps
+  data/common_events.ffmap      map 10000 (CallEvent pool, 26 routines) as a 1×1 FFM5 shell
   tex/mc{N}_{V}.tex             FTEX tilesheets (only those referenced by baked maps)
   sprites/fldchr{IMG}_{VAR}.tex FTEX character/object sheets (only those referenced by events)
   text/msg{N}.bin               FMSG dialogue banks (one per map group seen)
@@ -25,13 +25,15 @@ out_dir/
 
 **FTEX**: `"FTEX" u32 w, u32 h, w*h*4 RGBA`.
 
-**FFM4** (`load_ffmap` accepts FFM0–FFM4; features gate on the version digit):
+**FFM5** (`load_ffmap` accepts FFM0–FFM5; features gate on the version digit):
 ```
-"FFM4"; w u16; h u16; n_layers u16
+"FFM5"; w u16; h u16; n_layers u16
 mc_slot0 i16; var_slot0 u16; mc_slot1 i16; var_slot1 u16
 reserved u32: byte0 = overhead threshold (FieldClass+0xdc2c)
               byte1 = field_bgm (255=none)   byte2 = battle_bgm   byte3 unused
 [FFM4] spawn_x u8, spawn_y u8, spawn_dir u8   (255 = none; FieldClass+0xdc48..54)
+[FFM5] n_enc u8; n × { set_id u16 (formation id, story-bank section), rate u8,
+       x u8, y u8, w u8, h u8 }   random-encounter areas (LoadEncountData c:119075)
 per layer: w*h × u16 tile word (low=tile, high=slot 0/1)
 event_len u32 + raw event-region bytes        (legacy; superseded by events block)
 [FFM1+] has_pass u8; if set: w*h × u8 pass nibble (0 = solid; from capk word A & 0xF, layer-0 tiles)
@@ -43,11 +45,12 @@ event_len u32 + raw event-region bytes        (legacy; superseded by events bloc
     [FFM3+] appear[31]                          (CheckEventAppear block, header bytes 9..0x27)
     n_scripts u16; per script: len u16 + bytecode (BE operands — see formats/events.md)
 ```
-Known omission: per-map **wrap flags** were in the FFM0 draft spec but never baked; world-map edge wrap is unimplemented engine-side partly for this reason.
+Known omission: per-map **wrap flags** were in the FFM0 draft spec but never baked; world-map edge wrap is unimplemented engine-side partly for this reason. (The FFM5 tail also reads-and-skips 3 bool bytes — FieldClass+0xdc30..32 — whose meaning is still open.)
 
 **FITM** items: `"FITM" u32 n`; per: id u32, name pstr16, desc pstr16, atk u16, def u16, item_type u8 (0 consumable/key, 1–15 weapon classes, 16 shield, 17–19 head, 20–22 body, 23 hands/acc — `equip_type` in the raw data is always 0; item_type is the real category).
 **FCHR** chars: `"FCHR" u32 n`; per: id u32, name pstr16, equip 6×u16, job u8, level u8, str/spd/vit/int/mnd 5×u16, hp u16, mp u16, chpk u16 (field-sprite id).
-**FMON** monsters: `"FMON" u32 n`; per: id u32, name pstr16, hp u16, atk u16, def u16, level u8, exp u32, gil u32 (exp/gil = monster body[6]/[10] BE u32 in the source).
+**FMN2** monsters (0.7.26; loader also accepts old FMON): `"FMN2" u32 n`; per: id u32, name pstr16, hp u16 (BE u32 @ body[2]), atk u16 (= weapon-attack, body[15]), def u16 (body[18]), level u8 (body[0]), exp u32, gil u32 (body[6]/[10] BE), mdef u8, eva u8, meva u8, amin u8, amax u8 (body[19/20/21/24/25]). Decoded via `LoadMonsterData` c:151254 + `SetBtlEnemyParam` c:88427; enemy attack STAT = level, MP = HP/8.
+**FENC** encounters (0.7.26; from `form.bin` via `parse_form_bin_android`): `"FENC" u8 n_banks`; per bank: bank u8, n_recs u16; per record: formation_id u16, no_escape u8, battle_script i16 (bsc.dat id — unimplemented engine-side), n_enemies u8 × { enemy_id u16, x i16, y i16, flags u8 }, n_entries u8 × { slot u8, value u8, param i16 }.
 **FSPL** spells: `"FSPL" u32 n`; per: id u16, type u8 (0 dmg / 1 heal), mp u16, power u16, name pstr16.
 **FLVL** levels: `"FLVL" u16 n_thr` + n×u32 cumulative EXP thresholds (boot §8 `[0x10+9i]` BE), `u16 n_rows` + n×(maxHP u16, maxMP u16) (§8 rows `[L*9+2]`/`+4`). 98 thresholds + 143 rows.
 **FSGE** sprite geometry: `"FSGE" u16 n`; per: img u16, isObject u8, frame fx i16, fy i16, fw u16, fh u16, anchor px i16, py i16. Seeded from field_anm, merged with manual `sprite_grid.json`.
@@ -66,7 +69,7 @@ Known omission: per-map **wrap flags** were in the FFM0 draft spec but never bak
 
 ## Bake pipeline order (`bake()`)
 
-capk → chipanim/chipfloor → per-map (parse chunk + engine header + pass grid + events → FFM4; collect needed tilesheets/sprites) → tilesheets (variant-fallback, tolerates truncated mc34/mc60 sources) → sprites → messages (groups seen) → font → ui → menu data tables → intro → start → common events → sprite geo → audio → manifest. `--proper DIR` (fast, extracted folder) or `--obb FILE`; `--limit N`, `--only KEY`.
+capk → chipanim/chipfloor → per-map (parse chunk + engine header + pass grid + events + areas → FFM5; collect needed tilesheets/sprites) → tilesheets (variant-fallback, tolerates truncated mc34/mc60 sources) → sprites → messages (groups seen) → font → ui → menu data tables → intro → start → encounters (FENC) → common events → sprite geo → audio → manifest. `--proper DIR` (fast, extracted folder) or `--obb FILE`; `--limit N`, `--only KEY`.
 
 ## Invariants
 

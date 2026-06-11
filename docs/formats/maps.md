@@ -24,6 +24,9 @@ spawn: u8 layer, i16 x, i16 y, u8 dir          (FieldClass+0xdc48..54)
 i8 mc_id_slot0, u8 variant_slot0; i8 mc_id_slot1, u8 variant_slot1
 has_far u8 + 2 params; has_BG u8 + 2 params + 2×i16   (LoadFar/LoadBGLayerAnime consume 0 stream bytes)
 u8 overhead_threshold                          (FieldClass+0xdc2c; layers > threshold draw above chars)
+3 × u8 bools (0xdc30/0xdc31/0xdc32 — meaning open)
+u8 n_encount; n × 7-byte areas: u16BE formation-set id, u8 rate, u8 x, y, w, h
+                                               (LoadEncountData c:119075; decoded 2026-06-10)
 ```
 
 **Tile word semantics (HIGH, hard-won):** high byte is the **slot selector / variant only** (observed values 0/1) — NOT part of a tile id. mc_id is implicit at map level via the slots above. The old `(hb<<1)|variant` reading was Incorrect.
@@ -40,6 +43,7 @@ A bits: `&0xF` 4-dir passability (HIGH); bit8 animated, 9–10 anim type, 11–1
 ## Unknowns
 
 - Per-map wrap flags (CheckMovePass wraps via record+3/+4 when set) — location in the chunk header not pinned; not baked.
+- The per-step random-encounter **roll formula** (how rate × encount_ratio × steps decide a battle) — areas/ids are decoded (above), the roll is not; FFSmith's `--encounters` uses an approximation.
 - The 27% mc_id tail; `chunk[18]`/`chunk[5]` bucket bytes' real meaning (the bucketing works empirically — Inferred).
 - Layer attribute planes flag_a/flag_b content (skipped over, never decoded).
 - Mobile capk equivalent (Mobile collision source unparsed; Mobile maps render without a pass grid).

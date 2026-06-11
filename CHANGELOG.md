@@ -17,7 +17,32 @@ commit as the changelog entry.
 
 ## [Unreleased]
 
+## [0.7.26] - 2026-06-10
+
 ### Added
+
+- **Android battle formations decoded + baked** (`ffd/formats/form_bin.py::
+  parse_form_bin_android`, from `BattleClass::LoadFormation` c:103535). Android
+  `form.bin` = u32-LE per-story-bank TOC, BE u16 record offsets, records =
+  no_escape + battle-script id (bsc.dat) + up to 8 enemy slots of
+  **(enemy_id i16, x i16, y i16, flags u8)** + party-entry overrides. Verified:
+  16 banks, 1,887 formations, 5,259 enemy refs all within the 645-monster
+  table; bank-0 formation 1 = Goblin x2, formation 150 = the no-escape
+  prologue boss (enemy 48 "???", bsc 1000). Baked as `data/encounters.bin`
+  (`FENC`) by `--bake-ffsmith`.
+- **Per-map random-encounter areas decoded + baked** (LoadMapInfo tail ->
+  `FieldClass::LoadEncountData` c:119075): after the overhead threshold, 3
+  bool bytes then u8 n x 7-byte areas (formation-set id u16-BE, rate u8,
+  x/y/w/h rect). `parse_android_map_engine` now returns `encount_areas`;
+  the map format bumps to **FFM5** carrying them (901 of 1,679 maps have
+  areas; 8,154 total). **Rebuild FFSmith before rebaking.**
+- **Real monster combat stats baked** (`GameClass::LoadMonsterData` c:151254 +
+  `SetBtlEnemyParam` c:88427): level = body[0], HP = BE u32 @ body[2]
+  (enemy MP = HP/8), weapon-attack = body[15], DEF = body[18], MDEF =
+  body[19], evade = body[20], magic-evade = body[21], attack-stat range =
+  body[24..25]; the enemy's attack STAT is its LEVEL. `monsters.bin` bumps
+  to **FMN2** (+5 bytes/record), replacing the old `stat_b`/`stat_c` guesses
+  (`stat_b` was in fact body[15]; `stat_c` was NOT the real DEF).
 
 - **Living documentation tree (`docs/`)** from the 2026-06-10 repository audit:
   `architecture/` (toolkit status report, authoritative baked-bundle format
@@ -28,6 +53,14 @@ commit as the changelog entry.
   confidence matrix, contradiction report), `development/` (roadmap, technical
   debt, refactoring candidates, testing strategy). A matching tree was added
   under `Engine/docs/` (engine repo, versioned separately).
+
+### Changed
+
+- `0x50 ScriptEncount` operands documented from `FieldClass::ScriptEncount`
+  (c:120371): seven (indirect-flag u8, BE u16) pairs = formation, battle-bg
+  id+variant, battle-condition 1-3, BGM, BGM-compare, behavior flags. Battle
+  results reach scripts via `GetReference` target 8 (`GetReferenceBattle`,
+  type 3: 1 = won, 2 = escaped).
 
 ### Fixed
 
@@ -781,4 +814,6 @@ project went up on GitHub.
 ### Parsers and formats
 
 - `.sp` DoCoMo scratchpad container (Mobile / feature-phone build).
-- `.obb` XOR-obfuscated FFD container (Android build),
+- `.obb` XOR-obfuscated FFD container (Android build), with INP / mtxs /
+  ICP payload conversion.
+

@@ -37,5 +37,5 @@ Lives in the map-chunk tail after tile + attribute data; the true offset is **re
 ## Hypotheses / open
 
 - Choice option *value* = message id of the choice line (works in practice; the real text source unconfirmed).
-- `0x50 ScriptEncount` operand layout (formation id?) — next decode target.
+- ~~`0x50 ScriptEncount` operand layout~~ **DECODED 2026-06-10** (`FieldClass::ScriptEncount` c:120371): seven (indirect-flag u8, BE u16) pairs at offsets (1,2),(4,5),(7,8),(10,0xb),(0xd,0xe),(0x10,0x11),(0x13,0x14) = formation id, battle-bg id, bg variant, battle-condition 1–3 (flag table DAT_00418f94 — values unread), battle BGM, BGM-compare (p4==p5 → "keep BGM" flag), behavior flags (bit0 clear → cond-flag 0x10, bit1 → result-flag 2). Implemented in FFSmith (VM pause → formation battle → script resume; result via GetReference target 8). Still open within 0x50: the exact meaning of the condition-flag table values and `bsc.dat` battle scripts.
 - Page register (`+0xe474`) full semantics; `0x32` wait timing; NPC-move op family parameters (catalogued, not semantically decoded); fade/palette ops.

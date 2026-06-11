@@ -40,7 +40,7 @@ from ..maps.mobile import parse_mpkh_index
 from ..maps.capk import parse_capk, pass_nibble, parse_capk_anim, parse_capk_floor
 from ..events.android import parse_android_event_pack
 
-FFMAP_MAGIC = b"FFM4"
+FFMAP_MAGIC = b"FFM5"
 FTEX_MAGIC = b"FTEX"
 BUNDLE_VERSION = 3
 
@@ -194,6 +194,15 @@ def _write_ffmap(path, parsed, engine, pass_grid, events):
                             sx & 0xFF if 0 <= sx <= 254 else 255,
                             sy & 0xFF if 0 <= sy <= 254 else 255,
                             sd & 0xFF))
+        # FFM5: random-encounter areas (LoadMapInfo tail -> LoadEncountData):
+        # u8 n, then n x { u16 set_id (formation id in the map's story-bank
+        # section of form.bin), u8 rate, u8 x, y, w, h }.
+        areas = (engine or {}).get("encount_areas") or []
+        f.write(struct.pack("<B", min(len(areas), 255)))
+        for a in areas[:255]:
+            f.write(struct.pack("<HBBBBB", a["set_id"] & 0xFFFF,
+                                a["rate"] & 0xFF, a["x"] & 0xFF,
+                                a["y"] & 0xFF, a["w"] & 0xFF, a["h"] & 0xFF))
         for layer in layers:
             buf = bytearray()
             for (_mc_type, hb, lb) in layer:
@@ -383,14 +392,31 @@ def _bake_menu_data(files, out_dir):
             bd = m["body"]
             exp = int.from_bytes(bd[6:10], "big") if len(bd) >= 10 else 0
             gil = int.from_bytes(bd[10:14], "big") if len(bd) >= 14 else 0
-            mrecs.append((mid, en, min(hp, 65535), min(b.get("stat_b", 0), 65535),
-                          min(b.get("stat_c", 0), 65535), min(b.get("field14", 1), 255), exp, gil))
+            # Real combat fields (GameClass::LoadMonsterData c:151254 +
+            # BattleClass::SetBtlEnemyParam c:88427): level = body[0],
+            # HP = BE u32 @ body[2], weapon-attack = body[15],
+            # DEF = body[18], MDEF = body[19], evade = body[20],
+            # magic-evade = body[21], attack-stat range = body[24..25].
+            # The enemy's attack STAT (BTLACT+0x3c) is its LEVEL; MP = HP/8.
+            lvl = bd[0] if bd else 1
+            hp2 = int.from_bytes(bd[2:6], "big") if len(bd) >= 6 else hp
+            watk = bd[15] if len(bd) > 15 else 0
+            dfn = bd[18] if len(bd) > 18 else 0
+            mdef = bd[19] if len(bd) > 19 else 0
+            eva = bd[20] if len(bd) > 20 else 0
+            meva = bd[21] if len(bd) > 21 else 0
+            amin = bd[24] if len(bd) > 24 else 0
+            amax = bd[25] if len(bd) > 25 else 0
+            mrecs.append((mid, en, min(hp2, 65535), watk, dfn,
+                          min(lvl, 255), exp, gil, mdef, eva, meva, amin, amax))
         with open(Path(out_dir) / "data" / "monsters.bin", "wb") as f:
-            f.write(b"FMON"); f.write(struct.pack("<I", len(mrecs)))
-            for mid, en, hp, atk, df, lvl, exp, gil in mrecs:
+            f.write(b"FMN2"); f.write(struct.pack("<I", len(mrecs)))
+            for (mid, en, hp, atk, df, lvl, exp, gil,
+                 mdef, eva, meva, amin, amax) in mrecs:
                 nb = en.encode("utf-8")
                 f.write(struct.pack("<IH", mid, len(nb))); f.write(nb)
                 f.write(struct.pack("<HHHBII", hp, atk, df, lvl, exp & 0xFFFFFFFF, gil & 0xFFFFFFFF))
+                f.write(struct.pack("<BBBBB", mdef, eva, meva, amin, amax))
         counts["monsters"] = len(mrecs)
         # Castable spell set (ids from the system_message Magic table; names are real, effects
         # from the descriptions).  MP/power are tier approximations (boot has no clean magic-body
@@ -562,6 +588,44 @@ def _bake_start(files, out_dir):
             f.write(struct.pack("<HBBB", r["map"] & 0xFFFF, r["x"] & 0xFF,
                                 r["y"] & 0xFF, r["before_story"] & 0xFF))
     return len(recs)
+
+
+def _bake_encounters(files, out_dir):
+    """Bake form.bin (BattleClass::LoadFormation, c:103535) -> data/encounters.bin.
+
+    FENC (LE): "FENC" u8 n_banks; per bank: u8 bank, u16 n_recs; per rec:
+    u16 formation_id, u8 no_escape, i16 battle_script, u8 n_enemies x
+    { u16 enemy_id, i16 x, i16 y, u8 flags }, u8 n_entries x
+    { u8 slot, u8 value, i16 param }.
+    """
+    from ..formats.form_bin import parse_form_bin_android
+    raw = files.get("form.bin") if hasattr(files, "get") else (
+        files["form.bin"] if "form.bin" in files else None)
+    if not raw:
+        print("[bake] form.bin missing -- no encounters baked")
+        return 0
+    banks = parse_form_bin_android(raw)
+    n = 0
+    with open(Path(out_dir) / "data" / "encounters.bin", "wb") as f:
+        f.write(b"FENC")
+        f.write(struct.pack("<B", len(banks)))
+        for bank in sorted(banks):
+            recs = banks[bank]
+            f.write(struct.pack("<BH", bank, len(recs)))
+            for fid in sorted(recs):
+                r = recs[fid]
+                f.write(struct.pack("<HBh", fid, r["no_escape"] & 0xFF,
+                                    r["battle_script"]))
+                f.write(struct.pack("<B", len(r["enemies"])))
+                for e in r["enemies"]:
+                    f.write(struct.pack("<HhhB", e["enemy_id"] & 0xFFFF,
+                                        e["x"], e["y"], e["flags"] & 0xFF))
+                f.write(struct.pack("<B", len(r["entries"])))
+                for m in r["entries"]:
+                    f.write(struct.pack("<BBh", m["slot"] & 0xFF,
+                                        m["value"] & 0xFF, m["param"]))
+                n += 1
+    return n
 
 
 def _bake_audio(files, out_dir):
@@ -738,6 +802,7 @@ def bake(obb_path=None, out_dir=".", *, proper_dir=None, limit=None, only=None,
     menu_counts = _bake_menu_data(files, out)
     _bake_intro(files, out)
     manifest["start"] = _bake_start(files, out)
+    manifest["encounters"] = _bake_encounters(files, out)
     manifest["common_events"] = _bake_common_events(files, out)
     _bake_sprite_geo(files, out)
     manifest["audio"] = _bake_audio(files, out)
