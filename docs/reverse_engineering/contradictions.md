@@ -23,8 +23,8 @@
 **Resolution:** Either render "?" for unmapped fields or decode the real offsets (exp/gil ARE known — body[6]/[10] — yet the alias sets them to 0 while `decode_monster_body` is available; wire them).
 
 ## 6. Baked stats provenance is weaker than it looks
-**Evidence:** FITM atk/def regex-scraped from English descriptions; FMON atk/def/level from partially-mapped `stat_b`/`stat_c`/`field14`; FSPL is a hardcoded 11-spell list (`CAST`). All inside `_bake_menu_data`, all commented, none visible from the bundle itself.
-**Resolution:** Documented now in formats/battles.md & jobs.md; longer-term, decode the bodies and mark provenance in manifest.json.
+**Evidence (original):** FITM atk/def regex-scraped from English descriptions; FMON atk/def/level from partially-mapped `stat_b`/`stat_c`/`field14`; FSPL was a hardcoded 11-spell list (`CAST`). All inside `_bake_menu_data`, all commented, none visible from the bundle itself.
+**Resolution:** **Largely resolved 2026-06-13** — FITM atk/def now decoded from body[32] (`LoadItemData`); FSPL now the real 251-spell table decoded from the magic body (`LoadMagicData`/`CalcMagicDmg`); FJOB adds real per-job HP%/MP%. Monster stats were decoded earlier (FMN2). Remaining weak spot: consumable use-effect *magnitudes* still come from description text. Longer-term: surface provenance in manifest.json.
 
 ## 7. `docs`-vs-code drift inside `mc_overrides.py`
 **Evidence:** module docstring: "Until that header field is decoded, we let the user annotate…" — the header field **was** decoded (engine parser, 73%); the override system's role shifted from "stopgap" to "correction layer", and the file also grew custom-palettes + tileset-builds storage its docstring doesn't mention.

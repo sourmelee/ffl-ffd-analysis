@@ -18,9 +18,8 @@ later id slots with duplicate names ("メモリスト" appears at both
 id=13 and id=25 in Chapter 1) until the real job is introduced.
 
 Body decode is BE-on-both. The high-confidence prefix (sprite/palette
-indices) is decoded by `decode_job_body`; the rest is exposed as
-`tail_uN_OFF` fields for ComparisonTab to surface during phase-2
-delta-spec work.
+indices) plus the HP%/MP%/stat% growth multipliers are decoded by
+`decode_job_body`; the rest is exposed as a `tail` blob for ComparisonTab.
 """
 
 from __future__ import annotations
@@ -64,13 +63,13 @@ def parse_jobs_android(boot: bytes):
 #   body[3]      palette_ow
 #   body[4]      palette_btl  (or palette_btl2)
 #
-# Tail bytes [5..125] hold stats + ability lists + flags. The legacy
-# parser tried to break this into individual fields (base_hp, base_mp,
-# abilities, etc.) using heuristic skips -- and got it wrong (Warrior's
-# decoded base_hp came out as 8372223). Until the layout is verified
-# from libjniproxy.so / class_*.java, we expose the tail bytes as a
-# single `tail` blob in the decode dict, with a few tentative named
-# fields you can promote once you've eyeballed deltas in ComparisonTab.
+# Growth multipliers -- HIGH confidence (2026-06-13). Traced from
+# GameClass::SetJobStatus (libjniproxy.so_new.c @152572): the engine computes
+#   maxHP = base_hp[level] * jobStruct[0x1d] / 100   (and likewise MP / stats),
+# where jobStruct[0x1d] = body[9] and [0x1e] = body[10] (LoadJobData @150402
+# stores body[9]->struct+0x1d, body[10]->struct+0x1e, body[11..15]->+0x1f..+0x23).
+# Validated by archetype: Monk 142% HP, Black Mage 143% MP / 71 INT, Summoner
+# 67% HP / 150% MP, Warrior 138% HP / 33% MP -- exactly the expected FF curves.
 
 def decode_job_body(body: bytes) -> dict:
     if len(body) < _JOB_BODY_SIZE:
@@ -80,12 +79,19 @@ def decode_job_body(body: bytes) -> dict:
         "sprite_btl":  body[2],
         "palette_ow":  body[3],
         "palette_btl": body[4],
-        # tentative stat block
+        # growth multipliers (percent of the shared level-table base) — HIGH
+        "hp_pct":      body[9],
+        "mp_pct":      body[10],
+        "str_pct":     body[11],
+        "spd_pct":     body[12],
+        "vit_pct":     body[13],
+        "int_pct":     body[14],
+        "mnd_pct":     body[15],
+        # u32 BE @5 is the learn/EXP block per the legacy decode (kept for diffing)
         "stat_a":      be_u32(body, 5),
-        "stat_b":      be_u32(body, 9),
         # equip/move flags live near the end per the legacy decode
         "equip_flags": body[124],
         "move_type":   body[125],
         # bag of unmapped bytes for ComparisonTab to highlight diffs in
-        "tail":        bytes(body[13:124]),
+        "tail":        bytes(body[16:124]),
     }

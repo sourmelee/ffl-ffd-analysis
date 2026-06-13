@@ -308,7 +308,6 @@ def _bake_menu_data(files, out_dir):
         sm = SystemMessageLookup(_get("system_message.msd") or b"")
         boot = _get("boot_data.dat")
         items = parse_items_android(boot) if boot else []
-        import re as _re
         recs = []
         for iid, it in enumerate(items):
             if not it:
@@ -317,12 +316,15 @@ def _bake_menu_data(files, out_dir):
             desc = sm.desc("Item", iid, "en") or it.get("desc", "")
             if not name:
                 continue
-            ma = _re.search(r"ATK\s*(\d+)", desc); md = _re.search(r"DEF\s*(\d+)", desc)
-            atk = int(ma.group(1)) if ma else 0
-            dfn = int(md.group(1)) if md else 0
-            # item_type (body offset 0) = category: 0 consumable/key, 1-15 weapon classes,
-            # 16 shield, 17-19 head, 20-22 body, 23 hands/accessory (equip_type @off1 is always 0).
-            itype = decode_item_body(it["body"])["item_type"] if it.get("body") else 0
+            # Real equip stats from the decoded body (GameClass::LoadItemData):
+            # body[32] is the primary stat — weapon ATK or armor DEF, keyed by
+            # item_type. This replaces the old "ATK n"/"DEF n" description regex,
+            # which disagreed with the game on ~6 items (stale flavour text);
+            # the body field is what the engine actually uses.
+            d = decode_item_body(it["body"]) if it.get("body") else {}
+            atk = d.get("attack", 0)
+            dfn = d.get("defense", 0)
+            itype = d.get("item_type", 0)
             recs.append((iid, name, desc, atk, dfn, itype))
         with open(Path(out_dir) / "data" / "items.bin", "wb") as f:
             f.write(b"FITM"); f.write(struct.pack("<I", len(recs)))
@@ -418,18 +420,55 @@ def _bake_menu_data(files, out_dir):
                 f.write(struct.pack("<HHHBII", hp, atk, df, lvl, exp & 0xFFFFFFFF, gil & 0xFFFFFFFF))
                 f.write(struct.pack("<BBBBB", mdef, eva, meva, amin, amax))
         counts["monsters"] = len(mrecs)
-        # Castable spell set (ids from the system_message Magic table; names are real, effects
-        # from the descriptions).  MP/power are tier approximations (boot has no clean magic-body
-        # section).  type: 0 = damage, 1 = heal.
-        CAST = [(1,1,4,24),(7,1,10,64),(13,1,18,150),
-                (25,0,5,16),(26,0,5,16),(27,0,5,16),
-                (31,0,14,38),(32,0,14,38),(33,0,14,38),(23,0,30,70),(36,0,18,45)]
+        # Real spell table, decoded from the boot magic section body (54 B, same
+        # family as items).  Replaces the old hardcoded 11-spell approximation:
+        # MP cost = body[7] (GameClass::GetMagicUseLostValue), power = body[19]
+        # and effect category = body[16] (BattleClass::CalcMagicDmg), element =
+        # body[31].  We bake every named HP-damage / HP-heal spell (kind 0/1);
+        # status/buff spells (kind 2) are skipped — the engine has no status
+        # system yet, and the per-turn MP gate keeps the menu naturally short.
+        # FSPL record: id u16, type u8 (0 dmg/1 heal), mp u16, power u16,
+        # element u8, namelen u16, name.
+        from ..abilities.parser import parse_magic_android, decode_magic_body
+        mag = parse_magic_android(boot) if boot else []
+        srecs = []
+        for sid, sp in enumerate(mag):
+            if not sp:
+                continue
+            nm = sm.name("Magic", sid, "en") or sp.get("name", "")
+            if not nm or nm.startswith("DBG") or not nm.strip():
+                continue
+            d = decode_magic_body(sp.get("body", b""))
+            if not d or d["kind"] == 2:        # skip status/buff for now
+                continue
+            srecs.append((sid, d["kind"], d["mp_cost"], d["power"], d["element"], nm))
         with open(Path(out_dir) / "data" / "spells.bin", "wb") as f:
-            f.write(b"FSPL"); f.write(struct.pack("<I", len(CAST)))
-            for sid, typ, mp, pw in CAST:
-                nm = (sm.name("Magic", sid, "en") or "").encode("utf-8")
-                f.write(struct.pack("<HBHHH", sid, typ, mp, pw, len(nm))); f.write(nm)
-        counts["spells"] = len(CAST)
+            f.write(b"FSPL"); f.write(struct.pack("<I", len(srecs)))
+            for sid, typ, mp, pw, el, nm in srecs:
+                nb = nm.encode("utf-8")
+                f.write(struct.pack("<HBHHBH", sid, typ, mp, pw, el, len(nb)))
+                f.write(nb)
+        counts["spells"] = len(srecs)
+        # Per-job growth multipliers (HIGH — GameClass::SetJobStatus): the engine
+        # scales the shared level-table base HP/MP/stats by these percents.
+        # FJOB record: job_id u16, hp_pct/mp_pct/str/spd/vit/int/mnd u8.
+        from ..jobs.parser import parse_jobs_android, decode_job_body
+        jobs = parse_jobs_android(boot) if boot else []
+        jrecs = []
+        for jid, j in enumerate(jobs):
+            if not j:
+                continue
+            jb = decode_job_body(j.get("body", b""))
+            if not jb:
+                continue
+            jrecs.append((jid, jb["hp_pct"], jb["mp_pct"], jb["str_pct"],
+                          jb["spd_pct"], jb["vit_pct"], jb["int_pct"], jb["mnd_pct"]))
+        with open(Path(out_dir) / "data" / "jobs.bin", "wb") as f:
+            f.write(b"FJOB"); f.write(struct.pack("<I", len(jrecs)))
+            for rec in jrecs:
+                f.write(struct.pack("<H", rec[0]))
+                f.write(struct.pack("<BBBBBBB", *(min(255, v) for v in rec[1:])))
+        counts["jobs"] = len(jrecs)
     except Exception as e:
         print("[bake] menu data skipped:", e)
     return counts
@@ -814,3 +853,4 @@ def bake(obb_path=None, out_dir=".", *, proper_dir=None, limit=None, only=None,
     with open(out / "manifest.json", "w") as f:
         json.dump(manifest, f, indent=2)
     return manifest
+# (end of ffsmith_bake.py)

@@ -17,6 +17,42 @@ commit as the changelog entry.
 
 ## [Unreleased]
 
+## [0.7.27] - 2026-06-13
+
+### Added
+
+- **Magic body (54 B) decoded — real spell table replaces the hardcoded
+  11-spell list** (`ffd/abilities/parser.py::decode_magic_body`). Offsets traced
+  from `GameClass::LoadMagicData` (libjniproxy.so_new.c @150182) and confirmed
+  in the battle consumers: `mp_cost` = body[7] (`GetMagicUseLostValue` @90534),
+  `power` = body[19] and `effect_cat` = body[16] (`CalcMagicDmg` @93078,
+  `SetMagicStatus` @95336), `formula` = body[18], `element` = body[31]
+  (`CalcElementPoint`), `school` = body[0]. Validated against canonical FF
+  values across the whole table (Fire/Fira/Firaga = 5/10/32 MP, pow 14/40/90;
+  Cure->Curaga heal tiers; correct elements/summons). The FFSmith bake now emits
+  **251 real damage/heal spells** (was 11 approximations); status/buff spells
+  (effect_cat 5-8) are skipped until the engine has a status system.
+- **Per-job HP%/MP%/stat% growth multipliers decoded**
+  (`ffd/jobs/parser.py::decode_job_body`). From `GameClass::SetJobStatus`
+  (@152572): `maxHP = base_hp[level] * jobBody[9] / 100`, `maxMP` via body[10],
+  stats via body[11..15] (STR/SPD/VIT/INT/MND). Validated by archetype
+  (Monk 142% HP, Black Mage 143% MP / 71 INT, Summoner 67% HP / 150% MP,
+  Warrior 138% HP / 33% MP). Baked to the new `data/jobs.bin` (FJOB).
+
+### Changed
+
+- **Item equip stats now read from the body, not the description text.** The
+  FFSmith bake previously regex-scraped "ATK n"/"DEF n" out of the localized
+  description; it now uses the verified `body[32]` primary stat (weapon ATK /
+  armor DEF, keyed by `item_type`) decoded in
+  `ffd/items/parser.py::decode_item_body`. Verified against the descriptions:
+  206/209 weapons + 164/167 armor match exactly — the few mismatches are stale
+  flavour text, so the body field is *more* accurate than the old regex.
+- **`decode_item_body` field map corrected**: `price` is BE `body[1..4]` (the
+  old `price@2` was wrong; body[1] is the always-0 high byte previously
+  mislabelled `equip_type`); added verified `primary_stat`, `accuracy`,
+  `use_category`. `attack`/`defense` are surfaced from `primary_stat` by category.
+
 ## [0.7.26] - 2026-06-10
 
 ### Added

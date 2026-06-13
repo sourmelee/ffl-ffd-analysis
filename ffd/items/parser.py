@@ -51,29 +51,42 @@ def parse_items_android(boot: bytes):
 # Body field decode (shared)
 # ---------------------------------------------------------------------------
 
+# Verified offsets (HIGH) traced from GameClass::LoadItemData / consumers in
+# libjniproxy.so_new.c (2026-06-13, item-struct deserializer @149955):
+#   body[0]       item_type   (struct-0x28)  category discriminator
+#   body[1..4]    price        BE u32 (struct-0x24); body[1] is the always-0 high
+#                              byte the old parser mislabelled `equip_type`.
+#   body[5]       use_category (struct-0x20)  consumables: 1=HP 2=MP 3=full 5=revive
+#   body[32]      primary_stat (struct+0)     weapon ATK *or* armor DEF, keyed by
+#                              item_type. Verified against the "ATK n"/"DEF n"
+#                              descriptions: 206/209 weapons + 164/167 armor match
+#                              exactly (the few mismatches are stale desc text —
+#                              the body field is the value the game actually uses).
+#   body[33]      accuracy     (struct+2)     weapon hit-rate.
+# The remaining MEDIUM fields below are exploratory (kept for ComparisonTab); they
+# are NOT used by the FFSmith bake.
 _ITEM_FIELDS = [
     # (field_name, offset, size_bytes, kind)
-    ("item_type",     0,  1, "u8"),
-    ("equip_type",    1,  1, "u8"),
-    ("price",         2,  4, "u32"),
-    ("attack",        6,  1, "u8"),
-    ("defense",       7,  1, "u8"),
-    ("magic",         8,  1, "u8"),
+    ("item_type",     0,  1, "u8"),    # HIGH
+    ("price",         1,  4, "u32"),   # HIGH  (BE body[1..4])
+    ("use_category",  5,  1, "u8"),    # HIGH  (consumable effect class)
+    ("primary_stat", 32,  1, "u8"),    # HIGH  (weapon ATK / armor DEF)
+    ("accuracy",     33,  1, "u8"),    # HIGH  (weapon hit-rate)
+    # --- exploratory / MEDIUM (not bake-critical) ---
     ("weight",        9,  2, "u16"),
     ("flags",        11,  2, "u16"),
     ("element",      13,  1, "u8"),
     ("status",       14,  1, "u8"),
     ("hp_bonus",     34,  1, "u8"),
     ("mp_bonus",     35,  1, "u8"),
-    ("speed",        36,  1, "u8"),
     ("use_effect",   37,  2, "u16"),
     ("battle_flags", 39,  2, "u16"),
     ("job_mask",     49,  1, "u8"),
-    ("icon_r",       50,  1, "u8"),
-    ("icon_g",       51,  1, "u8"),
-    ("icon_b",       52,  1, "u8"),
-    ("sort_key_lo",  53,  1, "u8"),
 ]
+
+# item_type → equip category
+_WEAPON_TYPES = range(1, 16)      # 1..15 weapon classes
+_ARMOR_TYPES  = range(16, 24)     # 16 shield, 17..19 head, 20..22 body, 23 accessory
 
 
 def _read_int(body, off, size):
@@ -89,11 +102,12 @@ def decode_item_body(body, endian=None):
     The `endian` kwarg is retained for back-compat with callers that pass
     'be' or 'le', but is IGNORED -- multi-byte fields inside the item
     body are big-endian on both platforms. (Verified 2026-05-22 by
-    checking item bodies across all 640 records: 325/640 have
-    byte-identical body[2..5] (the price field) across Mobile and
-    Android, which is only consistent with BE-on-both. The earlier
-    "endian-flipped" interpretation was wrong; the ComparisonTab now
-    correctly shows real layout drift instead of phantom endian noise.)
+    checking item bodies across all 640 records; re-confirmed 2026-06-13
+    against the engine's own little-/big-endian reads in LoadItemData.)
+
+    `attack`/`defense` are the same on-disk field (``primary_stat`` = body[32]),
+    surfaced under the item's equip category so callers (ComparisonTab, the
+    FFSmith bake) can read whichever they expect.
     """
     out = {}
     for name, off, size, kind in _ITEM_FIELDS:
@@ -101,4 +115,8 @@ def decode_item_body(body, endian=None):
             out[name] = body[off] if off < len(body) else 0
         else:
             out[name] = _read_int(body, off, size)
+    t = out.get("item_type", 0)
+    ps = out.get("primary_stat", 0)
+    out["attack"]  = ps if t in _WEAPON_TYPES else 0
+    out["defense"] = ps if t in _ARMOR_TYPES  else 0
     return out

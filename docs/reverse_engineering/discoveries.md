@@ -34,6 +34,9 @@
 | 2026-06-10 | **Monster body combat map**: level=b[0], HP=BE32@b[2] (MP=HP/8), wATK=b[15], DEF=b[18], MDEF=b[19], EVA=b[20], MEVA=b[21], atk-range=b[24..25]; enemy A=LEVEL | LoadMonsterData c:151254 + SetBtlEnemyParam c:88427; Goblin lvl1/hp21/watk10 | battles.md, FMN2 |
 
 | 2026-06-11 | **Cutscene direction decoded + implemented**: 0x68 command bytes (68-entry table from the real .so), 0x69/0x32 script suspension, 0x1b camera re-target, 0x20/0x21/0x55 position/visibility, 0x2a fades; call-stack suspension; **exact-tile story sequencing** (stacked boot-7 dispatchers) | SetCharaCommand/MoveCharaEvent/CheckRangeEvent/ScriptIf reads + DAT_00418d40 extraction; intro plays headless w/ full direction (`--cuttest` PASS) | events.md, Engine field.{h,cpp} |
+| 2026-06-13 | **Magic body decoded** — mp_cost b[7], effect_cat b[16] (1 dmg/2 heal/5–8 status), formula b[18], power b[19], element b[31], school b[0]; replaces the hardcoded 11-spell `CAST` list (251 real spells baked) | `LoadMagicData`@150182, `GetMagicUseLostValue`@90534, `CalcMagicDmg`@93078; full-table canonical-FF-value match (Fire/Fira/Firaga 5/10/32 MP) | jobs.md, `abilities/parser.py`, FSPL |
+| 2026-06-13 | **Item equip stat = body[32]** (weapon ATK / armor DEF by item_type), **price = BE body[1..4]** (old `price@2` off by a byte) — replaces the bake's desc-regex | `LoadItemData`@149955; 206/209 wpn + 164/167 armor desc match; Potion 30 / Elixir 50000 G | items.md, `items/parser.py` |
+| 2026-06-13 | **Job HP%/MP%/stat% growth = body[9]/[10]/[11..15]** (percent of shared level-table base) — replaces the 100% default | `SetJobStatus`@152572 + `LoadJobData`@150402; archetype validation (Monk 142% HP, BlkMage 143% MP) | jobs.md, `jobs/parser.py`, FJOB |
 
 ## Negative results (worth not re-discovering)
 
@@ -45,3 +48,5 @@
 - Old `stat_c` was **not** the monster's DEF (real DEF = body[18]).
 - `e3_param.dat` is **not** the retail start party path.
 - Script warps do **not** auto walk-in a step — beats land exactly on dispatcher tiles (tried, reverted 2026-06-11); m200's off-by-one spawn expects a real player step.
+- A consumable's **heal amount is not a literal body field** (Potion's "100" appears nowhere in its 54-byte body; 2026-06-13). body[5] `use_category` classifies the effect (1 HP/2 MP/3 full/5 revive) but the magnitude is resolved through a separate effect table from the use-item path — still unmapped.
+- Item `attack`/`defense` are **not** at body[6]/[7] (the old `_ITEM_FIELDS` guess); the real equip stat is the single body[32], read as ATK or DEF by item_type.

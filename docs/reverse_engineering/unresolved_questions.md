@@ -9,7 +9,7 @@
 3. (E) **Original RNG + turn scheduler** — Mobile = `java.util.Random`; Android's own PRNG unidentified. Blocks any trace-level battle/encounter match.
 4. (T/E) **Random-encounter roll** — areas/formations/ratio are now decoded+baked (FFM5/FENC); still open: the per-step roll formula combining rate × encount_ratio (× floor-attr 15?), and where it runs. FFSmith `--encounters` ships an approximation.
 5. (T) **Android map mc_id 27% tail** — which side is right where engine parse and overrides disagree; meaning of bucket bytes chunk[18]/chunk[5].
-6. (T/M) **Remaining body maps** — monster body is now ~70% mapped (battles.md; open: b[16/17/22/23/26/28], element groups b[29..32], the 0x2c..0x46 tail incl. suspected AI/drops); job body 126-byte tail (per-job HP%/MP%); magic body 54-byte semantics; item use-effect encoding.
+6. (T/M) **Remaining body maps** — monster body is now ~70% mapped (battles.md; open: b[16/17/22/23/26/28], element groups b[29..32], the 0x2c..0x46 tail incl. suspected AI/drops). **Resolved 2026-06-13:** magic body (mp/power/type/element/formula — jobs.md) and the job growth multipliers (HP%/MP%/stat% = body[9]/[10]/[11..15]). Still open: the rest of the job 126-byte tail (ability-learn lists, equip/element flags) and **item use-effect *magnitude*** — body[5] classifies the effect (HP/MP/full/revive) but the heal amount is resolved via a separate effect table, not a literal body field.
 
 ## Medium
 
