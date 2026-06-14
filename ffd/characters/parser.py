@@ -44,8 +44,15 @@ def _parse_chara_set_records(data: bytes, start: int):
                 break
             f173 = data[p]; p += 1
             f174 = data[p]; p += 1
+            # body layout (offsets into the post-name record body):
+            #   [0]=f173 [1]=f174 (still semi-unknown -- sprite/palette-ish),
+            #   [2]=JOB [3]=LEVEL [4..9]=STR/SPD/VIT/INT/MND(+pad).
             # engine ReadStartData order: JOB, LEVEL, then 7 attribute bytes
             # (MEMBER_STATUS +0x34 job, +0x38 exp->level, +0x40.. STR/SPD/VIT/INT/MND).
+            # FF5-PC cross-check (sanctioned 2nd ground-truth): GameClass chara_set
+            # loader FUN_0046aa50 reads the same body[2]=job, body[3]=level,
+            # body[4..9]=base stats (FF5 body=26 vs FFD body=41, but the leading
+            # job/level/stat fields align) -- confirms the positions above.
             job = data[p]; level = data[p + 1]
             attrs = [data[p + 2 + k] for k in range(7)]
             p += 10                                     # job+level+7attrs(+1 pad)

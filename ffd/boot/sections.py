@@ -139,6 +139,12 @@ def boot_section_label(idx, endian):
 
 # Section→loader map decoded from libjniproxy.so's GameClass::LoadBootData.
 # Each tuple is (toc_offset_in_boot_data, body_size, label).
+# FF5-PC cross-check (2026-06-14, sanctioned 2nd ground-truth): FF5's
+# LoadMagicData/LoadItemData/LoadJobData read their sections from the SAME TOC
+# byte offsets 0x08 / 0x14 / 0x18 used below (FFV_Game.exe.unpacked.exe.c
+# FUN_0046c0a0 / FUN_0046b380 / FUN_0046c830) -- only FF5's section *indices*
+# (1/4/5) and record *formats* differ from FFD's (2/5/6). Same-engine TOC
+# alignment; the byte offsets here are correct.
 ANDROID_BOOT_LOADERS = {
     "magic":    (0x08, 54, "Magic / spells (~512)"),
     "passive":  (0x0c, 24, "Passive abilities (~113)"),
