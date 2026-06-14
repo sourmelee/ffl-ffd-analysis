@@ -38,7 +38,7 @@
 | 2026-06-13 | **Item equip stat = body[32]** (weapon ATK / armor DEF by item_type), **price = BE body[1..4]** (old `price@2` off by a byte) — replaces the bake's desc-regex | `LoadItemData`@149955; 206/209 wpn + 164/167 armor desc match; Potion 30 / Elixir 50000 G | items.md, `items/parser.py` |
 | 2026-06-13 | **Job HP%/MP%/stat% growth = body[9]/[10]/[11..15]** (percent of shared level-table base) — replaces the 100% default | `SetJobStatus`@152572 + `LoadJobData`@150402; archetype validation (Monk 142% HP, BlkMage 143% MP) | jobs.md, `jobs/parser.py`, FJOB |
 
-## Negative results (worth not re-discovering)
+| 2026-06-14 | **FF5 PC item record format decoded** (from `FUN_0046b380` in `FFV_Game.exe.unpacked.exe.c`): `[u8 name_len][name_sjis][u8 0x00][u8[91] stat_stream]`; stat = category@0, price(BE)@1..4, use_cat@5, misc@6..17, 18×s16 abilities@18..53, FF5-only zero@54..90. FFD→FF5: `stat = ffd_body[0:54] + b'\x00'*37`. In-memory: GameClass+0x1d6f4, 300 slots × 0xD0. All 10 sub-loader `this+offset` pairs decoded (see `ffd_port/docs/ffv_pc_addresses.md`). | `FFV_Game.exe.unpacked.exe.c` lines 75142-77400; cross-checked via item shim in `ffd_port/src/hooks/engine_hooks.c` | `ffd_port/docs/rebake_plan.md`, `ffd_port/tools/bake_boot_data.py` |
 
 - snd.dat is **not** gzip-wrapped (the old scanner found nothing because there was nothing).
 - Door warps are **not** map-header encoded (first assumption) — they're script-var idiom via common event 0x104.
