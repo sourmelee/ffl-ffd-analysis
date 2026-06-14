@@ -17,6 +17,27 @@ commit as the changelog entry.
 
 ## [Unreleased]
 
+## [0.7.28] - 2026-06-14
+
+### Added
+
+- **Per-level base-stat baked into FLVL** (`ffd/android_export/ffsmith_bake.py`).
+  boot section 8 level rows carry a base-stat byte at `[L*9+6]`; the FLVL
+  `levels.bin` now appends a back-tolerant `u16 n_stat` + n x u16 trailer after
+  the HP/MP block. This is the input FFSmith needs to derive the five attributes.
+- **`ffd/jobs/derive.py`** -- faithful Toolkit reproduction of
+  `GameClass::SetJobStatus` (libjniproxy.so_new.c 152644-152705): each attribute
+  `= max(1, base_stat[level] * job_stat% / 100) + equip`, HP/MP via body[9]/[10]%.
+  Decoded with the FF5-PC decompile (`SetMemberStatus` `FUN_00468490`) as a
+  sanctioned 2nd ground-truth; libjniproxy stays primary. Validated against
+  canonical bases (Sol L3 70/23, Aigis L10 199/51) and the archetype job %s.
+
+### Changed
+
+- `jobs/parser.py` docs note that body[11..15] (STR/SPD/VIT/INT/MND %) all scale
+  the single section-8 base-stat byte -- there is no separate per-character base
+  attribute in the derivation.
+
 ## [0.7.27] - 2026-06-13
 
 ### Added

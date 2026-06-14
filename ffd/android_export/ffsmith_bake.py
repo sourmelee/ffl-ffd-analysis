@@ -337,15 +337,19 @@ def _bake_menu_data(files, out_dir):
         cs = _get("chara_set.dat")
         chars = parse_chara_set_android(cs) if cs else []
         # level-growth table = boot_data section 8 (engine memcpy boot[TOC[8]:TOC[9]] -> +0x213f8;
-        # 9-byte/level entries: HPbase u16-BE @+2, MPbase u16-BE @+4).  maxHP/MP ~= base[level]
-        # (per-job HP%/MP% multiplier defaulted to 100%).
-        hpb, mpb, thr = [], [], []
+        # 9-byte/level entries: HPbase u16-BE @+2, MPbase u16-BE @+4, base-STAT u8 @+6).
+        # maxHP/MP = base[level] * jobHP%/MP% / 100; the five attributes (STR/SPD/VIT/INT/MND)
+        # all derive from the SINGLE base-stat byte @+6 scaled by each job's stat% (body[11..15])
+        # -- see GameClass::SetJobStatus libjniproxy.so_new.c 152644-152705. base6 grows ~20->32
+        # over L0-15 (a sane per-level curve); FF5 SetMemberStatus (FUN_00468490) confirms layout.
+        hpb, mpb, statb, thr = [], [], [], []
         if boot and len(boot) >= 68:
             t = [struct.unpack_from("<I", boot, i * 4)[0] for i in range(17)]
             s8 = boot[t[8]:t[9]]
             for L in range(len(s8) // 9):
                 e = s8[L*9:L*9+9]
                 hpb.append((e[2] << 8) | e[3]); mpb.append((e[4] << 8) | e[5])
+                statb.append(e[6])
             # EXP thresholds (LevelUp reads BE u32 @ s8[0x10 + 9*i]); level = #thresholds passed.
             for i in range(98):
                 o = 0x10 + 9 * i
@@ -368,7 +372,7 @@ def _bake_menu_data(files, out_dir):
                 f.write(struct.pack("<HH", _growth(hpb, lvl) & 0xffff, _growth(mpb, lvl) & 0xffff))
                 f.write(struct.pack("<H", c.get("f186", 0) & 0xffff))   # CHPK field-sprite id
         counts["chars"] = len(chars)
-        # level table: EXP thresholds + per-level HP/MP growth (boot section 8).
+        # level table: EXP thresholds + per-level HP/MP growth + base-stat (boot section 8).
         with open(Path(out_dir) / "data" / "levels.bin", "wb") as f:
             f.write(b"FLVL")
             f.write(struct.pack("<H", len(thr)))
@@ -377,6 +381,11 @@ def _bake_menu_data(files, out_dir):
             f.write(struct.pack("<H", len(hpb)))
             for L in range(len(hpb)):
                 f.write(struct.pack("<HH", hpb[L] & 0xFFFF, mpb[L] & 0xFFFF))
+            # trailing per-level base-stat block (FLVL 0.7.28); back-tolerant: older
+            # loaders stop after the HP/MP block. The five attributes derive from this.
+            f.write(struct.pack("<H", len(statb)))
+            for v in statb:
+                f.write(struct.pack("<H", v & 0xFFFF))
         counts["levels"] = len(thr)
         from ..monsters.parser import parse_monsters_android, decode_monster_body
         mons = parse_monsters_android(boot) if boot else []

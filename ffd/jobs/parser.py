@@ -1,21 +1,18 @@
-"""Job class parsers -- mobile (BE §5) and Android (LE §6).
+"""Job class parsers -- mobile (BE section 5) and Android (LE section 6).
 
 Both platforms share the same record layout: u16-BE count, then
 `name(pstr SJIS) + desc(pstr SJIS) + body[126]`. The Android port flips
 only the outer TOC pointer; multi-byte fields inside the body remain BE
 on both, matching Items and Monsters.
 
-Mobile uses §5 (TOC byte offset 20). The docstring comment in the
-legacy parser said "section 20" -- that was misleading, the actual
-section index is 5 and the byte offset is 20 (= 5 * 4). Behaviour was
-correct; only the comment was wrong.
-
-Android uses §6 (TOC byte offset 0x18) per ANDROID_BOOT_LOADERS.
+Mobile uses section 5 (TOC byte offset 20). The legacy comment said
+"section 20" -- that was the byte offset; the section index is 5
+(= 20 / 4). Behaviour was correct; only the comment was wrong.
+Android uses section 6 (TOC byte offset 0x18) per ANDROID_BOOT_LOADERS.
 
 Counts: Mobile Chapter 1 has 31 records; Android has 33. Mobile is
-chapter-scoped (like chara_set / monsters) -- early chapters fill
-later id slots with duplicate names ("メモリスト" appears at both
-id=13 and id=25 in Chapter 1) until the real job is introduced.
+chapter-scoped (like chara_set / monsters) -- early chapters fill later
+id slots with duplicate placeholder names until the real job appears.
 
 Body decode is BE-on-both. The high-confidence prefix (sprite/palette
 indices) plus the HP%/MP%/stat% growth multipliers are decoded by
@@ -28,13 +25,13 @@ from ..binary import be_u32
 from ..boot.sections import _parse_namedesc_section
 
 
-_MOBILE_JOBS_TOC_OFFSET  = 20      # §5 in mobile boot_data
-_ANDROID_JOBS_TOC_OFFSET = 0x18    # §6 in android boot_data
+_MOBILE_JOBS_TOC_OFFSET  = 20      # section 5 in mobile boot_data
+_ANDROID_JOBS_TOC_OFFSET = 0x18    # section 6 in android boot_data
 _JOB_BODY_SIZE = 126
 
 
 def parse_jobs_mobile(boot: bytes):
-    """Mobile §5 job table (BE TOC).
+    """Mobile section 5 job table (BE TOC).
 
     Returns `[{id, name, desc, body: bytes}]` matching the items/monsters
     parsers. Use `decode_job_body(body)` for the per-field decode.
@@ -45,7 +42,7 @@ def parse_jobs_mobile(boot: bytes):
 
 
 def parse_jobs_android(boot: bytes):
-    """Android §6 job table (LE TOC). Body=126 bytes."""
+    """Android section 6 job table (LE TOC). Body=126 bytes."""
     return _parse_namedesc_section(
         boot, _ANDROID_JOBS_TOC_OFFSET, _JOB_BODY_SIZE, endian="le"
     )
@@ -70,6 +67,11 @@ def parse_jobs_android(boot: bytes):
 # stores body[9]->struct+0x1d, body[10]->struct+0x1e, body[11..15]->+0x1f..+0x23).
 # Validated by archetype: Monk 142% HP, Black Mage 143% MP / 71 INT, Summoner
 # 67% HP / 150% MP, Warrior 138% HP / 33% MP -- exactly the expected FF curves.
+#
+# Stat derivation (2026-06-14): the five attribute percents body[11..15] all
+# scale the SAME per-level base-stat byte (boot section 8 row +6) -- see
+# ffd/jobs/derive.py and Python/docs/formats/jobs.md. There is no separate
+# per-character base stat in the derivation.
 
 def decode_job_body(body: bytes) -> dict:
     if len(body) < _JOB_BODY_SIZE:
@@ -79,7 +81,7 @@ def decode_job_body(body: bytes) -> dict:
         "sprite_btl":  body[2],
         "palette_ow":  body[3],
         "palette_btl": body[4],
-        # growth multipliers (percent of the shared level-table base) — HIGH
+        # growth multipliers (percent of the shared level-table base) -- HIGH
         "hp_pct":      body[9],
         "mp_pct":      body[10],
         "str_pct":     body[11],
