@@ -17,6 +17,17 @@ commit as the changelog entry.
 
 ## [Unreleased]
 
+## [0.7.30] - 2026-06-15
+
+### Added
+
+- **Monster battle sprites baked.** `ffsmith_bake.py` packs `mon{sprite}_*.png`
+  (sprite set = monster `body[0]`) into a horizontal FTEX strip `tex/mon{sprite}.tex`
+  (cap 8 idle frames), and the `FMN2` record gains `sprite_id u16 + nframes u8`
+  (back-tolerant). 86 distinct monster sprite sets; every monster's `body[0]` has a
+  matching sprite. NOTE: `body[0]` is the **sprite-set id**, not level — the FMN2
+  `level`/enemy-A still reads `body[0]` (latent mislabel, flagged for a follow-up).
+
 ## [0.7.29] - 2026-06-14
 
 ### Fixed

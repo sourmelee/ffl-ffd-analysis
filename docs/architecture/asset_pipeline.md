@@ -78,3 +78,5 @@ capk → chipanim/chipfloor → per-map (parse chunk + engine header + pass grid
 2. FFM version bumps: **rebuild the engine before rebaking** (loader is backward- but not forward-compatible).
 3. Pixel art is only ever integer nearest-neighbor scaled.
 4. No original assets committed; bundles are user-baked.
+
+**FMN2 (0.7.30):** monster record gains a trailing `sprite_id u16 + nframes u8`; monster battle sprites bake to `tex/mon{sprite_id}.tex` (horizontal idle-frame strip, frame_w = texW/nframes).
