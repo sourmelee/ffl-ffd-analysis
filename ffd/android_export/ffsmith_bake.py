@@ -418,44 +418,45 @@ def _bake_menu_data(files, out_dir):
             meva = bd[21] if len(bd) > 21 else 0
             amin = bd[24] if len(bd) > 24 else 0
             amax = bd[25] if len(bd) > 25 else 0
+            # Battle graphic = mon{group}_{variant}.png: group = BE-u16 body[56..57],
+            # variant = body[58] (SetBtlEnemyModel mon%d_%d -> in-mem +0x46 group / +0x48
+            # variant; LoadMonsterData packs body[54..63] into +0x44..+0x4c).  Each
+            # (group,variant) is ONE static image (the _N files are distinct monsters /
+            # recolours, NOT animation frames).
+            mgrp = ((bd[56] << 8) | bd[57]) if len(bd) >= 58 else 0xffff
+            mvar = bd[58] if len(bd) >= 59 else 0
             mrecs.append((mid, en, min(hp2, 65535), watk, dfn,
                           min(lvl, 255), exp, gil, mdef, eva, meva, amin, amax,
-                          bd[0] if bd else 0))   # body[0] = battle sprite set (mon{N}_*.png)
-        # Monster battle-sprite strips: pack mon{sprite}_{frame}.png (sprite = body[0])
-        # into a horizontal FTEX strip tex/mon{sprite}.tex; the engine animates the
-        # idle frames in battle (frame = timer % nframes).  Frames are consistent
-        # within a set; frame size varies per set (engine derives frame_w = texW/nframes).
-        nf_by = {}
+                          mgrp, mvar))
+        # Monster battle sprites: bake one static image per (group,variant) used, to
+        # tex/mon{group}_{variant}.tex.  The FFD mon{N}_{M}.png "variants" are distinct
+        # monsters/recolours (same silhouette, different palette) -- NOT animation frames.
         try:
-            from PIL import Image
-            for sprite in sorted({r[13] for r in mrecs}):
-                frs = []
-                for fi in range(8):                       # cap at 8 idle frames
-                    key = f"mon{sprite}_{fi}.png"
-                    if key not in files:
-                        break
-                    frs.append(Image.open(io.BytesIO(files[key])).convert("RGBA"))
-                if not frs:
-                    nf_by[sprite] = 0; continue
-                fw, fh = frs[0].size
-                strip = Image.new("RGBA", (fw * len(frs), fh), (0, 0, 0, 0))
-                for i, im in enumerate(frs):
-                    if im.size != (fw, fh):
-                        im = im.resize((fw, fh))
-                    strip.paste(im, (i * fw, 0))
-                _write_tex(Path(out_dir) / "tex" / f"mon{sprite}.tex", fw * len(frs), fh, strip.tobytes())
-                nf_by[sprite] = len(frs)
+            from PIL import Image, ImageFile
+            ImageFile.LOAD_TRUNCATED_IMAGES = True
+            for (g, v) in sorted({(r[13], r[14]) for r in mrecs}):
+                key = f"mon{g}_{v}.png"
+                if key not in files:
+                    continue
+                try:
+                    im = Image.open(io.BytesIO(files[key])).convert("RGBA")
+                    data = im.tobytes()
+                    if im.width * im.height * 4 != len(data):
+                        continue
+                    _write_tex(Path(out_dir) / "tex" / f"mon{g}_{v}.tex", im.width, im.height, data)
+                except Exception:
+                    continue
         except Exception as _e:
             print(f"[bake] monster sprites skipped: {_e}")
         with open(Path(out_dir) / "data" / "monsters.bin", "wb") as f:
             f.write(b"FMN2"); f.write(struct.pack("<I", len(mrecs)))
             for (mid, en, hp, atk, df, lvl, exp, gil,
-                 mdef, eva, meva, amin, amax, sprite) in mrecs:
+                 mdef, eva, meva, amin, amax, mgrp, mvar) in mrecs:
                 nb = en.encode("utf-8")
                 f.write(struct.pack("<IH", mid, len(nb))); f.write(nb)
                 f.write(struct.pack("<HHHBII", hp, atk, df, lvl, exp & 0xFFFFFFFF, gil & 0xFFFFFFFF))
                 f.write(struct.pack("<BBBBB", mdef, eva, meva, amin, amax))
-                f.write(struct.pack("<HB", sprite & 0xffff, nf_by.get(sprite, 0) & 0xff))
+                f.write(struct.pack("<HB", mgrp & 0xffff, mvar & 0xff))   # battle sprite: group u16 + variant u8
         counts["monsters"] = len(mrecs)
         # Real spell table, decoded from the boot magic section body (54 B, same
         # family as items).  Replaces the old hardcoded 11-spell approximation:

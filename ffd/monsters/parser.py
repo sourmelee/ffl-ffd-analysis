@@ -122,7 +122,13 @@ def decode_monster_body(body: bytes) -> dict:
     if len(body) < _MONSTER_BODY_SIZE:
         return {}
     return {
+        # body[0] is NOT the battle sprite (it increments per monster -- a book/order
+        # index, also (mis)used as enemy level by the FMN2 bake).  The real battle
+        # graphic is mon{sprite_group}_{sprite_variant}.png -- group = BE-u16 body[56..57],
+        # variant = body[58] (SetBtlEnemyModel mon%d_%d; LoadMonsterData +0x46/+0x48).
         "sprite_id":  body[0],
+        "sprite_group":   be_u16(body, 56),
+        "sprite_variant": body[58],
         "field9":     body[1],
         "max_hp":     be_u32(body, 2),
         "stat_b":     be_u32(body, 6),
