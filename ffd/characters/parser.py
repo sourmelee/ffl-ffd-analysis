@@ -55,16 +55,25 @@ def _parse_chara_set_records(data: bytes, start: int):
             # job/level/stat fields align) -- confirms the positions above.
             job = data[p]; level = data[p + 1]
             attrs = [data[p + 2 + k] for k in range(7)]
-            p += 10                                     # job+level+7attrs(+1 pad)
-            f181 = []
+            p += 10                                     # f173,f174,job,level (4) + 7 attr bytes (offset 4..10) + 1 flag (offset 11)
+            # EQUIPMENT = 5 BE-u16 slots (R.Hand, L.Hand, Head, Body, Accessory),
+            # offset 12..21.  Confirmed against GameClass::ReadStartData (libjniproxy
+            # 151839-151858: byte flag, 5x BE-u16 -> MEMBER_STATUS +0x1a1ce..+0x1a1d6,
+            # byte flag) -- e.g. Aigis = Iron Sword / Bronze Shield / Bronze Helm /
+            # Bronze Armor; Gawain = Galatine / Knight's Shield / Helm / Armor / Gauntlet.
+            # (Previously this block was mislabelled "f181" and the ABILITY list below
+            #  was mis-read as equipment -- the cause of weapons showing in head slots.)
+            equip = []
             for _ in range(5):
                 if p + 2 > len(data): break
-                f181.append(be_u16(data, p)); p += 2
-            f182 = data[p]; p += 1
-            equip = []
+                equip.append(be_u16(data, p)); p += 2
+            f182 = data[p]; p += 1                      # flag byte (MEMBER_STATUS +0x1a1d8)
+            # ABILITY slots = up to 7 BE-u16 (AddMemberSlotAbility, libjniproxy
+            # 151860-151899); the engine doesn't consume these yet.
+            abilities = []
             for _ in range(6):
                 if p + 2 > len(data): break
-                equip.append(be_u16(data, p)); p += 2
+                abilities.append(be_u16(data, p)); p += 2
             if p + 6 > len(data):
                 break
             f186 = data[p]; p += 1   # CHPK ENTRY
@@ -83,7 +92,8 @@ def _parse_chara_set_records(data: bytes, start: int):
                 "f182": f182,
                 "f186": f186, "f187": f187, "f188": f188,
                 "f189": f189, "f190": f190, "f191": f191,
-                "equipment": equip,
+                "equipment": equip,        # 5 real slots: R.Hand, L.Hand, Head, Body, Accessory
+                "abilities": abilities,    # up to 7 starting ability ids (engine: TODO)
             })
         except Exception:
             break

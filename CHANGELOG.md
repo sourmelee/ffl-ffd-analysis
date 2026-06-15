@@ -17,6 +17,22 @@ commit as the changelog entry.
 
 ## [Unreleased]
 
+## [0.7.29] - 2026-06-14
+
+### Fixed
+
+- **chara_set default equipment was reading the ability list, not equipment.**
+  The 5x BE-u16 block at body offset 12 (previously mislabelled `f181`) is the real
+  equipment -- R.Hand / L.Hand / Head / Body / Accessory -- and the 6x BE-u16 block
+  at offset 23 is the starting **ability** list. `characters/parser.py` now returns
+  the correct `equipment` (and exposes `abilities`). Confirmed against
+  `GameClass::ReadStartData` (libjniproxy 151839-151899): e.g. Aigis = Iron Sword /
+  Bronze Shield / Bronze Helm / Bronze Armor; Gawain = Galatine / Knight's Shield /
+  Helm / Armor / Gauntlet. (Fixes weapons appearing in head/off-hand slots in
+  FFSmith.)
+- **Restored `items/parser.py`** which was truncated on disk (86 lines, missing
+  `decode_item_body`), breaking the `ffd.items` package import and the bake.
+
 ## [0.7.28] - 2026-06-14
 
 ### Added
