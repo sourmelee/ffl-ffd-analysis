@@ -33,7 +33,10 @@ commit as the changelog entry.
   them flickered the palette (same trap as the monster recolours). Multifile objects
   now show ONE static variant (the placement `var` selects the file); nothing in the
   multifile path animates. fldchr77 (airship) `_0` is a 3×2 grid of 6 vehicle views —
-  sliced to show one static front view instead of the whole atlas.
+  sliced to show one static front view instead of the whole atlas. fldchr77 is now a **directional vehicle** (`directional` mode): its
+  `_0` cells are down(col0)/up(col2)/side(col1) views, so the airship faces its
+  movement direction (left = side, right = side flipped) instead of being stuck
+  on the down view.
 - **Whole-object anchor restored from the field_anm part offset.** The naive
   centre-bottom anchor mis-placed large objects (the 96×96 tree sat 32px too far
   left). The classifier pairs each multifile sheet to the field_anm entry whose

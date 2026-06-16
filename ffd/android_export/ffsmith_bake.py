@@ -612,7 +612,7 @@ def _bake_sprite_geo(files, out_dir):
         data_path = Path(__file__).resolve().parents[2] / "data" / "sheet_anim.json"
         table = load_table(str(data_path))
     _MODE = {"char": 0, "static": 1, "grid": 2, "multifile": 3, "special": 4,
-             "battlechar": 5}
+             "battlechar": 5, "directional": 6}
     geo = {}
     for key, rec in table.items():
         m = re.match(r"fldchr(\d+)$", key)

@@ -188,20 +188,40 @@ def classify_sheet(path, ents=None):
     if (W, H) == CHAR_SIZE:
         return {"mode": "char", "entry": 1, "size": size}
     if n in _SLICE_DESPITE_MULTIFILE:
-        # _0 is a grid of vehicle VIEWS; sibling files are palette/propeller
-        # variants (not frames). Show ONE static view (no palette cycling).
+        # _0 is a grid of vehicle VIEWS (DIRECTIONAL sprite): col0=down(front),
+        # col1=side, col2=up(back); rows are propeller frames (we take row 0).
+        # Sibling files are palette variants (not frames) -- no file cycling.
+        # frames are ordered [down, up, side]; the engine picks by facing (left =
+        # side, right = side flipped).
         a = np.array(im)[..., 3] > 16
         col = _runs(a.any(axis=0))
         row = _runs(a.any(axis=1))
-        cells = []
-        for (y0, y1) in row:
-            for (x0, x1) in col:
-                if a[y0:y1, x0:x1].any():
-                    cells.append(_tighten(a, [x0, y0, x1 - x0, y1 - y0]))
-        cell0 = cells[0] if cells else [0, 0, W, H]
-        px, py = _content_anchor(cell0)
-        return {"mode": "grid", "frames": [list(cell0)], "size": size,
-                "anim": False, "px": px, "py": py}
+
+        nprop = max(1, len(row))            # rows = propeller frames per direction
+        def _cell(ri, ci):
+            if ci >= len(col) or ri >= len(row):
+                return [0, 0, W, H]
+            x0, x1 = col[ci]
+            y0, y1 = row[ri]
+            if not a[y0:y1, x0:x1].any():
+                return None
+            return _tighten(a, [x0, y0, x1 - x0, y1 - y0])
+
+        def _dir(ci):                       # one direction's propeller frames
+            out = [_cell(ri, ci) for ri in range(nprop)]
+            out = [f for f in out if f]
+            return out or [[0, 0, W, H]]
+        down = _dir(0)
+        up = _dir(len(col) - 1)
+        side = _dir(1) if len(col) >= 3 else down
+        # equalise prop-frame count across directions so idx = dir*per + prop
+        per = min(len(down), len(up), len(side))
+        frames = []
+        for grp in (down, up, side):
+            frames += [list(f) for f in grp[:per]]
+        px, py = _content_anchor(down[0])
+        return {"mode": "directional", "frames": frames, "size": size,
+                "anim": False, "px": px, "py": py, "per_dir": per}
     if n in _BATTLE_CHAR_IDS:
         return {"mode": "battlechar", "btl_entry": 0, "size": size,
                 "nframes": len(sibs)}
