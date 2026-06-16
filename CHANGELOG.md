@@ -17,6 +17,43 @@ commit as the changelog entry.
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-06-15
+
+### Fixed
+- **2-state door sheets (fldchr8/62/63/97) drew their whole sheet.** They are
+  closed-front | open-side state pairs (32×64 each) that touch with no gutter, so
+  gutter-detection tagged them `static`. Now forced to `grid` 2×1 showing frame 0
+  (closed). Added an `anim` flag to the table + an `isObject` tri-state in `FSG2`
+  (0 not-object / 1 object-frame-0 / 2 object-loops): door/chest/prop **state**
+  sheets hold frame 0, only an explicit ambient-effect allow-list (fire/flames
+  85/92/93/94/206) loops — so doors no longer flicker open/closed. Grid/multifile
+  anchors baked at px/py=0 (the engine centres each frame by its own size; static
+  keeps the authored centre-bottom anchor).
+
+### Added
+- **Per-sheet field-sprite classification table** (`ffd/animation/sheet_anim.py`
+  + `data/sheet_anim.json`): every `fldchrN` sheet (218 total) is classified by
+  its own pixels into `char` (256×512 walk atlas → field_anm entry 1), `static`
+  (one whole image), `grid` (a single PNG packed with N frames; uniform
+  film-strips *and* the two irregular effect atlases 93/94 with explicit boxes),
+  `multifile` (frames ship as separate `fldchrN_K.png`), `battlechar` (fldchr30–49,
+  the btlanm_sp entry-0 48×48 battle template — excluded from field objects), and
+  `special` (number font 178 / palette 225 / debug 203). Deterministic generator,
+  Pillow+numpy only; regenerate with `python -m ffd.animation.sheet_anim <proper_obb>`.
+- `sprite_grid.seed_geo_from_table()` — the Animation tab now seeds object geometry
+  from the per-sheet table (the same source the baker keys off), replacing the old
+  per-field_anm-entry seed.
+
+### Changed
+- **`_bake_sprite_geo` now keys geometry by sprite img id from `sheet_anim.json`,
+  not by field_anm entry index.** There are ~218 sheets but only ~63 field_anm
+  entries, so the old entry-indexed seed mis-keyed and mis-aligned every
+  non-character object. Output is the new `spritegeo.bin` **`FSG2`** format
+  (per sprite: mode, isObject, anchor px/py, frame count, per-frame rects); the
+  legacy `sprite_grid.json` overrides still merge on top. Requires an FFSmith
+  rebuild + re-bake (engine FSG2 reader added in Engine 0.1.x).
+
+
 ## [0.7.30] - 2026-06-15
 
 ### Added

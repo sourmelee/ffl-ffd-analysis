@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import io
 import json
+import re
 import struct
 from pathlib import Path
 
@@ -587,48 +588,98 @@ def _bake_intro(files, out_dir):
 
 
 def _bake_sprite_geo(files, out_dir):
-    """Bake per-sprite field-animation geometry (data/spritegeo.bin) so FFSmith can draw
-    object sprites (doors/crystals/chests) with their REAL frame rect + anchor instead of the
-    hardcoded 48x48 character grid. Each entry = the default (sub0 static) frame {x,y,w,h} + the
-    part offset (px,py) + an isObject flag (max frame height < 40). An optional override file
-    `sprite_grid.json` (authored in the toolkit's Animation tab) is merged over the field_anm seed.
+    """Bake per-sprite field geometry (data/spritegeo.bin, magic ``FSG2``) so
+    FFSmith draws object sprites (doors / crystals / chests / effects) with their
+    REAL frames instead of the hardcoded 48x48 character grid or a mis-keyed
+    field_anm sub-rect.
+
+    Geometry is keyed by sprite IMG id (``fldchrN``) from the per-sheet
+    classification table (``ffd/animation/sheet_anim.py`` -> ``data/sheet_anim.json``):
+    there are ~218 sheets but only ~63 field_anm entries, so the old entry-indexed
+    seed mis-aligned every object.  Modes -> code: char(0, 48x48 grid path, no geo),
+    static(1, whole opaque bbox; isObject 1=frame0 / 2=loop), grid(2, in-sheet frame strip / effect boxes),
+    multifile(3, frames are sibling ``fldchr{img}_{k}`` textures), special(4, left
+    on the grid path).  Optional ``sprite_grid.json`` overrides still merge on top.
     """
-    from ..animation.parser import parse_field_anm
-    blob = files["field_anm.dat"] if "field_anm.dat" in files else b""
-    ents = parse_field_anm(blob) if blob else []
+    from ..animation.sheet_anim import load_table
+    table = {}
+    if "sheet_anim.json" in files:
+        try:
+            table = json.loads(files["sheet_anim.json"].decode("utf-8"))
+        except Exception:
+            table = {}
+    if not table:
+        data_path = Path(__file__).resolve().parents[2] / "data" / "sheet_anim.json"
+        table = load_table(str(data_path))
+    _MODE = {"char": 0, "static": 1, "grid": 2, "multifile": 3, "special": 4,
+             "battlechar": 5}
     geo = {}
-    for idx, e in enumerate(ents):
-        frs = e.get("frames", [])
-        if not frs:
+    for key, rec in table.items():
+        m = re.match(r"fldchr(\d+)$", key)
+        if not m:
             continue
-        subs = e.get("sub_anims", [])
-        kf = subs[0]["keyframes"][0] if subs and subs[0].get("keyframes") else None
-        fr = (kf.get("frame") if kf else None) or frs[0]
-        px = kf.get("part_x", 0) if kf else 0
-        py = kf.get("part_y", 0) if kf else 0
-        # isObject defaults to 0 (character -> 48x48 grid, no regression). Heuristics (size,
-        # walk-cycle) misclassify static NPCs as objects, so objects are marked ONLY via the
-        # manual sprite_grid.json override. The field_anm frame/anchor is still seeded here so an
-        # override can flip isObject=1 and reuse the decoded geometry.
-        geo[idx] = {"isObject": 0,
-                    "fx": fr["x"], "fy": fr["y"], "fw": fr["w"], "fh": fr["h"],
-                    "px": px, "py": py}
-    # merge manual overrides (Animation tab authoring)
+        img = int(m.group(1))
+        mode = rec.get("mode", "static")
+        code = _MODE.get(mode, 1)
+        if mode in ("char", "battlechar"):  # both use the 48x48 grid path, not a field object
+            geo[img] = {"mode": code, "isObject": 0, "px": 0, "py": 0, "frames": []}
+            continue
+        if mode == "multifile":
+            if rec.get("frames"):          # explicit per-file crop (e.g. airship cell)
+                frames = [list(map(int, f)) for f in rec["frames"]]
+            else:
+                szs = rec.get("frame_sizes") or [rec.get("size", [0, 0])]
+                frames = [[0, 0, int(w), int(h)] for (w, h) in szs]
+        else:
+            frames = [list(map(int, f)) for f in rec.get("frames", [])]
+            if not frames:
+                w, h = rec.get("size", [0, 0])
+                frames = [[0, 0, int(w), int(h)]]
+        f0 = frames[0]
+        # isObject tri-state: 0 = not an object (char grid path), 1 = object shown
+        # at frame 0 (doors/chests/props -- state sheets, no auto-cycle), 2 = object
+        # that loops its frames (ambient effects: fire/flames -- "anim" in the table).
+        is_obj = (0 if mode in ("char", "battlechar", "special")
+                  else (2 if rec.get("anim") else 1))
+        # Anchor: static uses the authored centre-bottom px/py (engine's legacy
+        # branch); grid/multifile are centred per-frame by the engine, so px/py=0.
+        if mode == "static":
+            px, py = -(f0[2] // 2), -f0[3]
+        else:
+            px, py = 0, 0
+        geo[img] = {"mode": code, "isObject": is_obj,
+                    "px": px, "py": py, "frames": frames}
+    # merge legacy manual overrides (Animation tab authoring)
     if "sprite_grid.json" in files:
         try:
-            import json as _json
-            ov = _json.loads(files["sprite_grid.json"].decode("utf-8"))
+            ov = json.loads(files["sprite_grid.json"].decode("utf-8"))
             for k, v in ov.items():
-                geo.setdefault(int(k), {}).update(v)
+                g = geo.setdefault(int(k),
+                                   {"mode": 1, "isObject": 0, "px": 0, "py": 0,
+                                    "frames": [[0, 0, 0, 0]]})
+                if "isObject" in v:
+                    g["isObject"] = int(v["isObject"])
+                if "px" in v:
+                    g["px"] = int(v["px"])
+                if "py" in v:
+                    g["py"] = int(v["py"])
+                if all(kk in v for kk in ("fx", "fy", "fw", "fh")):
+                    g["frames"] = [[int(v["fx"]), int(v["fy"]),
+                                    int(v["fw"]), int(v["fh"])]]
+                    if g["mode"] == 0:
+                        g["mode"] = 1
         except Exception:
             pass
     with open(Path(out_dir) / "data" / "spritegeo.bin", "wb") as f:
-        f.write(b"FSGE"); f.write(struct.pack("<H", len(geo)))
+        f.write(b"FSG2")
+        f.write(struct.pack("<H", len(geo)))
         for img in sorted(geo):
             g = geo[img]
-            f.write(struct.pack("<HBhhHHhh", img, g.get("isObject", 0),
-                                g.get("fx", 0), g.get("fy", 0), g.get("fw", 0), g.get("fh", 0),
-                                g.get("px", 0), g.get("py", 0)))
+            frames = g["frames"][:255]
+            f.write(struct.pack("<HBBhhH", img, g["mode"], g["isObject"],
+                                g["px"], g["py"], len(frames)))
+            for (x, y, w, h) in frames:
+                f.write(struct.pack("<hhHH", int(x), int(y), int(w), int(h)))
     return len(geo)
 
 

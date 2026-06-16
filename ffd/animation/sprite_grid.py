@@ -2,13 +2,12 @@
 overrides — ``sprite_grid.json`` — from the Animation tab.
 
 The FFSmith baker (``ffd/android_export/ffsmith_bake.py:_bake_sprite_geo``)
-seeds every field sprite's geometry from ``field_anm.dat`` (default static
-frame rect + keyframe part offset, ``isObject=0``), then merges
-``sprite_grid.json`` over that seed.  FFSmith only consults the baked geometry
-when ``isObject`` is set; otherwise it draws the sprite on the hardcoded 48x48
-character grid.  Marking a sprite as an object is therefore a deliberate,
-manual act (Jack's "manual annotation > heuristics" rule) — this module is the
-authoring side of that override file.
+seeds every field sprite's geometry from the per-sheet classification table
+(``sheet_anim.json``), then merges ``sprite_grid.json`` over that seed.  FFSmith
+only consults the baked geometry when ``isObject`` is set; otherwise it draws the
+sprite on the hardcoded 48x48 character grid.  Marking a sprite as an object is
+therefore a deliberate, manual act (Jack's "manual annotation > heuristics"
+rule) — this module is the authoring side of that override file.
 
 Kept entirely free of tkinter so the seed math, the FFSmith placement math, and
 the JSON round-trip can be unit-tested headlessly; the Animation tab supplies
@@ -26,12 +25,48 @@ from pathlib import Path
 GEO_KEYS = ("isObject", "fx", "fy", "fw", "fh", "px", "py")
 
 
+def seed_geo_from_table(rec):
+    """Seed a panel geo from a ``sheet_anim.json`` per-sheet record (the same
+    table the baker keys ``spritegeo.bin``/FSG2 off of).  Mirrors
+    ``_bake_sprite_geo``'s table path: frame 0 is the default rect, the anchor
+    is centre-bottom for that frame (``px = -w/2``, ``py = -h``), and ``isObject``
+    is set for everything except ``char``/``special``.
+
+    ``rec`` is one value from :func:`ffd.animation.sheet_anim.load_table`.
+    Returns a :data:`GEO_KEYS` dict, or ``None`` for char/empty sheets.
+    """
+    mode = rec.get("mode", "static")
+    if mode == "char":
+        return None
+    if mode == "multifile":
+        szs = rec.get("frame_sizes") or [rec.get("size", [0, 0])]
+        w, h = int(szs[0][0]), int(szs[0][1])
+        fx = fy = 0
+    else:
+        frames = rec.get("frames") or []
+        if not frames:
+            w, h = rec.get("size", [0, 0])
+            fx = fy = 0
+        else:
+            fx, fy, w, h = (int(v) for v in frames[0])
+    return {
+        "isObject": 0 if mode in ("char", "special") else 1,
+        "fx": int(fx), "fy": int(fy), "fw": int(w), "fh": int(h),
+        "px": -(int(w) // 2), "py": -int(h),
+    }
+
+
 def seed_geo_from_fa_entry(fa_entry):
-    """Mirror ``_bake_sprite_geo``'s per-entry seed so the panel shows exactly
-    what the baker would emit before any override.
+    """Mirror the OLD per-field_anm-entry seed so the legacy entry-browser
+    preview shows the same default the baker once emitted before any override.
 
     Returns a dict carrying every :data:`GEO_KEYS` value, or ``None`` when the
     field_anm entry has no frames (nothing to draw).
+
+    .. deprecated::
+        Superseded by :func:`seed_geo_from_table` — geometry is now keyed by
+        sprite img id from ``sheet_anim.json``, not by field_anm entry index
+        (there are far more sheets than entries).
     """
     frames = fa_entry.get("frames") or []
     if not frames:

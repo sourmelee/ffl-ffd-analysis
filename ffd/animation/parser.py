@@ -133,6 +133,18 @@ def parse_field_anm(data: bytes):
         n_frames_from_sub1 = sub_len(1) // 10
         n_frames = max(n_frames_byte, n_frames_from_sub1)
 
+        # --- sub[0] image list (sheet bindings) -------------------------
+        # sub[0] header = [u32, u16 n_frames, u16 n_images]; then n_images x u16
+        # sheet slots at sub[0]+8.  A frame's tex_id indexes THIS list.  Slot
+        # value 0 = "use the externally-bound sheet" (the character/object's own
+        # sprite, chosen by its sprite-id); non-zero = an explicit fldchr sheet.
+        # (MtxAnmCtrl::SetAnimeData libjniproxy 36686-36710: count @ sub0+6,
+        # list @ sub0+8; each slot -> GameClass::LoadCharaImage.)
+        sub0 = sub_abs(0)
+        n_images = le_u16(data, sub0 + 6) if sub0 + 8 <= len(data) else 0
+        image_list = [le_u16(data, sub0 + 8 + 2 * k)
+                      for k in range(n_images) if sub0 + 8 + 2 * (k + 1) <= len(data)]
+
         # Decode sub[1] frame table
         frames = []
         sub1 = sub_abs(1)
@@ -239,7 +251,7 @@ def parse_field_anm(data: bytes):
 
         entries.append({
             "index": i, "offset": base, "n_frames": len(frames),
-            "frames": frames, "sub_anims": sub_anims,
+            "frames": frames, "n_images": n_images, "image_list": image_list, "sub_anims": sub_anims,
             "subs": subs, "raw": data[base:end_of_entry],
         })
 
