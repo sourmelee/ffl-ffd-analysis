@@ -36,7 +36,7 @@ commit as the changelog entry.
   sliced to show one static front view instead of the whole atlas. fldchr77 is now a **directional vehicle** (`directional` mode): its
   `_0` cells are down(col0)/up(col2)/side(col1) views, so the airship faces its
   movement direction (left = side, right = side flipped) instead of being stuck
-  on the down view.
+  on the down view; each direction has 2 propeller frames that cycle (~5fps).
 - **Whole-object anchor restored from the field_anm part offset.** The naive
   centre-bottom anchor mis-placed large objects (the 96×96 tree sat 32px too far
   left). The classifier pairs each multifile sheet to the field_anm entry whose
