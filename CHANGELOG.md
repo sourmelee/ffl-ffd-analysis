@@ -17,6 +17,16 @@ commit as the changelog entry.
 
 ## [Unreleased]
 
+### Changed
+- **Android-Export "Mass convert tilesets" now uses the SpriteConverter preview's
+  exact rendering path.** Extracted the preview logic into a shared
+  `mobile_tile_to_android.render_tileset_variant()`; both `_render_tileset_preview`
+  and the batch mass-convert call it, so the exported `mc{id}_{var}.png` are
+  pixel-identical to the preview pane (variant 0 convert, variant>0 verbatim +
+  palette-swap all unified). Verified byte-identical on mc9 (variant 0, variant 1
+  verbatim + swap). Saved builds still take precedence via `produce_build_tile`.
+
+
 ## [0.8.0] - 2026-06-15
 
 ### Fixed

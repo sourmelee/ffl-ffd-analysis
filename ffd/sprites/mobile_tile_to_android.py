@@ -466,6 +466,61 @@ def convert_mobile_tileset_to_android(
     return out
 
 
+def render_tileset_variant(mobile_img, android_fill_img, android_variant_img,
+                           *, mc_id, variant, fill, strategy, obb, spec=None):
+    """Single source of truth for converting one Mobile cpk tileset into one
+    Android ``mc{id}_{variant}`` image.
+
+    This is the EXACT logic the SpriteConverter preview pane uses
+    (``converter_tab._render_tileset_preview``), factored out so the live
+    preview and the Android-Export mass-convert produce identical pixels.
+
+    Args:
+      mobile_img:          rendered Mobile cpk (RGBA) at the chosen palette
+                           (preview: ``self._mobile_img``).
+      android_fill_img:    Android original consulted for ``fill_from_android``
+                           (preview: ``self._tileset_android_orig_img``).
+      android_variant_img: the Android ``mc{id}_{variant}`` image, used for
+                           ``output_size`` and the verbatim pass-through
+                           (preview: ``self._android_img``).
+      mc_id, variant:      target tileset identity.
+      fill:                fill-missing-cells-from-Android toggle.
+      strategy:            ``"verbatim"`` | ``"swap"`` (only matters variant>0).
+      obb:                 loaded OBB files dict (palette-swap source).
+      spec:                optional working spec (carries cell_map /
+                           force_android / mobile_source.palette); a starter
+                           spec is synthesised when ``None``.
+
+    Variant 0 always converts from Mobile.  variant>0 + ``verbatim`` returns the
+    Android variant unchanged.  variant>0 + ``swap`` converts the Mobile base
+    then applies the palette LUT.  Returns an RGBA Image, or ``None``.
+    """
+    if mobile_img is None:
+        return None
+    variant = int(variant or 0)
+    spec = spec or make_tileset_starter_spec(
+        "export", cpk_entry=0, mc_id=mc_id or 0, variant=variant)
+    at = spec.setdefault("android_target", {})
+    at["variant"] = variant
+    at["fill_from_android"] = bool(fill)
+    at["palette_strategy"] = strategy
+    if android_variant_img is not None:
+        at["output_size"] = list(android_variant_img.size)
+    if variant > 0 and strategy == "verbatim":
+        return (android_variant_img.convert("RGBA")
+                if android_variant_img is not None else None)
+    base_out = convert_mobile_tileset_to_android(
+        mobile_img, spec, android_fill_img)
+    if variant > 0 and strategy == "swap":
+        base_pal_img = load_android_mc_png(obb, mc_id, 0, preserve_palette=True)
+        target_pal_img = load_android_mc_png(
+            obb, mc_id, variant, preserve_palette=True)
+        if base_pal_img is not None and target_pal_img is not None:
+            return apply_variant_palette_swap(
+                base_out, base_pal_img, target_pal_img)
+    return base_out
+
+
 def _apply_force_android_cells(base: Image.Image,
                                 android_orig: Image.Image,
                                 force_cells,

@@ -48,6 +48,7 @@ from .mobile_tile_to_android import (
     MOBILE_TILE_CELL, ANDROID_TILE_CELL, make_tileset_starter_spec,
     load_tileset_mapping_spec, lookup_mc_for_cpk,
     lookup_cpk_for_mc, convert_mobile_tileset_to_android, apply_variant_palette_swap,
+    render_tileset_variant,
     load_android_mc_png, list_android_mc_variants,
     list_android_mc_ids, count_cpk_palettes,
 )
@@ -2285,43 +2286,20 @@ class SpriteConverterTab(TabBase):
         c.configure(scrollregion=(0, 0, zoomed.size[0], zoomed.size[1]))
 
     def _render_tileset_preview(self):
-        """Build the converted preview image based on the current
-        spec + checkbox state. Handles the variant > 0 + palette-swap
-        opt-in path."""
+        """Build the converted preview image based on the current spec +
+        checkbox state. Delegates to the shared ``render_tileset_variant`` so
+        the preview and the Android-Export mass-convert are pixel-identical."""
         if self._mobile_img is None:
             return None
         spec = self._spec or make_tileset_starter_spec(
             "preview", cpk_entry=0, mc_id=0, variant=0)
-        # Always reflect the current variant in the spec
-        at = spec.setdefault("android_target", {})
-        at["variant"] = int(self._tileset_variant_idx or 0)
-        at["fill_from_android"] = bool(self._t_fill_from_android.get())
-        at["palette_strategy"] = self._t_palette_strategy.get()
-        # Match the original Android sheet's dims
-        if self._android_img is not None:
-            at["output_size"] = list(self._android_img.size)
-        # Variant 0: always convert from Mobile. Variant > 0 with
-        # 'verbatim' strategy: pass-through Android verbatim. Variant > 0
-        # with 'swap' strategy: convert from Mobile base + palette swap.
-        variant = int(self._tileset_variant_idx or 0)
-        strategy = self._t_palette_strategy.get()
-        if variant > 0 and strategy == "verbatim":
-            # Show the original Android variant unchanged (preview only;
-            # mass-convert writes it byte-for-byte from the OBB).
-            return self._android_img.convert("RGBA") if self._android_img else None
-        # Otherwise: run the Mobile-based converter
-        base_out = convert_mobile_tileset_to_android(
-            self._mobile_img, spec, self._tileset_android_orig_img)
-        if variant > 0 and strategy == "swap":
-            obb = self.data.obb_files or {}
-            base_pal_img = load_android_mc_png(obb, self._tileset_mc_id, 0,
-                                               preserve_palette=True)
-            target_pal_img = load_android_mc_png(
-                obb, self._tileset_mc_id, variant, preserve_palette=True)
-            if base_pal_img is not None and target_pal_img is not None:
-                return apply_variant_palette_swap(
-                    base_out, base_pal_img, target_pal_img)
-        return base_out
+        return render_tileset_variant(
+            self._mobile_img, self._tileset_android_orig_img, self._android_img,
+            mc_id=self._tileset_mc_id,
+            variant=int(self._tileset_variant_idx or 0),
+            fill=bool(self._t_fill_from_android.get()),
+            strategy=self._t_palette_strategy.get(),
+            obb=self.data.obb_files or {}, spec=spec)
 
     # ------------------------------------------------------------------
     # Tileset action bar (built lazily on first source-type switch)

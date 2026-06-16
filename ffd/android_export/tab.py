@@ -633,6 +633,7 @@ class AndroidExportTab(TabBase):
             list_android_mc_variants,
             make_tileset_starter_spec,
             produce_build_tile,
+            render_tileset_variant,
         )
         from ..maps.mc_overrides import (
             resolve_tileset_build, bound_variants_for_cpk,
@@ -724,8 +725,13 @@ class AndroidExportTab(TabBase):
                                 resolver, cpk_entry, mc_id, 0,
                                 builds_data, obb=obb)
                         else:
-                            out_img = convert_mobile_tileset_to_android(
-                                mobile_img, spec, android_orig)
+                            # EXACT preview-pane logic (shared render fn)
+                            out_img = render_tileset_variant(
+                                mobile_img, android_orig, android_orig,
+                                mc_id=mc_id, variant=0,
+                                fill=bool(self._mt_fill_from_android.get()),
+                                strategy=self._mt_palette_strategy.get(),
+                                obb=obb, spec=spec)
                         out_img.save(out_file)
                         emitted.add(key0)
                         n_done += 1
@@ -778,41 +784,20 @@ class AndroidExportTab(TabBase):
                                 continue
 
                         try:
-                            if strategy == "verbatim":
-                                # Copy the Android variant straight through
-                                src_blob = obb.get(f"mc{mc_id}_{var}.png")
-                                if not src_blob:
-                                    continue
-                                with open(out_var, "wb") as f:
-                                    f.write(src_blob)
-                            else:  # swap
-                                base_pal = load_android_mc_png(
-                                    obb, mc_id, 0, preserve_palette=True)
-                                tgt_pal = load_android_mc_png(
-                                    obb, mc_id, var, preserve_palette=True)
-                                if base_pal is None or tgt_pal is None:
-                                    self._mt_logln(
-                                        f"    mc{mc_id}_{var}: paletted "
-                                        f"variant missing, falling back to "
-                                        f"verbatim")
-                                    src_blob = obb.get(f"mc{mc_id}_{var}.png")
-                                    if src_blob:
-                                        with open(out_var, "wb") as f:
-                                            f.write(src_blob)
-                                else:
-                                    # Re-run convert for variant 0 base, then swap
-                                    base_spec = make_tileset_starter_spec(
-                                        f"cpk{cpk_entry}",
-                                        cpk_entry=cpk_entry, mc_id=mc_id,
-                                        variant=0, chapter=slot_label,
-                                        fill_from_android=bool(
-                                            self._mt_fill_from_android.get()),
-                                    )
-                                    base_out = convert_mobile_tileset_to_android(
-                                        mobile_img, base_spec, android_orig)
-                                    swapped = apply_variant_palette_swap(
-                                        base_out, base_pal, tgt_pal)
-                                    swapped.save(out_var)
+                            # EXACT preview-pane logic (shared render fn): variant>0
+                            # verbatim returns the Android variant, swap converts the
+                            # Mobile base + palette LUT -- identical to the preview.
+                            av = load_android_mc_png(obb, mc_id, var)
+                            out = render_tileset_variant(
+                                mobile_img, android_orig, av,
+                                mc_id=mc_id, variant=var,
+                                fill=bool(self._mt_fill_from_android.get()),
+                                strategy=strategy, obb=obb, spec=spec)
+                            if out is None:
+                                self._mt_logln(
+                                    f"    mc{mc_id}_{var}: no output, skipped")
+                                continue
+                            out.save(out_var)
                             emitted.add(keyN)
                             n_variants += 1
                         except Exception as e:
