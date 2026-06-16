@@ -47,7 +47,7 @@ _EXPLICIT_GRID = {
 # Everything else shows frame 0 by default -- doors/chests/props are STATE sheets,
 # not animations, and must not auto-cycle (Jack's manual-annotation rule).
 # Extend this set to opt a sheet into continuous animation.
-_ANIM_IDS = {85, 92, 93, 94, 206, 10}  # 10 = swaying tree (multifile sway)
+_ANIM_IDS = {85, 92, 93, 94, 206}  # in-sheet grid effects only (fire/flames)
 
 # Irregular effect atlases: explicit per-frame boxes (connected-component bboxes,
 # verified visually 2026-06-15).  x,y,w,h.
@@ -126,10 +126,50 @@ def _tighten_frames(a, frames, anim):
     return [_tighten(a, f) for f in frames]
 
 
-def classify_sheet(path):
-    """Classify one ``fldchrN_0.png`` -> dict with ``mode`` + geometry.
+def _content_anchor(fr):
+    """Centre-bottom anchor (px=-w/2, py=-h): frame's content centred on the tile,
+    bottom edge on the tile."""
+    return -(int(fr[2]) // 2), -int(fr[3])
 
-    ``path`` is the ``_0`` frame; multi-file detection inspects siblings.
+
+def _match_part_offset(W, H, nframes, ents):
+    """Find the field_anm entry whose overall frame extent matches a WHOLE-object
+    sheet (``W x H``, ``nframes`` variants) and return its authored part offset
+    ``(px, py)`` -- the FFD-faithful draw anchor.  ``None`` when nothing matches
+    closely (caller falls back to centre-bottom).
+
+    The part offset is the real anchor FFD uses: e.g. the 96x96 tree pairs to
+    entry 9, part ``(-16, -96)`` -- 32px to the RIGHT of naive centring.  Matched
+    strictly (size +/-2, frame-count +/-1) so a wrong entry never silently shifts
+    an object.
+    """
+    best = None
+    for e in ents or []:
+        frs = e.get("frames") or []
+        if not frs:
+            continue
+        fw = max(f["w"] for f in frs)   # individual frame size (frames may be
+        fh = max(f["h"] for f in frs)   # stacked in a packed atlas region)
+        if abs(fw - W) > 2 or abs(fh - H) > 2 or abs(len(frs) - nframes) > 1:
+            continue
+        subs = e.get("sub_anims") or []
+        kf = subs[0]["keyframes"][0] if subs and subs[0].get("keyframes") else None
+        if kf is None:
+            continue
+        score = abs(fw - W) + abs(fh - H) + abs(len(frs) - nframes)
+        if best is None or score < best[0]:
+            best = (score, int(kf.get("part_x", 0)), int(kf.get("part_y", 0)))
+    return (best[1], best[2]) if best else None
+
+
+def classify_sheet(path, ents=None):
+    """Classify one ``fldchrN_0.png`` -> dict with ``mode``, frames + anchor.
+
+    ``path`` is the ``_0`` frame; multi-file detection inspects siblings.  Sibling
+    files are PALETTE/seasonal variants (not animation frames) -- objects show one
+    static variant; only an explicit in-sheet effect allow-list (``_ANIM_IDS``)
+    loops.  ``ents`` (parsed field_anm) supplies the part-offset anchor for
+    whole-object (multifile) sheets; omit for a centre-bottom default.
     """
     import numpy as np
     from PIL import Image, ImageFile
@@ -148,10 +188,8 @@ def classify_sheet(path):
     if (W, H) == CHAR_SIZE:
         return {"mode": "char", "entry": 1, "size": size}
     if n in _SLICE_DESPITE_MULTIFILE:
-        # _0 is a grid of vehicle views; _0/_1 are propeller-spin variants. Show the
-        # first (front/down) view and ANIMATE by cycling the files at that crop, so
-        # the propeller spins instead of the airship cycling through all 6 views.
-        import numpy as np
+        # _0 is a grid of vehicle VIEWS; sibling files are palette/propeller
+        # variants (not frames). Show ONE static view (no palette cycling).
         a = np.array(im)[..., 3] > 16
         col = _runs(a.any(axis=0))
         row = _runs(a.any(axis=1))
@@ -161,26 +199,34 @@ def classify_sheet(path):
                 if a[y0:y1, x0:x1].any():
                     cells.append(_tighten(a, [x0, y0, x1 - x0, y1 - y0]))
         cell0 = cells[0] if cells else [0, 0, W, H]
-        return {"mode": "multifile", "nframes": len(sibs), "size": size,
-                "anim": True, "frames": [list(cell0) for _ in sibs],
-                "frame_sizes": [[cell0[2], cell0[3]] for _ in sibs]}
+        px, py = _content_anchor(cell0)
+        return {"mode": "grid", "frames": [list(cell0)], "size": size,
+                "anim": False, "px": px, "py": py}
     if n in _BATTLE_CHAR_IDS:
         return {"mode": "battlechar", "btl_entry": 0, "size": size,
                 "nframes": len(sibs)}
     if len(sibs) > 1:
-        sizes = [list(Image.open(s).size) for s in sibs]
-        return {"mode": "multifile", "nframes": len(sibs),
-                "size": size, "frame_sizes": sizes, "anim": n in _ANIM_IDS}
+        # Palette/seasonal variants -> one static variant (placement `var` selects
+        # the file). Whole-object anchor = matching field_anm part offset.
+        full = [0, 0, W, H]
+        anchor = _match_part_offset(W, H, len(sibs), ents) or _content_anchor(full)
+        return {"mode": "multifile", "nframes": len(sibs), "size": size,
+                "anim": False, "frames": [full],
+                "px": anchor[0], "py": anchor[1]}
     if n in _SPECIAL:
         return {"mode": "special", "kind": _SPECIAL[n],
                 "frames": [[0, 0, W, H]], "size": size}
     if n in _EXPLICIT_FRAMES:
-        return {"mode": "grid", "frames": _EXPLICIT_FRAMES[n], "size": size,
-                "anim": n in _ANIM_IDS}
+        anim = n in _ANIM_IDS
+        fr = _EXPLICIT_FRAMES[n]
+        px, py = _content_anchor(fr[0])
+        return {"mode": "grid", "frames": fr, "size": size,
+                "anim": anim, "px": px, "py": py}
 
     a = np.array(im)[..., 3] > 16
     if not a.any():
-        return {"mode": "static", "frames": [[0, 0, W, H]], "size": size}
+        return {"mode": "static", "frames": [[0, 0, W, H]], "size": size,
+                "px": -(W // 2), "py": -H}
     xs = np.where(a.any(axis=0))[0]
     ys = np.where(a.any(axis=1))[0]
     bb = [int(xs.min()), int(ys.min()),
@@ -197,26 +243,41 @@ def classify_sheet(path):
             y0, y1 = int(ys.min()), int(ys.max() + 1)
             fr = [[x0, y0, x1 - x0, y1 - y0] for x0, x1 in _runs(a.any(axis=0))]
         anim = n in _ANIM_IDS
-        return {"mode": "grid", "frames": _tighten_frames(a, fr, anim),
-                "size": size, "anim": anim}
+        fr = _tighten_frames(a, fr, anim)
+        px, py = _content_anchor(fr[0])
+        return {"mode": "grid", "frames": fr, "size": size,
+                "anim": anim, "px": px, "py": py}
 
     xb = _regular(_runs(a.any(axis=0)))
     yb = _regular(_runs(a.any(axis=1)))
     if not xb and not yb:
-        return {"mode": "static", "frames": [bb], "size": size}
+        return {"mode": "static", "frames": [bb], "size": size,
+                "px": -(bb[2] // 2), "py": -bb[3]}
     xb = xb or [(int(xs.min()), int(xs.max() + 1))]
     yb = yb or [(int(ys.min()), int(ys.max() + 1))]
     fr = [[int(x0), int(y0), int(x1 - x0), int(y1 - y0)]
           for y0, y1 in yb for x0, x1 in xb if a[y0:y1, x0:x1].sum() > 0]
     if len(fr) <= 1:
-        return {"mode": "static", "frames": [bb], "size": size}
+        return {"mode": "static", "frames": [bb], "size": size,
+                "px": -(bb[2] // 2), "py": -bb[3]}
     anim = n in _ANIM_IDS
-    return {"mode": "grid", "frames": _tighten_frames(a, fr, anim),
-            "size": size, "anim": anim}
+    fr = _tighten_frames(a, fr, anim)
+    px, py = _content_anchor(fr[0])
+    return {"mode": "grid", "frames": fr, "size": size,
+            "anim": anim, "px": px, "py": py}
 
 
 def generate_table(proper_obb_dir):
-    """Scan ``proper_obb_dir`` -> ``{"fldchrN": {mode,...}}`` for every base sheet."""
+    """Scan ``proper_obb_dir`` -> ``{"fldchrN": {mode,...}}`` for every base sheet.
+    Loads ``field_anm.dat`` (if present) for whole-object part-offset anchors."""
+    ents = []
+    fa = os.path.join(proper_obb_dir, "field_anm.dat")
+    if os.path.exists(fa):
+        try:
+            from .parser import parse_field_anm
+            ents = parse_field_anm(open(fa, "rb").read())
+        except Exception:
+            ents = []
     bases = sorted({
         int(re.match(r"fldchr(\d+)_", os.path.basename(f)).group(1))
         for f in glob.glob(os.path.join(proper_obb_dir, "fldchr*_*.png"))
@@ -225,7 +286,7 @@ def generate_table(proper_obb_dir):
     for nn in bases:
         p = os.path.join(proper_obb_dir, f"fldchr{nn}_0.png")
         if os.path.exists(p):
-            out[f"fldchr{nn}"] = classify_sheet(p)
+            out[f"fldchr{nn}"] = classify_sheet(p, ents)
     return out
 
 

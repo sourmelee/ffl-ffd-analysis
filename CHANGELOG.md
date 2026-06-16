@@ -26,9 +26,20 @@ commit as the changelog entry.
   (closed). Added an `anim` flag to the table + an `isObject` tri-state in `FSG2`
   (0 not-object / 1 object-frame-0 / 2 object-loops): door/chest/prop **state**
   sheets hold frame 0, only an explicit ambient-effect allow-list (fire/flames
-  85/92/93/94/206) loops — so doors no longer flicker open/closed. Grid/multifile
-  anchors baked at px/py=0 (the engine centres each frame by its own size; static
-  keeps the authored centre-bottom anchor).
+  85/92/93/94/206) loops — so doors no longer flicker open/closed. Non-looping
+  object frames are baked **content-tight** so they stand on their tile (the door
+  cell had ~17px of empty padding below the art).
+- **Multifile sibling files are PALETTE variants, not animation frames** — cycling
+  them flickered the palette (same trap as the monster recolours). Multifile objects
+  now show ONE static variant (the placement `var` selects the file); nothing in the
+  multifile path animates. fldchr77 (airship) `_0` is a 3×2 grid of 6 vehicle views —
+  sliced to show one static front view instead of the whole atlas.
+- **Whole-object anchor restored from the field_anm part offset.** The naive
+  centre-bottom anchor mis-placed large objects (the 96×96 tree sat 32px too far
+  left). The classifier pairs each multifile sheet to the field_anm entry whose
+  frame size + count match and bakes that entry's authored part offset (tree → entry
+  9, `(-16,-96)`); the engine draws every object at `(tile-centre+px, tile-bottom+py)`.
+  Strict match (size ±2, count ±1), centre-bottom fallback.
 
 ### Added
 - **Per-sheet field-sprite classification table** (`ffd/animation/sheet_anim.py`

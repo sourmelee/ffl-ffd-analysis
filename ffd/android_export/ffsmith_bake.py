@@ -641,12 +641,10 @@ def _bake_sprite_geo(files, out_dir):
         # that loops its frames (ambient effects: fire/flames -- "anim" in the table).
         is_obj = (0 if mode in ("char", "battlechar", "special")
                   else (2 if rec.get("anim") else 1))
-        # Anchor: static uses the authored centre-bottom px/py (engine's legacy
-        # branch); grid/multifile are centred per-frame by the engine, so px/py=0.
-        if mode == "static":
-            px, py = -(f0[2] // 2), -f0[3]
-        else:
-            px, py = 0, 0
+        # Anchor: the table carries the FFD part-offset (whole objects) or a
+        # centre-bottom default; the engine draws at (tile-centre+px, tile-bottom+py).
+        px = int(rec.get("px", -(f0[2] // 2)))
+        py = int(rec.get("py", -f0[3]))
         geo[img] = {"mode": code, "isObject": is_obj,
                     "px": px, "py": py, "frames": frames}
     # merge legacy manual overrides (Animation tab authoring)
