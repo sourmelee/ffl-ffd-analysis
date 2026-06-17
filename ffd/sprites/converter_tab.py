@@ -2981,6 +2981,10 @@ class SpriteConverterTab(TabBase):
                    command=self._save_tileset_build
                    ).pack(side="left", padx=4)
 
+        ttk.Button(self._tileset_bar, text="Manage overrides...",
+                   command=self._open_overrides_manager
+                   ).pack(side="left", padx=4)
+
         ttk.Checkbutton(self._tileset_bar, text="Link auto-match",
                         variable=self._link_auto_match
                         ).pack(side="left", padx=8)
@@ -2999,6 +3003,101 @@ class SpriteConverterTab(TabBase):
             return self.data.cpk_to_mc_overrides()
         except Exception:
             return None
+
+    def _open_overrides_manager(self):
+        """View / delete every stored override (routing + custom palettes +
+        tileset builds) in one table. Operates on FFData's live caches; "Save"
+        persists both JSON files via the truncation-guarded saver."""
+        import tkinter as tk
+        from tkinter import ttk, messagebox
+        from ..maps.mc_overrides import (enumerate_overrides,
+                                         delete_override_row)
+        routing = self._get_overrides() or {}
+        try:
+            custom = self.data.custom_palettes()
+        except Exception:
+            custom = {}
+
+        win = tk.Toplevel(self)
+        win.title("Manage tileset overrides")
+        win.geometry("780x480")
+
+        frame = ttk.Frame(win)
+        frame.pack(side="top", fill="both", expand=True, padx=4, pady=4)
+        vsb = ttk.Scrollbar(frame, orient="vertical")
+        vsb.pack(side="right", fill="y")
+        cols = ("kind", "chapter", "cpk", "variant", "detail")
+        tree = ttk.Treeview(frame, columns=cols, show="headings",
+                            selectmode="extended", yscrollcommand=vsb.set)
+        vsb.config(command=tree.yview)
+        for c, w in zip(cols, (95, 95, 50, 60, 430)):
+            tree.heading(c, text=c.capitalize())
+            tree.column(c, width=w, anchor="w")
+        tree.pack(side="left", fill="both", expand=True)
+
+        rowkeys = {}
+
+        def refresh():
+            tree.delete(*tree.get_children())
+            rowkeys.clear()
+            for r in enumerate_overrides(routing, custom):
+                iid = tree.insert(
+                    "", "end",
+                    values=(r["kind"], r["chapter"], r["cpk"],
+                            "" if r["variant"] is None else r["variant"],
+                            r["detail"]))
+                rowkeys[iid] = r["key"]
+
+        refresh()
+
+        bar = ttk.Frame(win)
+        bar.pack(side="bottom", fill="x", padx=4, pady=4)
+        status = ttk.Label(bar, text=f"{len(rowkeys)} overrides",
+                           foreground="#888")
+        status.pack(side="right", padx=6)
+
+        def do_delete():
+            sel = tree.selection()
+            if not sel:
+                return
+            if not messagebox.askyesno(
+                    "Delete overrides",
+                    f"Delete {len(sel)} selected override(s)?\n\n"
+                    f"They are removed from memory now; click Save to persist."):
+                return
+            n = 0
+            for iid in sel:
+                if delete_override_row(routing, custom, rowkeys.get(iid)):
+                    n += 1
+            refresh()
+            status.config(text=f"Deleted {n} (UNSAVED -- click Save); "
+                               f"{len(rowkeys)} remain")
+
+        def do_save():
+            ok1 = self.data.save_cpk_to_mc_overrides()
+            ok2 = self.data.save_custom_palettes()
+            if ok1 and ok2:
+                status.config(text="Saved both override files.")
+            else:
+                messagebox.showerror(
+                    "Save failed",
+                    "An override file did not save (the write was not verified, "
+                    "so the existing file was left intact). Try again.")
+
+        def do_reload():
+            nonlocal routing, custom
+            routing = self.data.cpk_to_mc_overrides(reload=True)
+            custom = self.data.custom_palettes(reload=True)
+            refresh()
+            status.config(text=f"Reloaded; {len(rowkeys)} overrides")
+
+        ttk.Button(bar, text="Delete selected",
+                   command=do_delete).pack(side="left", padx=4)
+        ttk.Button(bar, text="Save", command=do_save).pack(side="left", padx=4)
+        ttk.Button(bar, text="Reload from disk",
+                   command=do_reload).pack(side="left", padx=4)
+        ttk.Button(bar, text="Close",
+                   command=win.destroy).pack(side="left", padx=4)
 
     def _auto_match_android_tileset(self, chapter, cpk_entry):
         """Override v3: looks up overrides first, then cpk_to_mc.json.

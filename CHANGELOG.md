@@ -17,6 +17,27 @@ commit as the changelog entry.
 
 ## [Unreleased]
 
+### Fixed
+- **Recovered corrupted override files + stopped silent data loss.** Both
+  `custom_palettes.json` and `cpk_to_mc_overrides.json` had been truncated by a
+  short-write (the workspace FS can silently cut a save); the loaders caught the
+  parse error and returned EMPTY, so all hand-built palettes/builds/routing
+  silently vanished and the export fell back to native palette 0 (the "ruined
+  mc9 palette"). Repaired both (salvaged all but the last partial entry; mc9's 2
+  custom palettes + 2 builds + routing restored). `load_*` now auto-repairs a
+  truncated file, preserves a `.corrupt` copy, and warns loudly instead of
+  silently emptying. `save_*` writes via a verified temp file (reads it back,
+  confirms byte-identical + parses) and rotates a `.bak` before replacing, so a
+  short write can never clobber a good file again.
+
+### Added
+- **"Manage overrides..." viewer/editor** in the SpriteConverter tileset bar:
+  one table listing every routing override, custom palette, and tileset build
+  (`mc_overrides.enumerate_overrides`), with multi-select delete, Save (both
+  files, truncation-guarded), and Reload. `repair_custom_palettes`,
+  `delete_cpk_to_mc_override`, `delete_override_row` helpers added.
+
+
 ### Changed
 - **Android-Export "Mass convert tilesets" now uses the SpriteConverter preview's
   exact rendering path.** Extracted the preview logic into a shared

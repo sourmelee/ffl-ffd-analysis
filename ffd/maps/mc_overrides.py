@@ -208,33 +208,89 @@ def empty_cpk_to_mc_overrides() -> dict:
     }
 
 
+def _save_json_verified(path, data) -> bool:
+    """Write ``data`` as pretty JSON with truncation guards: write to a temp
+    file, read it back and confirm it round-trips byte-for-byte + parses, rotate
+    the previous good file to ``<path>.bak``, then atomically replace. Returns
+    False (leaving the existing file untouched) if the write didn't verify --
+    so a silent short-write on this workspace's filesystem can never clobber a
+    good overrides file."""
+    path = str(path); tmp = path + ".tmp"
+    try:
+        payload = _json.dumps(data, indent=2, ensure_ascii=False)
+        with open(tmp, "w", encoding="utf-8") as f:
+            f.write(payload)
+            f.flush()
+            try:
+                os.fsync(f.fileno())
+            except Exception:
+                pass
+        with open(tmp, "r", encoding="utf-8") as f:
+            written = f.read()
+        if written != payload:
+            try: os.remove(tmp)
+            except Exception: pass
+            return False
+        _json.loads(written)
+        if os.path.exists(path):
+            try:
+                import shutil
+                shutil.copy2(path, path + ".bak")
+            except Exception:
+                pass
+        os.replace(tmp, path)
+        return True
+    except Exception:
+        try:
+            if os.path.exists(tmp):
+                os.remove(tmp)
+        except Exception:
+            pass
+        return False
+
+
 def load_cpk_to_mc_overrides(path) -> dict:
-    """Load cpk_to_mc_overrides.json from ``path``. Returns an empty
-    structure if the file does not exist or fails to parse."""
+    """Load cpk_to_mc_overrides.json. On a parse error (e.g. a truncated write)
+    preserves a ``<path>.corrupt`` copy, attempts an automatic structural
+    repair, and warns loudly -- never silently discards saved routing
+    overrides."""
+    path = str(path)
     try:
         with open(path, "r", encoding="utf-8") as f:
-            data = _json.load(f)
-        if not isinstance(data, dict):
-            return empty_cpk_to_mc_overrides()
-        data.setdefault("format_version", 1)
-        data.setdefault("entries", {})
-        return data
+            text = f.read()
     except FileNotFoundError:
         return empty_cpk_to_mc_overrides()
     except Exception:
         return empty_cpk_to_mc_overrides()
+    try:
+        data = _json.loads(text)
+    except Exception as e:
+        import sys as _sys
+        try:
+            import shutil
+            shutil.copy2(path, path + ".corrupt"); bak = path + ".corrupt"
+        except Exception:
+            bak = "(backup failed)"
+        repaired = repair_custom_palettes(text)
+        if repaired is not None:
+            print(f"[mc_overrides] WARNING: {path} was corrupt ({e}); "
+                  f"AUTO-REPAIRED in memory (corrupt copy at {bak}). Re-save to "
+                  f"persist.", file=_sys.stderr)
+            data = repaired
+        else:
+            print(f"[mc_overrides] ERROR: {path} unparseable ({e}); corrupt copy "
+                  f"at {bak}. Loaded EMPTY.", file=_sys.stderr)
+            return empty_cpk_to_mc_overrides()
+    if not isinstance(data, dict):
+        return empty_cpk_to_mc_overrides()
+    data.setdefault("format_version", 1)
+    data.setdefault("entries", {})
+    return data
 
 
 def save_cpk_to_mc_overrides(path, overrides: dict) -> bool:
-    """Atomically save the overrides file. Returns True on success."""
-    try:
-        tmp = str(path) + ".tmp"
-        with open(tmp, "w", encoding="utf-8") as f:
-            _json.dump(overrides, f, indent=2, ensure_ascii=False)
-        os.replace(tmp, str(path))
-        return True
-    except Exception:
-        return False
+    """Atomically + verifiably save the routing overrides file."""
+    return _save_json_verified(path, overrides)
 
 
 def set_cpk_to_mc_override(overrides: dict, chapter: str, cpk_entry: int,
@@ -319,34 +375,99 @@ def empty_custom_palettes() -> dict:
     }
 
 
+def repair_custom_palettes(text):
+    """Best-effort repair of a TRUNCATED custom_palettes.json (the workspace
+    filesystem can silently short-write). Walks the JSON tracking bracket depth
+    (ignoring string contents), truncates at the last position where the prefix
+    can be validly closed, and appends the missing ``]``/``}``. Returns the
+    parsed dict on success or ``None`` if nothing salvageable.
+
+    Salvages everything up to the last complete element; only a single
+    partially-written entry at the very end is dropped.
+    """
+    def _stack(prefix):
+        stk = []; in_str = False; esc = False
+        for ch in prefix:
+            if in_str:
+                if esc: esc = False
+                elif ch == "\\": esc = True
+                elif ch == '"': in_str = False
+            elif ch == '"': in_str = True
+            elif ch in "{[": stk.append(ch)
+            elif ch in "}]":
+                if stk: stk.pop()
+        return stk, in_str
+    # candidate cut points: every } or ] that is not inside a string
+    cuts = []; in_str = False; esc = False
+    for i, ch in enumerate(text):
+        if in_str:
+            if esc: esc = False
+            elif ch == "\\": esc = True
+            elif ch == '"': in_str = False
+        elif ch == '"': in_str = True
+        elif ch in "}]": cuts.append(i)
+    for pos in reversed(cuts[-400:]):
+        prefix = text[:pos + 1]
+        stk, ins = _stack(prefix)
+        if ins:
+            continue
+        cand = prefix + "".join("]" if c == "[" else "}" for c in reversed(stk))
+        try:
+            data = _json.loads(cand)
+            if isinstance(data, dict):
+                return data
+        except Exception:
+            continue
+    return None
+
+
 def load_custom_palettes(path) -> dict:
-    """Load custom_palettes.json from ``path``. Returns an empty structure
-    if the file does not exist or fails to parse."""
+    """Load custom_palettes.json from ``path``. On a parse error (e.g. a
+    truncated write) this preserves the corrupt file as ``<path>.corrupt``,
+    attempts an automatic structural repair, and prints a loud warning -- it
+    NEVER silently discards saved overrides. Returns an empty structure only
+    when the file is missing or unsalvageable."""
+    path = str(path)
     try:
         with open(path, "r", encoding="utf-8") as f:
-            data = _json.load(f)
-        if not isinstance(data, dict):
-            return empty_custom_palettes()
-        data.setdefault("format_version", 1)
-        data.setdefault("entries", {})
-        data.setdefault("builds", {})
-        return data
+            text = f.read()
     except FileNotFoundError:
         return empty_custom_palettes()
     except Exception:
         return empty_custom_palettes()
+    try:
+        data = _json.loads(text)
+    except Exception as e:
+        import sys as _sys
+        try:
+            import shutil
+            shutil.copy2(path, path + ".corrupt")
+            bak = path + ".corrupt"
+        except Exception:
+            bak = "(backup failed)"
+        repaired = repair_custom_palettes(text)
+        if repaired is not None:
+            print(f"[mc_overrides] WARNING: {path} was corrupt ({e}); "
+                  f"AUTO-REPAIRED in memory (corrupt copy saved to {bak}). "
+                  f"Re-save to persist the repair.", file=_sys.stderr)
+            data = repaired
+        else:
+            print(f"[mc_overrides] ERROR: {path} failed to parse ({e}) and could "
+                  f"not be repaired; corrupt copy at {bak}. Loaded EMPTY -- saved "
+                  f"overrides are preserved in the .corrupt file.", file=_sys.stderr)
+            return empty_custom_palettes()
+    if not isinstance(data, dict):
+        return empty_custom_palettes()
+    data.setdefault("format_version", 1)
+    data.setdefault("entries", {})
+    data.setdefault("builds", {})
+    return data
 
 
 def save_custom_palettes(path, data: dict) -> bool:
-    """Atomically save custom_palettes.json. Returns True on success."""
-    try:
-        tmp = str(path) + ".tmp"
-        with open(tmp, "w", encoding="utf-8") as f:
-            _json.dump(data, f, indent=2, ensure_ascii=False)
-        os.replace(tmp, str(path))
-        return True
-    except Exception:
-        return False
+    """Atomically + verifiably save custom_palettes.json (truncation-guarded;
+    keeps a ``.bak`` of the last good file). See :func:`_save_json_verified`."""
+    return _save_json_verified(path, data)
 
 
 def list_custom_palettes(data: dict, chapter, cpk_entry) -> list:
@@ -562,4 +683,101 @@ def delete_tileset_build(data: dict, chapter, cpk_entry, variant) -> bool:
         if chap and ek in chap and vk in chap[ek]:
             del chap[ek][vk]
             return True
+    return False
+
+
+# ---------------------------------------------------------------------------
+# Override management (powers the toolkit's "Manage overrides" viewer/editor)
+# ---------------------------------------------------------------------------
+
+
+def delete_cpk_to_mc_override(overrides: dict, chapter, cpk_entry,
+                              palette=None) -> bool:
+    """Remove a routing override for (chapter, cpk_entry). With ``palette`` set,
+    only drops that ``by_palette`` entry (and the whole record if it becomes
+    empty). Returns True if something was removed."""
+    entries = (overrides or {}).get("entries") or {}
+    ek = str(cpk_entry)
+    for k in (chapter, str(chapter).replace(" ", "")):
+        chap = entries.get(k)
+        if not chap or ek not in chap:
+            continue
+        if palette is None:
+            del chap[ek]
+            return True
+        bp = chap[ek].get("by_palette") or {}
+        if str(palette) in bp:
+            del bp[str(palette)]
+            if not bp and "mc_id" not in chap[ek] and "variant" not in chap[ek]:
+                del chap[ek]
+            return True
+    return False
+
+
+def enumerate_overrides(routing=None, custom=None):
+    """Flatten every stored override into display rows for a management UI.
+
+    Each row is ``{kind, chapter, cpk, variant, detail, key}`` where ``key`` is a
+    tuple consumable by :func:`delete_override_row`.  ``kind`` is one of
+    ``'routing'`` (overall cpk->mc), ``'routing-pal'`` (per-Mobile-palette
+    routing), ``'palette'`` (a hand-built custom Mobile palette), ``'build'``
+    (a tileset build = palette + cell_map + fill bound to a variant)."""
+    rows = []
+    for chap, cpks in ((routing or {}).get("entries") or {}).items():
+        for cpk, rec in (cpks or {}).items():
+            if not isinstance(rec, dict):
+                continue
+            if "mc_id" in rec:
+                rows.append({"kind": "routing", "chapter": chap, "cpk": cpk,
+                             "variant": None,
+                             "detail": f"-> mc{rec.get('mc_id')}_{rec.get('variant')}",
+                             "key": ("routing", chap, cpk, None)})
+            for pal, pr in (rec.get("by_palette") or {}).items():
+                rows.append({"kind": "routing-pal", "chapter": chap, "cpk": cpk,
+                             "variant": None,
+                             "detail": f"pal {pal} -> mc{pr.get('mc_id')}_{pr.get('variant')}",
+                             "key": ("routing-pal", chap, cpk, pal)})
+    for chap, cpks in ((custom or {}).get("entries") or {}).items():
+        for cpk, rec in (cpks or {}).items():
+            for i, pal in enumerate((rec or {}).get("palettes") or []):
+                nc = pal.get("nc", len(pal.get("colors") or []))
+                note = (" " + pal.get("note", "")) if pal.get("note") else ""
+                rows.append({"kind": "palette", "chapter": chap, "cpk": cpk,
+                             "variant": i,
+                             "detail": f"custom palette #{i} ({nc} colors){note}",
+                             "key": ("palette", chap, cpk, i)})
+    for chap, cpks in ((custom or {}).get("builds") or {}).items():
+        for cpk, byvar in (cpks or {}).items():
+            for var, b in (byvar or {}).items():
+                pal = (b or {}).get("palette")
+                pn = len(pal) if isinstance(pal, list) else pal
+                rows.append({"kind": "build", "chapter": chap, "cpk": cpk,
+                             "variant": var,
+                             "detail": (f"build v{var} (palette {pn}, "
+                                        f"fill={(b or {}).get('fill_from_android')}, "
+                                        f"cells={len((b or {}).get('cell_map') or {})})"),
+                             "key": ("build", chap, cpk, var)})
+
+    def _sk(r):
+        cpk = r["cpk"]
+        return (r["kind"], str(r["chapter"]),
+                int(cpk) if str(cpk).isdigit() else 0,
+                r["variant"] if r["variant"] is not None else -1)
+    rows.sort(key=_sk)
+    return rows
+
+
+def delete_override_row(routing, custom, key) -> bool:
+    """Delete one row produced by :func:`enumerate_overrides`. ``key`` is
+    ``(kind, chapter, cpk, sub)``. Mutates ``routing``/``custom`` in place;
+    returns True if something was removed."""
+    kind, chap, cpk, sub = key
+    if kind == "routing":
+        return delete_cpk_to_mc_override(routing, chap, cpk)
+    if kind == "routing-pal":
+        return delete_cpk_to_mc_override(routing, chap, cpk, palette=sub)
+    if kind == "palette":
+        return delete_custom_palette(custom, chap, cpk, int(sub))
+    if kind == "build":
+        return delete_tileset_build(custom, chap, cpk, sub)
     return False
