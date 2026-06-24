@@ -17,6 +17,41 @@ commit as the changelog entry.
 
 ## [Unreleased]
 
+### Added
+- **Multi-source tilesets** — one output mc sheet can now pull tiles from more
+  than one Mobile cpk. The SpriteConverter gets a "Pick from" secondary-source
+  dropdown: switch the Mobile pane to any other cpk, click its cell → click the
+  Android destination, and that remap records its source. `cell_map` values gain
+  optional `src_chapter`/`src_cpk`/`src_palette`; `_apply_cell_map` +
+  `convert_mobile_tileset_to_android` + `render_tileset_variant` +
+  `produce_build_tile` take a `source_provider` (built by `make_source_provider(
+  sp_slots)`) so every consumer — live preview, PNG export, mass-convert, and the
+  Maps "mobile tilesets" render — resolves each cell from its own sheet. The
+  primary cpk stays the base; cells without a `src` are unchanged. Verified
+  end-to-end (a cpk11 cell composited into a cpk9-based mc sheet via the build
+  path).
+
+
+### Added
+- **`nearest` variant strategy** for tileset conversion: recolors the converted
+  Mobile base to the NEAREST colour in the target variant's palette
+  (`apply_nearest_variant`), instead of the index-LUT `swap` which mis-mapped
+  grey marble to orange when variant palettes aren't index-aligned. Verified on
+  mc11_1 (orange → correct cool-grey). Available in every strategy dropdown
+  (preview + mass-convert).
+- **Maps tab "Reload overrides ↻" button**: re-reads override files + custom
+  palettes/builds, clears the render + inverse caches, and re-renders the current
+  map, so overrides created during the session take effect without a restart.
+- **"Load into editor" in Manage overrides**: double-click (or select +) a row to
+  load that tileset build's cpk/mc selection, palette, cell-map, force-Android
+  cells and fill flag back into the SpriteConverter for editing + re-save.
+
+### Fixed
+- Override JSON files are now written **compact** when repaired, dodging the
+  workspace short-write that truncated the 328 KB pretty-printed
+  `custom_palettes.json`.
+
+
 ### Fixed
 - **Recovered corrupted override files + stopped silent data loss.** Both
   `custom_palettes.json` and `cpk_to_mc_overrides.json` had been truncated by a

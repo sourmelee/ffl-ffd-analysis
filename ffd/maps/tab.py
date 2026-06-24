@@ -200,6 +200,8 @@ class MapTab(TabBase):
                    command=self._apply_override).pack(side="left", padx=2)
         ttk.Button(btn_row, text="Clear all",
                    command=self._clear_override).pack(side="left", padx=2)
+        ttk.Button(btn_row, text="Reload overrides ↻",
+                   command=self._reload_overrides).pack(side="left", padx=2)
 
         # Internal state
         self._ts_override = {}
@@ -214,6 +216,29 @@ class MapTab(TabBase):
         self._and_tiles = None
         self._mob_resolvers = {}
         self.refresh_list()
+
+    def _reload_overrides(self):
+        """Re-read the override files (routing + custom palettes/builds) from
+        disk, drop every cached tileset/inverse map, and re-render the current
+        map -- so overrides created during THIS session (e.g. a 'Save tileset
+        build' in SpriteConverter) take effect without restarting the toolkit."""
+        try:
+            self.data.cpk_to_mc_overrides(reload=True)
+            self.data.custom_palettes(reload=True)
+        except Exception:
+            pass
+        # invalidate the reverse-lookup cache so the new routing is seen
+        if hasattr(self.data, "_cpk_to_mc_inv_cache"):
+            self.data._cpk_to_mc_inv_cache = None
+        # drop this tab's rendered-tileset caches
+        self._and_tiles = None
+        self._mob_tiles = None
+        self._mob_resolvers = {}
+        # re-render the current selection
+        try:
+            self._on_select()
+        except Exception:
+            self.refresh_list()
 
     def _on_source_change(self):
         """Radio button changed: drop the cached tilesets so the new source's
@@ -744,11 +769,13 @@ class MapTab(TabBase):
         # edits show up here too. normalize=True forces a uniform 512px
         # (32px tile) sheet so the Android map renderer never mixes tile
         # sizes across slots.
-        from ..sprites.mobile_tile_to_android import produce_build_tile
+        from ..sprites.mobile_tile_to_android import (
+            produce_build_tile, make_source_provider)
         try:
             builds_data = self.data.custom_palettes()
         except Exception:
             builds_data = {}
+        prov = make_source_provider(self.data.sp_slots or {})
         obb = self.data.obb_files or {}
 
         img_cache = {}
@@ -764,7 +791,7 @@ class MapTab(TabBase):
                 res = find_resolver(chap)
                 if res is None: continue
                 img = produce_build_tile(res, cpk_id, mc_id, variant,
-                                         builds_data, obb=obb, normalize=True)
+                                         builds_data, obb=obb, normalize=True, source_provider=prov)
                 if img is not None:
                     img_cache[key] = img
                     return img
@@ -774,7 +801,7 @@ class MapTab(TabBase):
                 res = find_resolver(chap)
                 if res is None: continue
                 img = produce_build_tile(res, cpk_id, mc_id, variant,
-                                         builds_data, obb=obb, normalize=True)
+                                         builds_data, obb=obb, normalize=True, source_provider=prov)
                 if img is not None:
                     img_cache[key] = img
                     return img
@@ -790,7 +817,7 @@ class MapTab(TabBase):
                 if res is not None:
                     img = produce_build_tile(res, cpk_id, mc_id, variant,
                                              builds_data, obb=obb,
-                                             normalize=True)
+                                             normalize=True, source_provider=prov)
                     if img is not None:
                         img_cache[key] = img
                         if key not in missing_log:
@@ -812,7 +839,7 @@ class MapTab(TabBase):
             # positions land in transparent regions of the chosen sheet.
             for slot, res in resolvers.items():
                 img = produce_build_tile(res, mc_id, mc_id, variant,
-                                         builds_data, obb=obb, normalize=True)
+                                         builds_data, obb=obb, normalize=True, source_provider=prov)
                 if img is not None:
                     img_cache[key] = img
                     if key not in missing_log:

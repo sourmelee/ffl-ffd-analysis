@@ -557,7 +557,7 @@ class AndroidExportTab(TabBase):
                   ).grid(row=2, column=0, sticky="w", padx=6, pady=2)
         self._mt_palette_strategy = tk.StringVar(value="verbatim")
         ttk.Combobox(optf, textvariable=self._mt_palette_strategy,
-                     values=("verbatim", "swap"), width=10,
+                     values=("verbatim", "swap", "nearest"), width=10,
                      state="readonly"
                      ).grid(row=2, column=1, sticky="w", padx=6, pady=2)
         ttk.Label(optf,
@@ -634,6 +634,7 @@ class AndroidExportTab(TabBase):
             make_tileset_starter_spec,
             produce_build_tile,
             render_tileset_variant,
+            make_source_provider,
         )
         from ..maps.mc_overrides import (
             resolve_tileset_build, bound_variants_for_cpk,
@@ -645,6 +646,7 @@ class AndroidExportTab(TabBase):
             builds_data = self.data.custom_palettes()
         except Exception:
             builds_data = {}
+        prov = make_source_provider(self.data.sp_slots or {})
 
         # Cache loaded cpk_to_mc for telemetry
         self._mt_logln(f"Output:         {out_path}")
@@ -723,7 +725,7 @@ class AndroidExportTab(TabBase):
                         if _b0 is not None:
                             out_img = produce_build_tile(
                                 resolver, cpk_entry, mc_id, 0,
-                                builds_data, obb=obb)
+                                builds_data, obb=obb, source_provider=prov)
                         else:
                             # EXACT preview-pane logic (shared render fn)
                             out_img = render_tileset_variant(
@@ -731,7 +733,7 @@ class AndroidExportTab(TabBase):
                                 mc_id=mc_id, variant=0,
                                 fill=bool(self._mt_fill_from_android.get()),
                                 strategy=self._mt_palette_strategy.get(),
-                                obb=obb, spec=spec)
+                                obb=obb, spec=spec, source_provider=prov)
                         out_img.save(out_file)
                         emitted.add(key0)
                         n_done += 1
@@ -768,7 +770,7 @@ class AndroidExportTab(TabBase):
                             try:
                                 bimg = produce_build_tile(
                                     resolver, cpk_entry, mc_id, var,
-                                    builds_data, obb=obb)
+                                    builds_data, obb=obb, source_provider=prov)
                                 if bimg is not None:
                                     bimg.save(out_var)
                                     emitted.add(keyN)
@@ -792,7 +794,7 @@ class AndroidExportTab(TabBase):
                                 mobile_img, android_orig, av,
                                 mc_id=mc_id, variant=var,
                                 fill=bool(self._mt_fill_from_android.get()),
-                                strategy=strategy, obb=obb, spec=spec)
+                                strategy=strategy, obb=obb, spec=spec, source_provider=prov)
                             if out is None:
                                 self._mt_logln(
                                     f"    mc{mc_id}_{var}: no output, skipped")
@@ -821,7 +823,7 @@ class AndroidExportTab(TabBase):
                     try:
                         bimg = produce_build_tile(
                             resolver, cpk_entry, mc_id, var,
-                            builds_data, obb=obb)
+                            builds_data, obb=obb, source_provider=prov)
                         if bimg is not None:
                             bimg.save(out_b)
                             emitted.add(keyB)

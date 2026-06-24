@@ -1356,6 +1356,8 @@ class SpriteConverterTab(TabBase):
         # Combobox shows only the labels; selection is matched by index
         self._mobile_pick_combo.config(values=[o["label"] for o in mobile_opts])
         self._android_pick_combo.config(values=[o["label"] for o in android_opts])
+        if hasattr(self, "_refresh_pickfrom_values"):
+            self._refresh_pickfrom_values()
 
     def _enumerate_mobile_chpk_characters(self):
         """Walk every loaded .sp slot, find chpk.dat, and emit one option
@@ -1930,7 +1932,7 @@ class SpriteConverterTab(TabBase):
         at = (self._spec or {}).get("android_target", {}) or {}
         self._t_fill_from_android.set(bool(at.get("fill_from_android", True)))
         ps = at.get("palette_strategy", "verbatim")
-        if ps in ("verbatim", "swap"):
+        if ps in ("verbatim", "swap", "nearest"):
             self._t_palette_strategy.set(ps)
 
     # ------------------------------------------------------------------
@@ -2216,12 +2218,16 @@ class SpriteConverterTab(TabBase):
 
     def _draw_mobile_tileset(self):
         c = self._mobile_canvas
-        if self._mobile_img is None:
+        # When a secondary "pick from" source is active, the Mobile pane shows
+        # THAT sheet (so the user clicks its cells); the primary base image
+        # (self._mobile_img) is untouched and still drives the conversion.
+        img = (self._pickfrom_img if getattr(self, "_pickfrom_source", None)
+               else self._mobile_img)
+        if img is None:
             return
         zoom = max(1, int(self._zoom_mobile.get() or 1))
         cell_w = MOBILE_TILE_CELL
         cell_h = MOBILE_TILE_CELL
-        img = self._mobile_img
         w, h = img.size
         zoomed = img.resize((w * zoom, h * zoom), Image.NEAREST)
         self._photo_mobile = ImageTk.PhotoImage(zoomed)
@@ -2293,13 +2299,18 @@ class SpriteConverterTab(TabBase):
             return None
         spec = self._spec or make_tileset_starter_spec(
             "preview", cpk_entry=0, mc_id=0, variant=0)
+        try:
+            from .mobile_tile_to_android import make_source_provider
+            prov = make_source_provider(self.data.sp_slots or {})
+        except Exception:
+            prov = None
         return render_tileset_variant(
             self._mobile_img, self._tileset_android_orig_img, self._android_img,
             mc_id=self._tileset_mc_id,
             variant=int(self._tileset_variant_idx or 0),
             fill=bool(self._t_fill_from_android.get()),
             strategy=self._t_palette_strategy.get(),
-            obb=self.data.obb_files or {}, spec=spec)
+            obb=self.data.obb_files or {}, spec=spec, source_provider=prov)
 
     # ------------------------------------------------------------------
     # Tileset action bar (built lazily on first source-type switch)
@@ -2324,7 +2335,7 @@ class SpriteConverterTab(TabBase):
                   ).pack(side="left", padx=(8,2))
         ttk.Combobox(self._tileset_bar,
                      textvariable=self._t_palette_strategy,
-                     values=("verbatim", "swap"), width=10,
+                     values=("verbatim", "swap", "nearest"), width=10,
                      state="readonly").pack(side="left", padx=2)
         ttk.Button(self._tileset_bar, text="Convert tileset...",
                    command=self._export_tileset_png).pack(side="left", padx=8)
@@ -2411,7 +2422,7 @@ class SpriteConverterTab(TabBase):
                   ).pack(side="left", padx=(8,2))
         ttk.Combobox(self._tileset_bar,
                      textvariable=self._t_palette_strategy,
-                     values=("verbatim", "swap"), width=10,
+                     values=("verbatim", "swap", "nearest"), width=10,
                      state="readonly").pack(side="left", padx=2)
 
         ttk.Button(self._tileset_bar, text="Convert tileset...",
@@ -2598,12 +2609,17 @@ class SpriteConverterTab(TabBase):
         """Override: adds green selection outline for the picked Mobile
         cell (used by the click-Mobile-then-click-Android remap flow)."""
         c = self._mobile_canvas
-        if self._mobile_img is None:
+        c.delete("all")
+        # Secondary "pick from" source shows in the Mobile pane (so its cells can
+        # be clicked); the primary base (self._mobile_img) still drives the base
+        # conversion and is restored when "Pick from" is back on (primary).
+        img = (self._pickfrom_img if getattr(self, "_pickfrom_source", None)
+               else self._mobile_img)
+        if img is None:
             return
         zoom = max(1, int(self._zoom_mobile.get() or 1))
         cell_w = MOBILE_TILE_CELL
         cell_h = MOBILE_TILE_CELL
-        img = self._mobile_img
         w, h = img.size
         zoomed = img.resize((w * zoom, h * zoom), Image.NEAREST)
         self._photo_mobile = ImageTk.PhotoImage(zoomed)
@@ -2703,15 +2719,18 @@ class SpriteConverterTab(TabBase):
 
     def _cell_from_event_mobile(self, ev):
         """Return (col, row) Mobile cell coords from a canvas event, or
-        None if click is outside the sheet bounds."""
-        if self._mobile_img is None:
+        None if click is outside the DISPLAYED sheet (the pick-from secondary
+        when active, else the primary) bounds."""
+        disp = (self._pickfrom_img if getattr(self, "_pickfrom_source", None)
+                else self._mobile_img)
+        if disp is None:
             return None
         zoom = max(1, int(self._zoom_mobile.get() or 1))
         cx = self._mobile_canvas.canvasx(ev.x)
         cy = self._mobile_canvas.canvasy(ev.y)
         col = int(cx // (MOBILE_TILE_CELL * zoom))
         row = int(cy // (MOBILE_TILE_CELL * zoom))
-        w, h = self._mobile_img.size
+        w, h = disp.size
         cols = w // MOBILE_TILE_CELL
         rows = h // MOBILE_TILE_CELL
         if not (0 <= col < cols and 0 <= row < rows):
@@ -2820,11 +2839,17 @@ class SpriteConverterTab(TabBase):
         dc, dr = android_cell
         cmap = self._spec.setdefault("cell_map", {})
         key = f"{dc},{dr}"
-        cmap[key] = {
+        entry = {
             "mobile_col": mc,
             "mobile_row": mr,
             "flip_h": False,
         }
+        pf = getattr(self, "_pickfrom_source", None)
+        if pf is not None:                       # tile from a SECONDARY tileset
+            entry["src_chapter"] = pf[0]
+            entry["src_cpk"] = int(pf[1])
+            entry["src_palette"] = int(pf[2])
+        cmap[key] = entry
         # If this cell was previously in force_android_cells, remove it
         at = self._spec.setdefault("android_target", {})
         fa = at.get("force_android_cells", []) or []
@@ -2834,8 +2859,10 @@ class SpriteConverterTab(TabBase):
         self._sel_mobile_tileset_cell = None
         self._drag_origin_mobile_cell = None
         self._refresh_all()
+        _pf = getattr(self, "_pickfrom_source", None)
+        _srcdesc = (f" [cpk{_pf[1]}]" if _pf is not None else "")
         self._status.config(
-            text=f"Remapped Android ({dc},{dr}) <- Mobile ({mc},{mr})")
+            text=f"Remapped Android ({dc},{dr}) <- Mobile ({mc},{mr}){_srcdesc}")
 
     def _on_right_click_android_tileset(self, ev):
         """Show a context menu on the clicked Android cell with three
@@ -2962,7 +2989,7 @@ class SpriteConverterTab(TabBase):
                   ).pack(side="left", padx=(8,2))
         ttk.Combobox(self._tileset_bar,
                      textvariable=self._t_palette_strategy,
-                     values=("verbatim", "swap"), width=10,
+                     values=("verbatim", "swap", "nearest"), width=10,
                      state="readonly").pack(side="left", padx=2)
 
         ttk.Button(self._tileset_bar, text="Convert tileset...",
@@ -2980,6 +3007,21 @@ class SpriteConverterTab(TabBase):
         ttk.Button(self._tileset_bar, text="Save tileset build",
                    command=self._save_tileset_build
                    ).pack(side="left", padx=4)
+
+        ttk.Label(self._tileset_bar, text="Pick from:").pack(side="left", padx=(10, 0))
+        if not hasattr(self, "_pickfrom_var"):
+            self._pickfrom_var = tk.StringVar(value="(primary)")
+        if not hasattr(self, "_pickfrom_source"):
+            self._pickfrom_source = None
+        if not hasattr(self, "_pickfrom_img"):
+            self._pickfrom_img = None
+        self._pickfrom_combo = ttk.Combobox(
+            self._tileset_bar, textvariable=self._pickfrom_var,
+            values=("(primary)",), width=22, state="readonly")
+        self._pickfrom_combo.pack(side="left", padx=2)
+        self._pickfrom_var.trace_add(
+            "write", lambda *a: self._on_pickfrom_change())
+        self._refresh_pickfrom_values()
 
         ttk.Button(self._tileset_bar, text="Manage overrides...",
                    command=self._open_overrides_manager
@@ -3003,6 +3045,56 @@ class SpriteConverterTab(TabBase):
             return self.data.cpk_to_mc_overrides()
         except Exception:
             return None
+
+    def _refresh_pickfrom_values(self):
+        """Populate the 'Pick from' secondary-source dropdown with '(primary)'
+        plus every Mobile cpk option (same list as the primary picker)."""
+        opts = getattr(self, "_mobile_pick_options", []) or []
+        vals = ["(primary)"] + [o.get("label", "?") for o in opts]
+        combo = getattr(self, "_pickfrom_combo", None)
+        if combo is not None:
+            try:
+                combo.config(values=vals)
+            except Exception:
+                pass
+
+    def _on_pickfrom_change(self):
+        """Secondary-source dropdown changed. '(primary)' clears the secondary
+        (Mobile pane shows the base again); any cpk renders that sheet into the
+        Mobile pane so its cells can be picked -- remaps made while a secondary
+        is active record where they came from (multi-source cell_map)."""
+        sel = self._pickfrom_var.get() if hasattr(self, "_pickfrom_var") else ""
+        if not sel or sel == "(primary)":
+            self._pickfrom_source = None
+            self._pickfrom_img = None
+            try:
+                self._draw_mobile_tileset()
+            except Exception:
+                pass
+            return
+        for opt in getattr(self, "_mobile_pick_options", []) or []:
+            if opt.get("label") != sel:
+                continue
+            sp_slot = opt.get("sp_slot")
+            cpk = opt.get("cpk_entry")
+            try:
+                img = self._load_mobile_tileset_img(sp_slot, cpk, 0)
+            except Exception:
+                img = None
+            if img is not None:
+                self._pickfrom_img = img.convert("RGBA")
+                self._pickfrom_source = (sp_slot, int(cpk), 0)
+                try:
+                    self._status.config(
+                        text=(f"Pick-from: {sel} -- click its cells then an "
+                              f"Android cell to source that tile from cpk{cpk}"))
+                except Exception:
+                    pass
+                try:
+                    self._draw_mobile_tileset()
+                except Exception:
+                    pass
+            return
 
     def _open_overrides_manager(self):
         """View / delete every stored override (routing + custom palettes +
@@ -3094,10 +3186,150 @@ class SpriteConverterTab(TabBase):
         ttk.Button(bar, text="Delete selected",
                    command=do_delete).pack(side="left", padx=4)
         ttk.Button(bar, text="Save", command=do_save).pack(side="left", padx=4)
+        def do_load():
+            sel = tree.selection()
+            if not sel:
+                return
+            key = rowkeys.get(sel[0])
+            if not key:
+                return
+            kind, chap, cpk, sub = key
+            var = sub if kind == "build" else 0
+            try:
+                self._load_build_into_editor(chap, cpk, var)
+                win.destroy()
+            except Exception as e:
+                messagebox.showerror("Load failed", str(e))
+
+        ttk.Button(bar, text="Load into editor",
+                   command=do_load).pack(side="left", padx=4)
         ttk.Button(bar, text="Reload from disk",
                    command=do_reload).pack(side="left", padx=4)
         ttk.Button(bar, text="Close",
                    command=win.destroy).pack(side="left", padx=4)
+        tree.bind("<Double-1>", lambda _e: do_load())
+
+    def _load_build_into_editor(self, chapter, cpk_entry, variant):
+        """Populate the SpriteConverter from a saved tileset build so it can be
+        edited + re-saved: select the Mobile cpk + Android mc/variant, apply the
+        build's palette / cell_map / force-Android cells / fill flag, and redraw
+        all three panes. Best-effort -- each step is guarded so a not-loaded
+        source degrades gracefully rather than raising."""
+        from ..maps.mc_overrides import (get_tileset_build,
+                                         lookup_cpk_to_mc_override)
+        from ..sprites.mobile_tile_to_android import lookup_mc_for_cpk
+        cpk_entry = int(cpk_entry)
+        try:
+            variant = int(variant)
+        except Exception:
+            variant = 0
+        chap_dense = str(chapter).replace(" ", "")
+
+        # Ensure Tilesets mode + fresh pickers.
+        try:
+            if self._source_type.get() != "Tilesets":
+                self._source_type.set("Tilesets")
+                self._on_source_type_change()
+            self._refresh_source_pickers()
+        except Exception:
+            pass
+
+        # 1) resolve mc_id: routing override -> cpk_to_mc.json -> build note.
+        mc_id = None
+        try:
+            m, _v, _by = lookup_cpk_to_mc_override(
+                self._get_overrides() or {}, chapter, cpk_entry)
+            if m is not None:
+                mc_id = int(m)
+        except Exception:
+            pass
+        if mc_id is None:
+            try:
+                mc_id, _v, _s = lookup_mc_for_cpk(
+                    self.data.cpk_to_mc() or {}, chapter, cpk_entry)
+            except Exception:
+                mc_id = None
+        build = get_tileset_build(self.data.custom_palettes(), chapter,
+                                  cpk_entry, variant) or {}
+        if mc_id is None:
+            import re as _re
+            mm = _re.search(r"mc(\d+)_", build.get("note", "") or "")
+            if mm:
+                mc_id = int(mm.group(1))
+
+        # 2) select Android mc/variant, then Mobile cpk (auto-match off).
+        self._suppress_auto_match = True
+        try:
+            if mc_id is not None:
+                for opt in getattr(self, "_android_pick_options", []):
+                    if opt.get("mc_id") == mc_id:
+                        self._android_pick_var.set(opt["label"])
+                        self._on_android_pick_selected_tileset()
+                        break
+            for opt in getattr(self, "_mobile_pick_options", []):
+                if (opt.get("cpk_entry") == cpk_entry and
+                        str(opt.get("sp_slot", "")).replace(" ", "") == chap_dense):
+                    self._mobile_pick_var.set(opt["label"])
+                    self._on_mobile_pick_selected_tileset()
+                    break
+        finally:
+            self._suppress_auto_match = False
+
+        # 3) variant.
+        try:
+            self._suppress_variant_cb = True
+            self._tileset_variant_var.set(str(variant))
+            self._tileset_variant_idx = variant
+            self._reload_android_mc_image()
+        except Exception:
+            pass
+        finally:
+            self._suppress_variant_cb = False
+
+        # 4) apply the build into the live spec.
+        spec = self._spec or {}
+        self._spec = spec
+        at = spec.setdefault("android_target", {})
+        at["mc_id"] = mc_id
+        at["variant"] = variant
+        at["force_android_cells"] = list(build.get("force_android_cells") or [])
+        at["fill_from_android"] = bool(build.get("fill_from_android"))
+        spec["cell_map"] = dict(build.get("cell_map") or {})
+        ms = spec.setdefault("mobile_source", {})
+        ms["chapter"] = chapter
+        ms["cpk_entry"] = cpk_entry
+        try:
+            self._t_fill_from_android.set(bool(build.get("fill_from_android")))
+        except Exception:
+            pass
+
+        # 5) apply the build's palette by rendering the Mobile image through it.
+        pal = build.get("palette")
+        if pal:
+            try:
+                from ..tilesets.parser import MobileTilesetResolver
+                sp_files = ((self.data.sp_slots or {}).get(chapter)
+                            or (self.data.sp_slots or {}).get(chap_dense))
+                if sp_files:
+                    img = MobileTilesetResolver(sp_files).get_with_palette(
+                        cpk_entry, [tuple(int(x) for x in c[:3]) for c in pal])
+                    if img is not None:
+                        self._mobile_img = img.convert("RGBA")
+            except Exception:
+                pass
+
+        # 6) redraw.
+        try:
+            self._refresh_all()
+        except Exception:
+            pass
+        try:
+            self._status.config(
+                text=(f"Loaded build for editing: {chapter} cpk{cpk_entry} "
+                      f"-> mc{mc_id}_{variant} "
+                      f"({len(spec.get('cell_map') or {})} remaps)"))
+        except Exception:
+            pass
 
     def _auto_match_android_tileset(self, chapter, cpk_entry):
         """Override v3: looks up overrides first, then cpk_to_mc.json.

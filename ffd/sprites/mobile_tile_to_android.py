@@ -348,21 +348,27 @@ def _apply_cell_map(
     dst_cell_w: int,
     dst_cell_h: int,
     scale: int,
+    source_provider=None,
 ) -> Image.Image:
     """Apply per-tile rearrangement on top of an already-upscaled base.
 
-    ``cell_map`` keys are ``"col,row"`` (destination cell coords in the
-    Android sheet). Values are ``{"mobile_col", "mobile_row",
-    "flip_h"}`` describing which Mobile cell to draw at that
-    destination. Cells not in the map are left as the base produced
-    (which is just the identity 2x upscale).
+    ``cell_map`` keys are ``"col,row"`` (destination cell coords in the Android
+    sheet).  Values are ``{"mobile_col", "mobile_row", "flip_h"}`` describing
+    which Mobile cell to draw there.
+
+    **Multi-source:** a value may additionally carry ``"src_cpk"`` (and optional
+    ``"src_chapter"`` / ``"src_palette"``).  When present, that cell is taken
+    from a DIFFERENT Mobile tileset -- resolved via
+    ``source_provider(chapter, cpk, palette) -> native RGBA Image`` -- instead
+    of the primary ``mobile_native``.  This lets one output mix tiles from
+    several Mobile cpk sheets.  Cells with an unresolvable source fall back to
+    the primary sheet; cells not in the map keep the identity 2x upscale.
     """
     if not cell_map:
         return base
     out = base.copy()
-    mw, mh = mobile_native.size
-    src_cols = mw // src_cell_w
-    src_rows = mh // src_cell_h
+    prim_cols = mobile_native.size[0] // src_cell_w
+    prim_rows = mobile_native.size[1] // src_cell_h
     for key, val in cell_map.items():
         try:
             dc_s, dr_s = key.split(",", 1)
@@ -371,26 +377,75 @@ def _apply_cell_map(
             mr = int(val.get("mobile_row", -1))
         except (ValueError, AttributeError, TypeError):
             continue
-        if not (0 <= mc < src_cols and 0 <= mr < src_rows):
+        src_img, scols, srows = mobile_native, prim_cols, prim_rows
+        scpk = val.get("src_cpk")
+        if scpk is not None and source_provider is not None:
+            try:
+                alt = source_provider(val.get("src_chapter"), scpk,
+                                      val.get("src_palette", 0))
+            except Exception:
+                alt = None
+            if alt is not None:
+                src_img = alt
+                scols = alt.size[0] // src_cell_w
+                srows = alt.size[1] // src_cell_h
+        if not (0 <= mc < scols and 0 <= mr < srows):
             continue
-        sx = mc * src_cell_w
-        sy = mr * src_cell_h
-        cell = mobile_native.crop((sx, sy, sx + src_cell_w,
-                                       sy + src_cell_h))
+        sx, sy = mc * src_cell_w, mr * src_cell_h
+        cell = src_img.crop((sx, sy, sx + src_cell_w, sy + src_cell_h))
         if val.get("flip_h"):
             cell = cell.transpose(Image.FLIP_LEFT_RIGHT)
         scaled = cell.resize((src_cell_w * scale, src_cell_h * scale),
                              Image.NEAREST)
-        dx = dc * dst_cell_w
-        dy = dr * dst_cell_h
-        out.paste(scaled, (dx, dy), scaled)
+        out.paste(scaled, (dc * dst_cell_w, dr * dst_cell_h), scaled)
     return out
+
+
+def make_source_provider(sp_slots):
+    """Build a ``provider(chapter, cpk, palette) -> native RGBA Image`` over a
+    project's ``sp_slots`` (chapter -> {filename: bytes}), for resolving
+    multi-source ``cell_map`` cells.  Resolvers + rendered images are cached;
+    returns ``None`` for an unknown chapter/cpk.  ``sp_slots`` may be empty."""
+    sp_slots = sp_slots or {}
+    _res, _cache = {}, {}
+
+    def _find_files(chapter):
+        if chapter in sp_slots:
+            return sp_slots[chapter]
+        dense = str(chapter).replace(" ", "")
+        for k, v in sp_slots.items():
+            if str(k).replace(" ", "") == dense:
+                return v
+        return None
+
+    def provider(chapter, cpk, palette=0):
+        try:
+            cpk = int(cpk); palette = int(palette or 0)
+        except (TypeError, ValueError):
+            return None
+        key = (str(chapter), cpk, palette)
+        if key in _cache:
+            return _cache[key]
+        files = _find_files(chapter)
+        img = None
+        if files is not None:
+            from ..tilesets.parser import MobileTilesetResolver
+            rid = id(files)
+            r = _res.get(rid)
+            if r is None:
+                r = MobileTilesetResolver(files); _res[rid] = r
+            m = r.get(cpk, palette)
+            img = m.convert("RGBA") if m is not None else None
+        _cache[key] = img
+        return img
+    return provider
 
 
 def convert_mobile_tileset_to_android(
     mobile_img: Image.Image,
     spec: Optional[dict] = None,
     android_orig_img: Optional[Image.Image] = None,
+    source_provider=None,
 ) -> Image.Image:
     """Convert a Mobile cpk tileset PNG into an Android mc PNG layout.
 
@@ -442,7 +497,8 @@ def convert_mobile_tileset_to_android(
     if cell_map:
         out = _apply_cell_map(out, src, cell_map,
                               src_cell_w, src_cell_h,
-                              dst_cell_w, dst_cell_h, scale)
+                              dst_cell_w, dst_cell_h, scale,
+                              source_provider=source_provider)
 
     # Step 3.5 (optional): force-Android cells. For each "col,row" in
     # ``android_target.force_android_cells``, paste the Android original
@@ -467,7 +523,8 @@ def convert_mobile_tileset_to_android(
 
 
 def render_tileset_variant(mobile_img, android_fill_img, android_variant_img,
-                           *, mc_id, variant, fill, strategy, obb, spec=None):
+                           *, mc_id, variant, fill, strategy, obb, spec=None,
+                           source_provider=None):
     """Single source of truth for converting one Mobile cpk tileset into one
     Android ``mc{id}_{variant}`` image.
 
@@ -510,7 +567,7 @@ def render_tileset_variant(mobile_img, android_fill_img, android_variant_img,
         return (android_variant_img.convert("RGBA")
                 if android_variant_img is not None else None)
     base_out = convert_mobile_tileset_to_android(
-        mobile_img, spec, android_fill_img)
+        mobile_img, spec, android_fill_img, source_provider=source_provider)
     if variant > 0 and strategy == "swap":
         base_pal_img = load_android_mc_png(obb, mc_id, 0, preserve_palette=True)
         target_pal_img = load_android_mc_png(
@@ -518,6 +575,14 @@ def render_tileset_variant(mobile_img, android_fill_img, android_variant_img,
         if base_pal_img is not None and target_pal_img is not None:
             return apply_variant_palette_swap(
                 base_out, base_pal_img, target_pal_img)
+    if strategy == "nearest":
+        # Applies to ANY variant (incl 0): snap the converted Mobile base to the
+        # nearest colour in this variant's Android palette -- recolours variant>0
+        # AND cleans the washed Mobile palette on variant 0.
+        av = (android_variant_img if android_variant_img is not None
+              else load_android_mc_png(obb, mc_id, variant))
+        if av is not None:
+            return apply_nearest_variant(base_out, av)
     return base_out
 
 
@@ -622,6 +687,36 @@ def apply_variant_palette_swap(
     out = Image.new("RGBA", src.size)
     out.putdata(out_pixels)
     return out
+
+
+def apply_nearest_variant(base_out, target_variant_img):
+    """Recolour a converted Mobile base to the TARGET variant's palette by
+    NEAREST-colour matching.
+
+    Unlike :func:`apply_variant_palette_swap` (exact-RGB -> index -> variant-RGB,
+    which mis-maps when the variant palettes are not index-aligned and so paints
+    e.g. grey marble orange), every opaque pixel here is mapped to the closest
+    colour actually present in ``target_variant_img``.  No misses, no index
+    collisions -- the result is colour-consistent with the real Android variant.
+    Uses only the variant's opaque colours (so the transparent sentinel never
+    leaks in), and matches per-unique-colour for speed.  Returns an RGBA Image.
+    """
+    import numpy as np
+    base = base_out.convert("RGBA")
+    a = np.array(base)
+    ta = np.array(target_variant_img.convert("RGBA"))
+    pal = np.unique(ta[ta[..., 3] > 16][:, :3], axis=0).astype(np.int32)
+    op = a[..., 3] > 16
+    if len(pal) == 0 or not op.any():
+        return base
+    px = a[op][:, :3].astype(np.int32)
+    uniq, inv = np.unique(px, axis=0, return_inverse=True)
+    # (U,1,3) - (1,P,3) -> (U,P) squared distance; U,P both small (<~300, <~256)
+    d = ((uniq[:, None, :] - pal[None, :, :]) ** 2).sum(axis=2)
+    nearest = pal[d.argmin(axis=1)]
+    out = a.copy()
+    out[op, :3] = nearest[inv].astype(a.dtype)
+    return Image.fromarray(out, "RGBA")
 
 
 # ---------------------------------------------------------------------------
@@ -773,7 +868,8 @@ def _spec_for_build(build, output_size=(512, 512)):
 
 
 def produce_build_tile(resolver, cpk_id, mc_id, variant, builds_data,
-                       obb=None, normalize=False, output_size=(512, 512)):
+                       obb=None, normalize=False, output_size=(512, 512),
+                       source_provider=None):
     """Produce an Android-layout tile sheet for (mc_id, variant) sourced
     from Mobile ``cpk_id`` via ``resolver``, honouring any stored build.
 
@@ -822,7 +918,8 @@ def produce_build_tile(resolver, cpk_id, mc_id, variant, builds_data,
                 android_orig = load_android_mc_png(obb, mc_id, 0)
         try:
             return convert_mobile_tileset_to_android(
-                base.convert("RGBA"), spec, android_orig)
+                base.convert("RGBA"), spec, android_orig,
+                source_provider=source_provider)
         except Exception:
             return base.convert("RGBA")
 
