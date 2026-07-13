@@ -1,6 +1,6 @@
 # Format: Event Scripts
 
-*Audit 2026-06-10. Parsers: `ffd/events/{opcodes,android,mobile}.py`. Execution semantics: `Engine/docs/systems/event_vm.md` + `scripting.md`. Sources: `FieldClass::MoveScript` (c:125488/139119), `MoveEventScript` (c:138937), `ScriptIf` (c:134322); Mobile `class_16.method_785` (l:11586).*
+*Audit 2026-06-10 (rev. 2026-07-11). Parsers: `ffd/events/{opcodes,android,mobile}.py`. Execution semantics: `Engine/docs/systems/event_vm.md` + `scripting.md`. Sources: `FieldClass::MoveScript` (c:125488/139119), `MoveEventScript` (c:138937), `ScriptIf` (c:134322); Mobile `class_16.method_785` (l:11586).*
 
 ## Shared command encoding — HIGH
 
@@ -11,10 +11,17 @@ Both platforms store each command as a **length-prefixed packet**: `u8 len; scri
 ```
 u32-BE EDO (event data offset); [4..EDO+3] palette/scene info
 u8 event_count; then events back-to-back:
-  0x3f-byte fixed header: id u16-BE @+0 · type @+0x07 · boot @+0x08
+  0x3f-byte fixed header: id u16-BE @+0 · x/y @+2/+3 · rect w/h @+4/+5
+                          type @+0x07 · boot @+0x08
                           appear block @+0x09..0x27 (31 B, CheckEventAppear)
-                          rect w/h (header bytes 4/5; CheckRangeEvent)
                           img u16-BE @+0x2b · variant @+0x2d
+                          NPC movement block (InitEventDataOfChara c:119752):
+                            move_type @+0x35 (1 stand · 2 wander-in-rect · 3 wander-free)
+                            facing @+0x36 (0..3 = D/U/L/R) · chara_flags @+0x37
+                            speed @+0x38 (0..7) · off_x/off_y @+0x39/0x3a
+                            freq @+0x3b (0..4)
+                          spawn tile = (x+off_x, y+off_y); the trigger rect
+                          DOUBLES as the type-2 wander bounds
   u16-BE script_count; script_count length-prefixed scripts
 ```
 Common events live in **map 10000** (named by `field_constant.dat` @0x8d; `FieldClass::LoadCommonEvent` c:96813), byte-identical in all 15 groups, 26 routines: 0x104 move-map, 0x103 spawn, 0x101 chapter change→prologue battle, 0x107 system-flag reset, 0x114–0x116 party management, 0x117 full heal…
@@ -43,9 +50,29 @@ Lives in the map-chunk tail after tile + attribute data; the true offset is **re
 - **Warp position is the story sequencer**: intro dispatchers stack on adjacent tiles (m300: (1,1)/(1,2)/(1,3) = beats 1/2/3; m1: (1,1)/(0,1)/(3,1)) and every script warp lands **exactly** on the next beat's boot-7 tile. Negative result: a "walk-in step after warps" was implemented and REVERTED — it overshoots beats. m200's (1,0) spawn one tile above its (1,1) trigger is real: the player walks one step to continue.
 - All implemented in FFSmith 2026-06-11 (actor system, resume-stack, camera ease, screen fade; `--cuttest`); intro verified headless through the prologue battle with full cutscene direction.
 
+## NPC auto-wander (decoded 2026-07-11, HIGH)
+
+`FieldClass::MoveCharaAuto` (c:115518): when a move_type-2/3 chara's current
+command expires, `GetPassFlags` (c:117339) builds a 4-direction mask — low bit
+per direction whose target stays **inside the event rect** (type 2 only; with
+per-layer wrap applied), plus a hit bit `0x10<<dir` when `CheckMovePass`
+(c:114790) blocks it (OOB / collision / another chara). The NPC picks uniformly
+among low-bit candidates (`Rand(popcount)`); a hit-bit pick issues the **face**
+command `0x10|dir` (the NPC just turns), otherwise the walk command. No
+candidates → wait. After a walk, if freq < max, a wait command follows —
+duration `field_constant[0x42+freq]` ({180,90,45,21,0} ticks); walk duration =
+`field_constant[0x37+speed]` ({44,30,14,6,4,22,8,6}; `CalcCharaAnimeSpeed`
+c:118074). While the NPC's own event runs (`CheckEventActive` c:138435) it
+finishes its step, then stands (cmd 0x90); other NPCs keep wandering. Retail
+census: **370 wander NPCs, all move_type 2**. Toolkit: parsed fields + FFM6
+bake block (0.9.0); FFSmith: `Field::tickWander` (0.3.0). Bonus locate: the
+per-LAYER **wrap flags** live at bytes +3/+4 of the 0x28-byte layer records
+(FieldClass+0xdc40), applied modulo map w/h in CheckMovePass/GetPassFlags —
+the N6 world-map-wrap prerequisite.
+
 ## Hypotheses / open
 
 - Choice option *value* = message id of the choice line (works in practice; the real text source unconfirmed).
 - Within cutscene ops: pose rendering (0x40-0x44), jump arcs (0x30/0x32 approximated as walks), anim-frequency semantics, chara flags 0x100/0x200/0x8/0x10, command 0x91, exact 0x32 tick rate, `GetReferenceParty/Event` sub-queries (0x101 uses target-5 type-1 and target-6 — stubbed).
 - ~~`0x50 ScriptEncount` operand layout~~ **DECODED 2026-06-10** (`FieldClass::ScriptEncount` c:120371): seven (indirect-flag u8, BE u16) pairs at offsets (1,2),(4,5),(7,8),(10,0xb),(0xd,0xe),(0x10,0x11),(0x13,0x14) = formation id, battle-bg id, bg variant, battle-condition 1–3 (flag table DAT_00418f94 — values unread), battle BGM, BGM-compare (p4==p5 → "keep BGM" flag), behavior flags (bit0 clear → cond-flag 0x10, bit1 → result-flag 2). Implemented in FFSmith (VM pause → formation battle → script resume; result via GetReference target 8). Still open within 0x50: the exact meaning of the condition-flag table values and `bsc.dat` battle scripts.
-- Page register (`+0xe474`) full semantics; `0x32` wait timing; NPC-move op family parameters (catalogued, not semantically decoded); fade/palette ops.
+- Page register (`+0xe474`) full semantics; `0x32` wait timing; fade/palette ops. ~~NPC-move op family parameters~~ **DECODED 2026-07-11** (see "NPC auto-wander" above; scripted moves were already decoded 2026-06-11).

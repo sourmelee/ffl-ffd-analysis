@@ -1,6 +1,6 @@
 # Asset Pipeline — Authoritative Baked-Bundle Specification
 
-*Audit 2026-06-10 (rev. same day, toolkit 0.7.26 / map format **FFM5**). This supersedes the "Bundle layout (v0 draft)" in `Engine/docs/ASSET_PIPELINE.md` (kept there for its principles/symbiosis rules). Writer: `ffd/android_export/ffsmith_bake.py`. Reader: `Engine/src/data/bundle.cpp`. Any change must touch both and bump the relevant magic.*
+*Audit 2026-06-10 (rev. 2026-07-11, toolkit 0.9.0 / map format **FFM6**). This supersedes the "Bundle layout (v0 draft)" in `Engine/docs/ASSET_PIPELINE.md` (kept there for its principles/symbiosis rules). Writer: `ffd/android_export/ffsmith_bake.py`. Reader: `Engine/src/data/bundle.cpp`. Any change must touch both and bump the relevant magic.*
 
 All baked integers are **little-endian** unless noted. `pstr16` = u16 length + bytes (UTF-8).
 
@@ -9,8 +9,8 @@ All baked integers are **little-endian** unless noted. `pstr16` = u16 length + b
 ```
 out_dir/
   manifest.json                 version, source, maps/tilesheets/sprites TOC, counts
-  maps/g{G}_p{P}_m{M}.ffmap     FFM5 baked maps
-  data/common_events.ffmap      map 10000 (CallEvent pool, 26 routines) as a 1×1 FFM5 shell
+  maps/g{G}_p{P}_m{M}.ffmap     FFM6 baked maps
+  data/common_events.ffmap      map 10000 (CallEvent pool, 26 routines) as a 1×1 FFM6 shell
   tex/mc{N}_{V}.tex             FTEX tilesheets (only those referenced by baked maps)
   sprites/fldchr{IMG}_{VAR}.tex FTEX character/object sheets (only those referenced by events)
   text/msg{N}.bin               FMSG dialogue banks (one per map group seen)
@@ -25,9 +25,9 @@ out_dir/
 
 **FTEX**: `"FTEX" u32 w, u32 h, w*h*4 RGBA`.
 
-**FFM5** (`load_ffmap` accepts FFM0–FFM5; features gate on the version digit):
+**FFM6** (`load_ffmap` accepts FFM0–FFM6; features gate on the version digit):
 ```
-"FFM5"; w u16; h u16; n_layers u16
+"FFM6"; w u16; h u16; n_layers u16
 mc_slot0 i16; var_slot0 u16; mc_slot1 i16; var_slot1 u16
 reserved u32: byte0 = overhead threshold (FieldClass+0xdc2c)
               byte1 = field_bgm (255=none)   byte2 = battle_bgm   byte3 unused
@@ -43,13 +43,20 @@ event_len u32 + raw event-region bytes        (legacy; superseded by events bloc
     [FFM4] rect w u8, h u8 (0→1)
     type u8, boot u8, img i16, var u8
     [FFM3+] appear[31]                          (CheckEventAppear block, header bytes 9..0x27)
+    [FFM6] move_type u8, facing u8, chara_flags u8, speed u8, off_x u8, off_y u8, freq u8
+                                                (NPC movement block, header bytes +0x35..+0x3b;
+                                                 InitEventDataOfChara c:119752 — spawn tile =
+                                                 rect origin + off; move_type 2 wanders confined
+                                                 to the event rect, GetPassFlags c:117339)
     n_scripts u16; per script: len u16 + bytecode (BE operands — see formats/events.md)
 ```
-Known omission: per-map **wrap flags** were in the FFM0 draft spec but never baked; world-map edge wrap is unimplemented engine-side partly for this reason. (The FFM5 tail also reads-and-skips 3 bool bytes — FieldClass+0xdc30..32 — whose meaning is still open.)
+Known omission: per-map **wrap flags** were in the FFM0 draft spec but never baked; world-map edge wrap is unimplemented engine-side partly for this reason. Their source is now LOCATED (2026-07-11): per-LAYER bytes +3/+4 of the 0x28-byte layer records at FieldClass+0xdc40, applied as modulo-w/h in `CheckMovePass` c:114790 / `GetPassFlags` c:117339 — baking them is the N6 prerequisite. (The FFM5 tail also reads-and-skips 3 bool bytes — FieldClass+0xdc30..32 — whose meaning is still open.)
 
 **FITM** items: `"FITM" u32 n`; per: id u32, name pstr16, desc pstr16, atk u16, def u16, item_type u8 (0 consumable/key, 1–15 weapon classes, 16 shield, 17–19 head, 20–22 body, 23 hands/acc). atk/def are the **decoded body[32] primary stat** (weapon ATK or armor DEF by item_type), 0.7.27 — replaced the old "ATK n"/"DEF n" description regex (`LoadItemData` @149955; 206/209 + 164/167 desc agreement).
 **FCHR** chars: `"FCHR" u32 n`; per: id u32, name pstr16, equip 6×u16, job u8, level u8, str/spd/vit/int/mnd 5×u16, hp u16, mp u16, chpk u16 (field-sprite id).
 **FMN2** monsters (0.7.26; loader also accepts old FMON): `"FMN2" u32 n`; per: id u32, name pstr16, hp u16 (BE u32 @ body[2]), atk u16 (= weapon-attack, body[15]), def u16 (body[18]), level u8 (body[0]), exp u32, gil u32 (body[6]/[10] BE), mdef u8, eva u8, meva u8, amin u8, amax u8 (body[19/20/21/24/25]). Decoded via `LoadMonsterData` c:151254 + `SetBtlEnemyParam` c:88427; enemy attack STAT = level, MP = HP/8.
+**field_constant.bin** (0.9.0): `field_constant.dat` baked **verbatim** (306 B). NPC movement timing: walk-duration table @0x37 (8 × u8 ticks/step, speed clamped to [cfg[0x32], cfg[0x34]-1] per `CalcCharaAnimeSpeed` c:118074); wander-wait table @0x42 (u8 ticks, freq clamped to [cfg[0x3f], cfg[0x40]-1] per the `SetCharaAction` c:117759 wait-command branch). Retail values: walk {44,30,14,6,4,22,8,6}, wait {180,90,45,21,0}. The engine compiles in these decoded defaults, so pre-FFM6 bundles still run.
+
 **FENC** encounters (0.7.26; from `form.bin` via `parse_form_bin_android`): `"FENC" u8 n_banks`; per bank: bank u8, n_recs u16; per record: formation_id u16, no_escape u8, battle_script i16 (bsc.dat id — unimplemented engine-side), n_enemies u8 × { enemy_id u16, x i16, y i16, flags u8 }, n_entries u8 × { slot u8, value u8, param i16 }.
 **FSPL** spells (0.7.27 — gained an `element` byte): `"FSPL" u32 n`; per: id u16, type u8 (0 dmg / 1 heal), mp u16, power u16, **element u8**, name pstr16. Decoded from the magic body (`decode_magic_body`): mp = body[7], power = body[19], type from effect_cat body[16], element = body[31]. 251 real damage/heal spells (was an 11-entry hardcoded `CAST` list); status spells (effect_cat 5–8) are skipped pending an engine status system.
 **FJOB** jobs (0.7.27, new): `"FJOB" u32 n`; per: job_id u16, hp_pct u8, mp_pct u8, str/spd/vit/int/mnd 5×u8. Per-job growth multipliers (percent of the FLVL base) from `decode_job_body` (body[9]/[10]/[11..15]); the engine scales `memberMaxHp`/`memberMaxMp` and level-up deltas by these (`SetJobStatus` @152572).
@@ -70,7 +77,7 @@ Known omission: per-map **wrap flags** were in the FFM0 draft spec but never bak
 
 ## Bake pipeline order (`bake()`)
 
-capk → chipanim/chipfloor → per-map (parse chunk + engine header + pass grid + events + areas → FFM5; collect needed tilesheets/sprites) → tilesheets (variant-fallback, tolerates truncated mc34/mc60 sources) → sprites → messages (groups seen) → font → ui → menu data tables → intro → start → encounters (FENC) → common events → sprite geo → audio → manifest. `--proper DIR` (fast, extracted folder) or `--obb FILE`; `--limit N`, `--only KEY`.
+capk → chipanim/chipfloor → per-map (parse chunk + engine header + pass grid + events + areas → FFM6; collect needed tilesheets/sprites) → tilesheets (variant-fallback, tolerates truncated mc34/mc60 sources) → sprites → messages (groups seen) → font → ui → menu data tables → intro → start → encounters (FENC) → common events → sprite geo → audio → field_constant → manifest. `--proper DIR` (fast, extracted folder) or `--obb FILE`; `--limit N`, `--only KEY`.
 
 ## Invariants
 

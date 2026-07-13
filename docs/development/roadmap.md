@@ -5,8 +5,9 @@
 ## Engine-driven (near-term)
 
 1. **ScriptEncount decode → bake** formation linkage (pairs with engine N1). Likely new: Android formation table parser + `data/encounters.bin`.
+1b. ~~NPC movement block~~ **DONE 2026-07-11** (0.9.0: event header +0x35..+0x3b parsed, FFM6 bake, field_constant.bin; pairs with engine N4).
 2. **Body decodes for battle fidelity** (engine N2): magic body 54 B, monster body field map (replace stat_b/stat_c guesses), job tail (per-job HP%/MP%), item use-effects. Each lands as parser fields + comparison-tab columns + re-bake.
-3. **Wrap flags** — locate in the map header, bake into FFM (engine N6 prerequisite).
+3. **Wrap flags** — ~~locate in the map header~~ LOCATED 2026-07-11 (per-LAYER bytes +3/+4 of the 0x28-byte records @FieldClass+0xdc40, modulo-w/h in CheckMovePass c:114790); remaining: find them in the map-chunk layer records toolkit-side and bake into FFM (engine N6 prerequisite).
 4. **Encounter tables** + floor-attr values 1/8/12/15 (engine N3).
 
 ## Toolkit-own

@@ -2,9 +2,9 @@
 
 *Audit 2026-06-10. Problem → evidence → resolution. Engine-side report: `Engine/docs/development/contradiction_report.md`.*
 
-## 1. `ffsmith_bake.py` module docstring documents FFM1; the code writes FFM4
+## ~~1. `ffsmith_bake.py` module docstring documents FFM1; the code writes FFM4~~ RESOLVED 2026-07-11
 **Evidence:** docstring lines 8–12 ("FFM1, format below") vs `FFMAP_MAGIC = b"FFM4"` (line 43) and the FFM4 spawn/rect/appear writers.
-**Resolution:** Replace the docstring's format block with a pointer to `docs/architecture/asset_pipeline.md` (now authoritative).
+**Resolution:** Done with the FFM6 bump (toolkit 0.9.0): the docstring documents FFM6 and points to `docs/architecture/asset_pipeline.md` as the authoritative spec.
 
 ## 2. README says "18 tabs"; `FFDApp.TAB_ORDER` has 20
 **Evidence:** README "The notebook displays 18 tabs"; `gui_core/app.py:48` lists 20 (the README's tab list omits **Android Export** and **Comparison**, both of which have full implementations and their own CLI).

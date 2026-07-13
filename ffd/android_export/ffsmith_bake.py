@@ -5,11 +5,12 @@ toolkit is the single source of truth. See ``Engine/docs/ASSET_PIPELINE.md``.
 
 Output (under ``out_dir``):
     manifest.json
-    maps/g{G}_p{P}_m{M}.ffmap     # flat little-endian baked map (FFM1, format below)
+    maps/g{G}_p{P}_m{M}.ffmap     # flat little-endian baked map (FFM6, format below)
     tex/mc{N}_{V}.tex             # raw RGBA tilesheet ("FTEX")
 
-``.ffmap`` (FFM1, little-endian):
-    magic     "FFM1"      4 bytes
+``.ffmap`` (FFM6, little-endian; the authoritative spec lives in
+``Python/docs/architecture/asset_pipeline.md``):
+    magic     "FFM6"      4 bytes
     width     u16
     height    u16
     n_layers  u16
@@ -18,10 +19,15 @@ Output (under ``out_dir``):
     mc_slot1  i16         secondary tileset id (-1 = none)
     var_slot1 u16
     reserved  u32
+    overhead_threshold / spawn / bgm header fields (FFM4)
+    encounter areas (FFM5)
     per layer: width*height * u16   tile words (low = tile_num, high = slot 0/1)
     event_len u32 + event bytes
     has_pass  u8          1 if a passability grid follows
     pass      width*height u8       per-cell 4-dir pass nibble (0 = solid; from capk.dat)
+    events    u16 count; per event: id/x/y/w/h/type/boot/img/var, 31 appear
+              bytes (FFM3), 7-byte NPC movement block (FFM6: move_type, facing,
+              chara_flags, speed, off_x, off_y, freq), scripts
 
 Maps: parse_android_map_chunk + parse_android_map_engine. Collision: capk.dat
 (see ffd/maps/capk.py). Tilesheets: decoded from the OBB's mc*.png via PIL.
@@ -41,7 +47,7 @@ from ..maps.mobile import parse_mpkh_index
 from ..maps.capk import parse_capk, pass_nibble, parse_capk_anim, parse_capk_floor
 from ..events.android import parse_android_event_pack
 
-FFMAP_MAGIC = b"FFM5"
+FFMAP_MAGIC = b"FFM6"
 FTEX_MAGIC = b"FTEX"
 BUNDLE_VERSION = 3
 
@@ -153,6 +159,14 @@ def _build_events(raw):
             # header[9..0x27] — flag(5) flag(5) variable(9) item(3) member(3)
             # timer(6); slot present when its first byte != 0.
             "appear": bytes(h[9:9 + 31]) if len(h) >= 40 else b"\x00" * 31,
+            # FFM6 NPC movement block (InitEventDataOfChara c:119752): spawn
+            # tile = rect origin + (off_x, off_y); move_type 2 wanders confined
+            # to the event rect, 3 unbounded; speed/freq index field_constant
+            # timing tables.
+            "move_type": ev.get("move_type", 0), "facing": ev.get("facing", 0),
+            "chara_flags": ev.get("chara_flags", 0), "speed": ev.get("speed", 2),
+            "off_x": ev.get("off_x", 0), "off_y": ev.get("off_y", 0),
+            "freq": ev.get("freq", 2),
             "scripts": ev["scripts"],
         })
     return out
@@ -216,7 +230,8 @@ def _write_ffmap(path, parsed, engine, pass_grid, events):
             f.write(pass_grid)
         else:
             f.write(struct.pack("<B", 0))
-        # FFM4 events block (+event id, rect w,h, 31 appear bytes per event)
+        # FFM4 events block (+event id, rect w,h, 31 appear bytes per event);
+        # FFM6 appends the 7-byte NPC movement block per event.
         f.write(struct.pack("<H", len(events)))
         for ev in events:
             img = ev["img"] if -32768 <= ev["img"] <= 32767 else -1
@@ -227,6 +242,15 @@ def _write_ffmap(path, parsed, engine, pass_grid, events):
                                 ev["var"] & 0xFF))
             ap = ev.get("appear", b"\x00" * 31)
             f.write(ap[:31].ljust(31, b"\x00"))
+            # FFM6: NPC movement block (7 bytes; header +0x35..+0x3b)
+            f.write(struct.pack("<BBBBBBB",
+                                ev.get("move_type", 0) & 0xFF,
+                                ev.get("facing", 0) & 0xFF,
+                                ev.get("chara_flags", 0) & 0xFF,
+                                ev.get("speed", 2) & 0xFF,
+                                ev.get("off_x", 0) & 0xFF,
+                                ev.get("off_y", 0) & 0xFF,
+                                ev.get("freq", 2) & 0xFF))
             f.write(struct.pack("<H", len(ev["scripts"])))
             for sc in ev["scripts"]:
                 f.write(struct.pack("<H", len(sc)))
@@ -932,6 +956,12 @@ def bake(obb_path=None, out_dir=".", *, proper_dir=None, limit=None, only=None,
     manifest["common_events"] = _bake_common_events(files, out)
     _bake_sprite_geo(files, out)
     manifest["audio"] = _bake_audio(files, out)
+    # field_constant.dat verbatim -> data/field_constant.bin (NPC movement
+    # timing: walk-duration table @0x37 by speed, wander-wait table @0x42 by
+    # frequency; CalcCharaAnimeSpeed c:118074 / SetCharaAction c:117759).
+    if "field_constant.dat" in files:
+        with open(out / "data" / "field_constant.bin", "wb") as f:
+            f.write(bytes(files["field_constant.dat"]))
     manifest["text"] = {"messages": n_msgs, "font": has_font,
                         "banks": sorted(groups_seen)}
     manifest["ui"] = ui_imgs

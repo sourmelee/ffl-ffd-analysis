@@ -17,7 +17,26 @@ commit as the changelog entry.
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-07-11
+
 ### Added
+- **Event NPC-movement fields decoded and parsed** — `parse_android_event_pack`
+  now exposes the header's NPC movement block (`FieldClass::InitEventDataOfChara`
+  c:119752): `move_type` @+0x35 (1 stand, 2 wander-in-rect, 3 wander-free),
+  `facing` @+0x36, `chara_flags` @+0x37, `speed` @+0x38 (0..7), `off_x`/`off_y`
+  @+0x39/0x3a (spawn offset from the rect origin — the event rect doubles as the
+  type-2 wander bounds, `GetPassFlags` c:117339), `freq` @+0x3b (0..4). Retail
+  census: 370 wander NPCs, all type 2.
+- **FFM6 bake** — `.ffmap` events gain the 7-byte NPC movement block after the
+  appear bytes; `FFMAP_MAGIC` bumped `FFM5` → `FFM6` (rebuild FFSmith before
+  re-baking). `data/field_constant.bin` is now baked verbatim from
+  `field_constant.dat` (NPC walk-duration table @0x37 by speed, wander-wait
+  table @0x42 by frequency; `CalcCharaAnimeSpeed` c:118074).
+
+### Fixed
+- `ffsmith_bake.py` module docstring described the long-gone `FFM1` layout
+  (contradiction report #1); it now documents FFM6 and points to
+  `docs/architecture/asset_pipeline.md` as the authoritative spec.
 - **Multi-source tilesets** — one output mc sheet can now pull tiles from more
   than one Mobile cpk. The SpriteConverter gets a "Pick from" secondary-source
   dropdown: switch the Mobile pane to any other cpk, click its cell → click the

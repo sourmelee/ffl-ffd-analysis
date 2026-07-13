@@ -51,6 +51,14 @@ def parse_android_event_pack(buf: bytes) -> dict:
               "boot":       int,       # header u8 @ +8
               "chara_img":  int,       # header u16-BE @ +0x2b
               "chara_var":  int,       # header u8 @ +0x2d
+              "move_type":  int,       # header u8 @ +0x35 (InitEventDataOfChara:
+                                       #   1 stand, 2 wander-in-rect, 3 wander-free)
+              "facing":     int,       # header u8 @ +0x36 (0..3 = D/U/L/R)
+              "chara_flags":int,       # header u8 @ +0x37 (EventOptionToCharaFlags)
+              "speed":      int,       # header u8 @ +0x38 (walk-speed index 0..7)
+              "off_x":      int,       # header u8 @ +0x39 (spawn offset from rect x)
+              "off_y":      int,       # header u8 @ +0x3a (spawn offset from rect y)
+              "freq":       int,       # header u8 @ +0x3b (wander frequency 0..4)
               "scripts":   [bytes,...] # length-prefix-stripped command bytes
             }, …
         ],
@@ -96,6 +104,16 @@ def parse_android_event_pack(buf: bytes) -> dict:
                 "boot":      header[8] & 0xFF,
                 "chara_img": (header[0x2b] << 8) | header[0x2c],
                 "chara_var": header[0x2d] & 0xFF,
+                # NPC movement block (FieldClass::InitEventDataOfChara c:119752):
+                # spawn tile = (rect_x + off_x, rect_y + off_y); move_type 2
+                # wanders CONFINED TO THE EVENT RECT (GetPassFlags c:117339).
+                "move_type":   header[0x35] & 0xFF,
+                "facing":      header[0x36] & 0xFF,
+                "chara_flags": header[0x37] & 0xFF,
+                "speed":       header[0x38] & 0xFF,
+                "off_x":       header[0x39] & 0xFF,
+                "off_y":       header[0x3a] & 0xFF,
+                "freq":        header[0x3b] & 0xFF,
                 "scripts":   scripts,
             })
             pos = sp
